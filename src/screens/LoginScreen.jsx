@@ -3,10 +3,11 @@ import { ActivityIndicator, Alert, StyleSheet, Text, TextInput, TouchableOpacity
 import { AuthContext } from '../context/AuthContext';
 
 export default function LoginScreen({ navigation }) {
-  const { signIn } = useContext(AuthContext);
+  const { signIn, socialSignIn } = useContext(AuthContext);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [socialLoading, setSocialLoading] = useState(false);
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -20,6 +21,17 @@ export default function LoginScreen({ navigation }) {
       Alert.alert('Daxil olma xətası', error.response?.data?.message || error.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setSocialLoading(true);
+    try {
+      await socialSignIn('google');
+    } catch (error) {
+      Alert.alert('Google daxil olma xətası', error.message);
+    } finally {
+      setSocialLoading(false);
     }
   };
 
@@ -48,6 +60,24 @@ export default function LoginScreen({ navigation }) {
         <TouchableOpacity style={styles.button} onPress={handleLogin} disabled={loading}>
           {loading ? <ActivityIndicator color="#ffffff" /> : <Text style={styles.buttonText}>Daxil ol</Text>}
         </TouchableOpacity>
+
+        <View style={styles.dividerContainer}>
+          <View style={styles.divider} />
+          <Text style={styles.dividerText}>və ya</Text>
+          <View style={styles.divider} />
+        </View>
+
+        <TouchableOpacity style={styles.googleButton} onPress={handleGoogleSignIn} disabled={socialLoading}>
+          {socialLoading ? (
+            <ActivityIndicator color="#ffffff" />
+          ) : (
+            <>
+              <Text style={styles.googleIcon}>🔵</Text>
+              <Text style={styles.googleButtonText}>Google ilə daxil ol</Text>
+            </>
+          )}
+        </TouchableOpacity>
+
         <TouchableOpacity onPress={() => navigation.navigate('Register')}>
           <Text style={styles.switchText}>Hesabın yoxdursa, qeydiyyatdan keç</Text>
         </TouchableOpacity>
@@ -101,6 +131,39 @@ const styles = StyleSheet.create({
   buttonText: {
     color: '#ffffff',
     fontWeight: '700',
+  },
+  dividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 16,
+  },
+  divider: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#1e293b',
+  },
+  dividerText: {
+    marginHorizontal: 12,
+    color: '#64748b',
+    fontSize: 13,
+  },
+  googleButton: {
+    backgroundColor: '#1e293b',
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    marginBottom: 12,
+  },
+  googleIcon: {
+    fontSize: 18,
+    marginRight: 8,
+  },
+  googleButtonText: {
+    color: '#e2e8f0',
+    fontWeight: '600',
+    fontSize: 14,
   },
   switchText: {
     color: '#94a3b8',
