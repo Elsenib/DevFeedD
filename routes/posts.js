@@ -12,10 +12,10 @@ router.get('/', async (req, res) => {
     const result = await pool.query(
       `SELECT 
         p.id, p.user_id, p.title, p.caption, p.body, p.post_type, p.metadata, p.tags, p.views, p.likes, p.created_at,
-        u.name, u.role, u.role_sub, u.avatar_url,
+        u.name, u.role, u.avatar_url,
         (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id) as like_count,
         (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comment_count,
-        (SELECT COUNT(*) FROM post_bookmarks WHERE post_id = p.id) as bookmark_count
+        COALESCE((SELECT COUNT(*) FROM post_bookmarks WHERE post_id = p.id), 0) as bookmark_count
        FROM posts p
        JOIN users u ON p.user_id = u.id
        ORDER BY p.created_at DESC
@@ -36,10 +36,10 @@ router.get('/:id', async (req, res) => {
     const result = await pool.query(
       `SELECT 
         p.id, p.user_id, p.title, p.caption, p.body, p.post_type, p.metadata, p.tags, p.views, p.likes, p.created_at,
-        u.name, u.role, u.role_sub, u.avatar_url,
+        u.name, u.role, u.avatar_url,
         (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id) as like_count,
         (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comment_count,
-        (SELECT COUNT(*) FROM post_bookmarks WHERE post_id = p.id) as bookmark_count
+        COALESCE((SELECT COUNT(*) FROM post_bookmarks WHERE post_id = p.id), 0) as bookmark_count
        FROM posts p
        JOIN users u ON p.user_id = u.id
        WHERE p.id = $1`,
