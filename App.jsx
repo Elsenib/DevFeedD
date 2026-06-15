@@ -3,6 +3,8 @@ import { ActivityIndicator, SafeAreaView, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
+import * as Linking from 'expo-linking';
+import * as WebBrowser from 'expo-web-browser';
 import { AuthContext } from './src/context/AuthContext';
 import { AppAlertProvider } from './src/context/AppAlertContext';
 import { PreferencesProvider } from './src/context/PreferencesContext';
@@ -15,6 +17,8 @@ import PostDetailScreen from './src/screens/PostDetailScreen';
 import ChatScreen from './src/screens/ChatScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
+
+WebBrowser.maybeCompleteAuthSession();
 
 const Stack = createNativeStackNavigator();
 const AUTH_STORAGE_KEY = 'devfeed.auth';
@@ -45,6 +49,12 @@ function persistAuth(nextToken, nextUser) {
   }
 
   storage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ token: nextToken, user: nextUser }));
+}
+
+function getOAuthParam(url, key) {
+  const parsed = Linking.parse(url);
+  const value = parsed.queryParams?.[key];
+  return Array.isArray(value) ? value[0] : value;
 }
 
 export default function App() {
@@ -115,14 +125,33 @@ export default function App() {
         return data;
       },
       socialSignIn: async (provider, profile) => {
-        if (!profile?.providerId || !profile?.email || !profile?.name) {
-          throw new Error(
-            `${provider} OAuth hele tamamlanmayib. Provider profile geldikde /auth/social-login endpoint-i hazirdir.`
-          );
+        let data;
+
+        if (profile?.providerId && profile?.email && profile?.name) {
+          data = await api.socialLogin({ provider, ...profile });
+        } else {
+          const redirectUri = Linking.createURL('oauth');
+          const started = await api.startOAuth(provider, redirectUri);
+          const result = await WebBrowser.openAuthSessionAsync(started.authUrl, redirectUri);
+
+          if (result.type !== 'success' || !result.url) {
+            throw new Error('OAuth penceresi tamamlanmadi.');
+          }
+
+          const oauthError = getOAuthParam(result.url, 'error');
+          if (oauthError) {
+            throw new Error(decodeURIComponent(String(oauthError)));
+          }
+
+          const sessionId = getOAuthParam(result.url, 'sessionId');
+          if (!sessionId) {
+            throw new Error('OAuth sessiyasi alinmadi.');
+          }
+
+          data = await api.completeOAuth(sessionId);
         }
 
-        const data = await api.socialLogin({ provider, ...profile });
-        const nextUser = normalizeUser(data.user || { email: profile.email, name: profile.name });
+        const nextUser = normalizeUser(data.user || (profile ? { email: profile.email, name: profile.name } : null));
         setToken(data.token);
         setUser(nextUser);
         persistAuth(data.token, nextUser);

@@ -2,6 +2,7 @@
   "expo": {
     "name": "DevFeed Mobile",
     "slug": "devfeed-mobile",
+    "scheme": "devfeed",
     "platforms": ["ios", "android", "web"],
     "version": "1.0.0",
     "orientation": "portrait",

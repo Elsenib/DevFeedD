@@ -99,6 +99,54 @@ function makeToken(user) {
   return jwt.sign({ id: user.id, email: user.email, name: user.name }, jwtSecret, { expiresIn: '30d' });
 }
 
+function randomToken(bytes = 32) {
+  return crypto.randomBytes(bytes).toString('base64url');
+}
+
+function getBackendBaseUrl(req) {
+  return (process.env.PUBLIC_BACKEND_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
+}
+
+function appendQuery(url, params) {
+  const nextUrl = new URL(url);
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) nextUrl.searchParams.set(key, String(value));
+  });
+  return nextUrl.toString();
+}
+
+function getOAuthConfig(provider, req) {
+  const normalizedProvider = String(provider || '').toLowerCase();
+  const backendBaseUrl = getBackendBaseUrl(req);
+  const redirectUri = `${backendBaseUrl}/auth/oauth/callback/${normalizedProvider}`;
+
+  if (normalizedProvider === 'google') {
+    return {
+      provider: 'google',
+      clientId: process.env.GOOGLE_CLIENT_ID_WEB,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      redirectUri,
+      authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+      tokenUrl: 'https://oauth2.googleapis.com/token',
+      scope: 'openid email profile',
+    };
+  }
+
+  if (normalizedProvider === 'github') {
+    return {
+      provider: 'github',
+      clientId: process.env.GITHUB_CLIENT_ID,
+      clientSecret: process.env.GITHUB_CLIENT_SECRET,
+      redirectUri,
+      authUrl: 'https://github.com/login/oauth/authorize',
+      tokenUrl: 'https://github.com/login/oauth/access_token',
+      scope: 'read:user user:email',
+    };
+  }
+
+  return null;
+}
+
 async function sendVerificationEmail(email, code) {
   const appName = process.env.APP_NAME || 'DevFeed';
   const resendKey = process.env.RESEND_API_KEY;
@@ -133,6 +181,93 @@ async function sendVerificationEmail(email, code) {
   }
 
   throw new Error('Email təsdiqləmə servisi qoşulmayıb. Railway Variables bölməsinə RESEND_API_KEY və EMAIL_FROM əlavə et.');
+}
+
+async function exchangeOAuthCode(config, code) {
+  const body = new URLSearchParams({
+    client_id: config.clientId,
+    client_secret: config.clientSecret,
+    code,
+    grant_type: 'authorization_code',
+    redirect_uri: config.redirectUri,
+  });
+
+  const response = await fetch(config.tokenUrl, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: body.toString(),
+  });
+
+  const text = await response.text();
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch (error) {
+    data = Object.fromEntries(new URLSearchParams(text));
+  }
+
+  if (!response.ok || data.error) {
+    throw new Error(data.error_description || data.error || text.slice(0, 160) || 'OAuth token exchange failed');
+  }
+
+  return data.access_token;
+}
+
+async function fetchOAuthProfile(provider, accessToken) {
+  if (provider === 'google') {
+    const response = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!response.ok) throw new Error('Google profili oxunmadı.');
+    const profile = await response.json();
+    return {
+      provider: 'google',
+      providerId: profile.sub || profile.id,
+      email: profile.email,
+      name: profile.name || profile.email,
+      avatarUrl: profile.picture || null,
+    };
+  }
+
+  if (provider === 'github') {
+    const headers = {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: 'application/vnd.github+json',
+      'User-Agent': 'DevFeed',
+    };
+    const profileResponse = await fetch('https://api.github.com/user', { headers });
+    if (!profileResponse.ok) throw new Error('GitHub profili oxunmadı.');
+    const profile = await profileResponse.json();
+
+    let email = profile.email;
+    if (!email) {
+      const emailResponse = await fetch('https://api.github.com/user/emails', { headers });
+      if (emailResponse.ok) {
+        const emails = await emailResponse.json();
+        const primary = Array.isArray(emails)
+          ? emails.find((item) => item.primary && item.verified) || emails.find((item) => item.verified)
+          : null;
+        email = primary?.email;
+      }
+    }
+
+    if (!email) {
+      throw new Error('GitHub hesabında təsdiqlənmiş email tapılmadı.');
+    }
+
+    return {
+      provider: 'github',
+      providerId: String(profile.id),
+      email,
+      name: profile.name || profile.login || email,
+      avatarUrl: profile.avatar_url || null,
+    };
+  }
+
+  throw new Error('Unsupported provider');
 }
 
 router.post('/register', async (req, res) => {
@@ -301,41 +436,143 @@ router.post('/social-login', async (req, res) => {
   }
 
   try {
-    let user = null;
-    const existingByProvider = await db.query(
-      'SELECT id, name, email, provider, provider_id, avatar_url, role, role_sub, skills, languages, bio, website, activity_visible, email_verified FROM users WHERE provider = $1 AND provider_id = $2',
-      [provider, providerId]
-    );
-    if (existingByProvider.rows.length > 0) {
-      user = existingByProvider.rows[0];
-    } else {
-      const existingByEmail = await db.query(
-        'SELECT id, name, email, provider, provider_id, avatar_url, role, role_sub, skills, languages, bio, website, activity_visible, email_verified FROM users WHERE email = $1',
-        [normalizedEmail]
-      );
-      if (existingByEmail.rows.length > 0) {
-        user = existingByEmail.rows[0];
-        await db.query(
-          'UPDATE users SET provider = $1, provider_id = $2, avatar_url = $3, email_verified = true WHERE id = $4',
-          [provider, providerId, avatarUrl || user.avatar_url, user.id]
-        );
-        user.email_verified = true;
-      } else {
-        const result = await db.query(
-          `INSERT INTO users (name, email, password_hash, provider, provider_id, avatar_url, email_verified)
-           VALUES ($1, $2, NULL, $3, $4, $5, true)
-           RETURNING id, name, email, provider, provider_id, avatar_url, role, role_sub, skills, languages, bio, website, activity_visible, email_verified`,
-          [name, normalizedEmail, provider, providerId, avatarUrl || null]
-        );
-        user = result.rows[0];
-      }
-    }
-
-    const token = makeToken(user);
-    res.json({ token, user });
+    const result = await performOAuthLogin({ provider, providerId, email: normalizedEmail, name, avatarUrl });
+    res.json(result);
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Social login failed.' });
+  }
+});
+
+router.get('/oauth/start/:provider', async (req, res) => {
+  const config = getOAuthConfig(req.params.provider, req);
+  const appRedirectUri = String(req.query.redirectUri || '').trim();
+
+  if (!config) {
+    return res.status(400).json({ message: 'Provider dəstəklənmir.' });
+  }
+  if (!config.clientId || !config.clientSecret) {
+    return res.status(500).json({ message: `${config.provider} OAuth üçün client id/secret Railway Variables-da yoxdur.` });
+  }
+  if (!appRedirectUri) {
+    return res.status(400).json({ message: 'redirectUri lazımdır.' });
+  }
+
+  try {
+    const state = randomToken(24);
+    await db.query('DELETE FROM oauth_states WHERE expires_at < NOW()');
+    await db.query(
+      `INSERT INTO oauth_states (state, provider, app_redirect_uri, expires_at)
+       VALUES ($1, $2, $3, NOW() + INTERVAL '10 minutes')`,
+      [state, config.provider, appRedirectUri]
+    );
+
+    const params = {
+      client_id: config.clientId,
+      redirect_uri: config.redirectUri,
+      response_type: 'code',
+      scope: config.scope,
+      state,
+    };
+    if (config.provider === 'google') {
+      params.prompt = 'select_account';
+      params.access_type = 'offline';
+    }
+
+    res.json({
+      provider: config.provider,
+      authUrl: appendQuery(config.authUrl, params),
+      callbackUrl: config.redirectUri,
+    });
+  } catch (error) {
+    console.error('GET /auth/oauth/start/:provider error:', error);
+    res.status(500).json({ message: 'OAuth başlanmadı.' });
+  }
+});
+
+router.get('/oauth/callback/:provider', async (req, res) => {
+  const provider = String(req.params.provider || '').toLowerCase();
+  const state = String(req.query.state || '');
+  const code = String(req.query.code || '');
+  const providerError = req.query.error || req.query.error_description;
+
+  let oauthState;
+  try {
+    const stateResult = await db.query(
+      'SELECT state, provider, app_redirect_uri FROM oauth_states WHERE state = $1 AND provider = $2 AND expires_at > NOW()',
+      [state, provider]
+    );
+    oauthState = stateResult.rows[0];
+  } catch (error) {
+    console.error('OAuth state lookup error:', error);
+  }
+
+  const redirectError = (message) => {
+    if (oauthState?.app_redirect_uri) {
+      return res.redirect(appendQuery(oauthState.app_redirect_uri, { error: message }));
+    }
+    return res.status(400).send(message);
+  };
+
+  if (!oauthState) {
+    return redirectError('OAuth sessiyası tapılmadı və ya vaxtı bitib.');
+  }
+  if (providerError) {
+    await db.query('DELETE FROM oauth_states WHERE state = $1', [state]).catch(() => {});
+    return redirectError(String(providerError));
+  }
+  if (!code) {
+    return redirectError('OAuth code gəlmədi.');
+  }
+
+  try {
+    const config = getOAuthConfig(provider, req);
+    if (!config || !config.clientId || !config.clientSecret) {
+      return redirectError(`${provider} OAuth konfiqurasiyası tamamlanmayıb.`);
+    }
+
+    const accessToken = await exchangeOAuthCode(config, code);
+    const profile = await fetchOAuthProfile(provider, accessToken);
+    const loginResult = await performOAuthLogin(profile);
+    const sessionId = randomToken(32);
+
+    await db.query(
+      `INSERT INTO oauth_login_sessions (id, token, user_payload, expires_at)
+       VALUES ($1, $2, $3::jsonb, NOW() + INTERVAL '5 minutes')`,
+      [sessionId, loginResult.token, JSON.stringify(loginResult.user)]
+    );
+    await db.query('DELETE FROM oauth_states WHERE state = $1', [state]);
+
+    res.redirect(appendQuery(oauthState.app_redirect_uri, { sessionId }));
+  } catch (error) {
+    console.error('GET /auth/oauth/callback/:provider error:', error);
+    await db.query('DELETE FROM oauth_states WHERE state = $1', [state]).catch(() => {});
+    return redirectError(error.message || 'OAuth tamamlanmadı.');
+  }
+});
+
+router.post('/oauth/complete', async (req, res) => {
+  const sessionId = String(req.body.sessionId || '').trim();
+  if (!sessionId) {
+    return res.status(400).json({ message: 'sessionId lazımdır.' });
+  }
+
+  try {
+    await db.query('DELETE FROM oauth_login_sessions WHERE expires_at < NOW()');
+    const result = await db.query(
+      `DELETE FROM oauth_login_sessions
+       WHERE id = $1 AND expires_at > NOW()
+       RETURNING token, user_payload`,
+      [sessionId]
+    );
+    const session = result.rows[0];
+    if (!session) {
+      return res.status(404).json({ message: 'OAuth sessiyası tapılmadı və ya vaxtı bitib.' });
+    }
+    res.json({ token: session.token, user: session.user_payload });
+  } catch (error) {
+    console.error('POST /auth/oauth/complete error:', error);
+    res.status(500).json({ message: 'OAuth sessiyası tamamlanmadı.' });
   }
 });
 
@@ -401,9 +638,9 @@ router.post('/oauth-callback', async (req, res) => {
         avatarUrl: profile.picture
       };
 
-      console.log('[oauth-callback] Calling performSocialLogin...');
+      console.log('[oauth-callback] Calling performOAuthLogin...');
       // Use existing social-login logic
-      const result = await performSocialLogin(payload);
+      const result = await performOAuthLogin(payload);
       console.log('[oauth-callback] Success, returning token + user');
       return res.json(result);
 
@@ -417,71 +654,73 @@ router.post('/oauth-callback', async (req, res) => {
   }
 });
 
-// Helper function to handle social login (reuse logic from /auth/social-login)
-async function performSocialLogin(payload) {
+async function performOAuthLogin(payload) {
   const { provider, providerId, email, name, avatarUrl } = payload;
+  const normalizedEmail = normalizeEmail(email);
+  const normalizedProvider = String(provider || '').toLowerCase();
+  const normalizedProviderId = String(providerId || '').trim();
+  const displayName = String(name || normalizedEmail).trim();
 
-  if (!email) {
-    throw new Error('Email not provided by OAuth provider');
+  if (!normalizedProvider || !normalizedProviderId || !normalizedEmail || !displayName) {
+    throw new Error('OAuth profile melumatlari tamam deyil.');
   }
 
-  // Check if user exists
-  const existingUser = await db.query(
-    'SELECT id, role, name, avatar_url FROM users WHERE email = $1',
-    [email]
+  const fields = `
+    id, name, email, provider, provider_id, avatar_url, role, role_sub,
+    skills, languages, bio, website, activity_visible, email_verified
+  `;
+
+  const attachAliases = (user) => ({
+    ...user,
+    providerId: user.provider_id,
+    avatarUrl: user.avatar_url,
+    onboardingPending: !user.role,
+  });
+
+  const existingByProvider = await db.query(
+    `SELECT ${fields}
+     FROM users
+     WHERE provider = $1 AND provider_id = $2`,
+    [normalizedProvider, normalizedProviderId]
   );
 
-  if (existingUser.rows.length > 0) {
-    // User exists - update provider ID if needed
-    const user = existingUser.rows[0];
-    await db.query(
-      'UPDATE users SET avatar_url = $1, email_verified = true WHERE id = $2',
-      [avatarUrl || null, user.id]
+  let user = existingByProvider.rows[0];
+
+  if (!user) {
+    const existingByEmail = await db.query(
+      `SELECT ${fields}
+       FROM users
+       WHERE email = $1`,
+      [normalizedEmail]
     );
-
-    const token = makeToken({ id: user.id, email, name: user.name || name });
-
-    return {
-      token,
-      user: {
-        id: user.id,
-        email,
-        name,
-        avatarUrl,
-        avatar_url: avatarUrl || user.avatar_url,
-        provider,
-        providerId,
-        role: user.role || null,
-        email_verified: true,
-        onboardingPending: !user.role
-      }
-    };
+    user = existingByEmail.rows[0];
   }
 
-  // Create new user
+  if (user) {
+    const updated = await db.query(
+      `UPDATE users
+       SET provider = $1,
+           provider_id = $2,
+           avatar_url = COALESCE($3, avatar_url),
+           email_verified = true
+       WHERE id = $4
+       RETURNING ${fields}`,
+      [normalizedProvider, normalizedProviderId, avatarUrl || null, user.id]
+    );
+    user = updated.rows[0];
+
+    return { token: makeToken(user), user: attachAliases(user) };
+  }
+
   const newUser = await db.query(
-    'INSERT INTO users (email, password_hash, name, avatar_url, email_verified) VALUES ($1, $2, $3, $4, true) RETURNING id',
-    [email, null, name || email, avatarUrl || null]
+    `INSERT INTO users (email, password_hash, name, provider, provider_id, avatar_url, email_verified)
+     VALUES ($1, NULL, $2, $3, $4, $5, true)
+     RETURNING ${fields}`,
+    [normalizedEmail, displayName, normalizedProvider, normalizedProviderId, avatarUrl || null]
   );
 
-  const userId = newUser.rows[0].id;
-  const token = makeToken({ id: userId, email, name: name || email });
-
-  return {
-    token,
-    user: {
-      id: userId,
-      email,
-      name,
-      avatarUrl,
-      avatar_url: avatarUrl || null,
-      provider,
-      providerId,
-      role: null,
-      email_verified: true,
-      onboardingPending: true
-    }
-  };
+  user = newUser.rows[0];
+  return { token: makeToken(user), user: attachAliases(user) };
 }
 
 module.exports = router;

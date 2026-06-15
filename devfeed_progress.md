@@ -120,7 +120,7 @@ Bu fayl `DevFeed.jsx` prototipinde olan hedefleri ve repo-da real gorunen veziyy
 - `RegisterOnboarding.jsx` app navigation-a qosulub; role olmayan user onboarding-e gedir.
 - Token persistence real deyil: `App.jsx` launch zamani token restore etmir.
 - Real mobil UI `DevFeed.jsx` prototipindeki zengin feed/profile/settings/chat strukturuna hele catmayib.
-- Google/GitHub duymeleri login ve register ekranlarinda var; OAuth redirect/client ID hissesi qalib.
+- Google/GitHub duymeleri login ve register ekranlarinda real OAuth start/callback/complete flow-a baglanib; Railway/provider callback config ve live test qalib.
 
 ---
 
@@ -130,13 +130,13 @@ Bu fayl `DevFeed.jsx` prototipinde olan hedefleri ve repo-da real gorunen veziyy
 
 | Is | Status | Qeyd |
 | --- | --- | --- |
-| `socialSignIn`-i AuthContext/App.jsx-e elave etmek | PARTIAL | Context ve UI var; real OAuth provider flow qalib |
+| `socialSignIn`-i AuthContext/App.jsx-e elave etmek | DONE | Google/GitHub OAuth start/callback/complete flow-a baglandi |
 | `completeOnboarding`-i AuthContext/App.jsx-e elave etmek | DONE | `PATCH /profile` ile profil tamamlanir |
 | RegisterOnboarding-i real navigation flow-a qosmaq | DONE | Role olmayan user onboarding-e gedir |
 | Token persistence | PARTIAL | Web `localStorage` fallback var; mobile SecureStore/AsyncStorage qalib |
-| Google OAuth mobile/web flow-un tam test edilmesi | TODO | Client ID, redirect URI, backend callback |
-| GitHub OAuth flow-un elave edilmesi | TODO | GitHub app ID/secret, callback, provider mapping |
-| Email/password register verification | PARTIAL | OTP flow hazirdir; Railway-de `RESEND_API_KEY` ve `EMAIL_FROM` qurulmalidir |
+| Google OAuth mobile/web flow-un tam test edilmesi | PARTIAL | Backend/frontend flow hazirdir; Railway env ve Google callback live test qalib |
+| GitHub OAuth flow-un elave edilmesi | PARTIAL | Backend/frontend flow hazirdir; Railway env ve GitHub callback live test qalib |
+| Email/password register verification | DONE | OTP flow ve Railway email env qurulub; spam/reputation polish qalir |
 
 ### P1 - Feed ve post sistemi
 
@@ -224,9 +224,9 @@ Bu fayl `DevFeed.jsx` prototipinde olan hedefleri ve repo-da real gorunen veziyy
 ### Auth
 
 - `POST /auth/social-login` frontend API client-e elave edilsin.
-- Google OAuth redirect flow mobile/web ucun tamamlanib test edilsin.
-- GitHub OAuth endpoint/callback elave edilsin.
-- Provider account merge qaydasi: eyni email varsa eyni user-e baglansin.
+- Google OAuth redirect flow mobile/web ucun backend/frontend tamamlandi; provider dashboard callback ve live test qalsin.
+- GitHub OAuth endpoint/callback elave edildi; provider dashboard callback ve live test qalsin.
+- Provider account merge qaydasi: eyni email varsa eyni user-e baglanir.
 
 ### Public chat
 
@@ -256,7 +256,7 @@ Bu fayl `DevFeed.jsx` prototipinde olan hedefleri ve repo-da real gorunen veziyy
 
 ## 7. Melum Problemler
 
-- Google/GitHub duymeleri UI-da var, amma real OAuth provider redirect/profile alma flow-u hele tamamlanmayib.
+- Google/GitHub real OAuth flow-u kodda hazirdir, amma live test ucun Railway env ve provider callback URL-lari duzgun qurulmalidir.
 - Token persistence web `localStorage` fallback ile mehduddur; mobile ucun SecureStore/AsyncStorage lazimdir.
 - Media postlari hele fayl upload etmir; title/link metadata kimi saxlanir.
 - Public chat ve DM hazirda REST/manual refresh ile isleyir; realtime Socket.io/SSE/polling hele secilmeyib.
@@ -270,7 +270,7 @@ Bu fayl `DevFeed.jsx` prototipinde olan hedefleri ve repo-da real gorunen veziyy
 
 En vacib qalanlar:
 
-- Social login-i real islek etmek: Google + GitHub.
+- Social login-i live testden kecirmek: Google + GitHub callback/env.
 - Token persistence-i duzeltmek.
 - `DevFeed.jsx`-deki qalan UI-lari real `src/` ekranlarina kocurmek.
 - Media upload, realtime chat ve code block/link preview polish-i tamamlamaq.
@@ -296,10 +296,13 @@ Vacib env deyisenleri:
 ```bash
 DATABASE_URL=
 JWT_SECRET=
+PUBLIC_BACKEND_URL=
 GOOGLE_CLIENT_ID_WEB=
 GOOGLE_CLIENT_SECRET=
 GITHUB_CLIENT_ID=
 GITHUB_CLIENT_SECRET=
+RESEND_API_KEY=
+EMAIL_FROM=
 SUPPORT_ACCOUNT_NUMBER=
 ```
 

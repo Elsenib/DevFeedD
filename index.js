@@ -15,6 +15,7 @@ const notificationsRoutes = require('./routes/notifications');
 
 dotenv.config();
 const app = express();
+app.set('trust proxy', 1);
 app.use(cors());
 app.use(express.json());
 
@@ -217,6 +218,24 @@ const createSchema = async () => {
         languages JSONB DEFAULT '[]'::jsonb,
         code_hash TEXT NOT NULL,
         attempts INTEGER DEFAULT 0,
+        expires_at TIMESTAMPTZ NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS oauth_states (
+        state TEXT PRIMARY KEY,
+        provider TEXT NOT NULL,
+        app_redirect_uri TEXT NOT NULL,
+        expires_at TIMESTAMPTZ NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS oauth_login_sessions (
+        id TEXT PRIMARY KEY,
+        token TEXT NOT NULL,
+        user_payload JSONB NOT NULL,
         expires_at TIMESTAMPTZ NOT NULL,
         created_at TIMESTAMPTZ DEFAULT NOW()
       );

@@ -40,6 +40,18 @@ export async function socialLogin({ provider, providerId, email, name, avatarUrl
   return response.data;
 }
 
+export async function startOAuth(provider, redirectUri) {
+  const response = await api.get(`/auth/oauth/start/${provider}`, {
+    params: { redirectUri },
+  });
+  return response.data;
+}
+
+export async function completeOAuth(sessionId) {
+  const response = await api.post('/auth/oauth/complete', { sessionId });
+  return response.data;
+}
+
 export async function updateProfile(profile) {
   const response = await api.patch('/profile', profile);
   return response.data;
@@ -238,6 +250,8 @@ export default {
   register,
   verifyEmailRegistration,
   socialLogin,
+  startOAuth,
+  completeOAuth,
   updateProfile,
   uploadAvatar,
   fetchPosts,

@@ -34,7 +34,9 @@
     "react-native-web": "~0.19.6",
     "sharp": "^0.32.6",
     "expo-image-picker": "~14.3.2",
-    "@react-native-async-storage/async-storage": "1.18.2"
+    "@react-native-async-storage/async-storage": "1.18.2",
+    "expo-web-browser": "~12.3.2",
+    "expo-linking": "~5.0.2"
   },
   "devDependencies": {
     "nodemon": "^3.1.14"

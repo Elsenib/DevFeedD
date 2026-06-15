@@ -1,12 +1,12 @@
 # DevFeed Next Steps
 
-**Last updated:** 2026-06-15
+**Last updated:** 2026-06-16
 
 This file is the short working checklist. The full plan lives in `devfeed_progress.md`; handoff notes live in `HANDOFF.md`.
 
-## Current Stage: Social Graph + Notifications Deploy Test
+## Current Stage: OAuth Deploy Test
 
-Goal: deploy the updated backend, then test follow/search/notifications/email verification and the fixed headers/avatar flow on the phone.
+Goal: deploy the Google/GitHub OAuth update, configure provider callback URLs on Railway/Google/GitHub, then test login/register on the phone.
 
 ### P0 Checklist
 
@@ -15,14 +15,18 @@ Goal: deploy the updated backend, then test follow/search/notifications/email ve
 - [x] Fix `RegisterOnboarding.jsx` compile/runtime issues.
 - [x] Add frontend API helpers for `POST /auth/social-login` and `PATCH /profile`.
 - [x] Add Google and GitHub buttons to both login and register screens.
-- [x] Keep social OAuth as a documented skeleton until real provider IDs/secrets and redirect URIs are confirmed.
+- [x] Replace social OAuth skeleton with backend-driven Google/GitHub OAuth start/callback/complete flow.
 - [ ] Add token persistence with a real mobile storage layer (`expo-secure-store` or AsyncStorage). Current code has only a web `localStorage` fallback.
-- [ ] Implement real Google OAuth provider flow and pass provider profile into `socialSignIn`.
-- [ ] Implement real GitHub OAuth provider flow and pass provider profile into `socialSignIn`.
+- [x] Implement real Google OAuth provider flow and pass provider profile into `socialSignIn`.
+- [x] Implement real GitHub OAuth provider flow and pass provider profile into `socialSignIn`.
 - [x] Add email verification code flow for password registration.
-- [ ] Configure production email sending on Railway: `RESEND_API_KEY`, `EMAIL_FROM`.
+- [x] Configure production email sending on Railway: `RESEND_API_KEY`, `EMAIL_FROM`.
 - [x] Run web compile check with `npm.cmd run web -- --offline`.
 - [ ] Manually verify login/register -> onboarding -> main against Railway backend.
+- [ ] Configure Railway OAuth variables: `PUBLIC_BACKEND_URL`, `GOOGLE_CLIENT_ID_WEB`, `GOOGLE_CLIENT_SECRET`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`.
+- [ ] Add provider callback URLs:
+  - Google: `https://devfeedd-backend-production.up.railway.app/auth/oauth/callback/google`
+  - GitHub: `https://devfeedd-backend-production.up.railway.app/auth/oauth/callback/github`
 
 ## Next Stages
 
@@ -83,6 +87,7 @@ After each stage, update this file and `HANDOFF.md` so another account/session c
 - [ ] Confirm `https://devfeedd-backend-production.up.railway.app/health`.
 - [ ] Confirm new backend routes after deploy: `/chat/rooms`, `/conversations`, `/posts`.
 - [ ] Confirm new backend routes after deploy: `/users/search`, `/notifications`, `/profile/:id`, `/posts/search`.
+- [ ] Confirm OAuth start routes after deploy: `/auth/oauth/start/google`, `/auth/oauth/start/github`.
 - [ ] Start Expo for phone testing: `npx.cmd expo start --tunnel` or `npx.cmd expo start --lan`.
 - [ ] Install/open Expo Go on the phone and scan the QR.
 - [ ] If native dev-client is needed later: configure EAS and build an Android APK/AAB.

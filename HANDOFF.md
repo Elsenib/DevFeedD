@@ -1,10 +1,10 @@
 # DevFeed Handoff
 
-**Last updated:** 2026-06-15
+**Last updated:** 2026-06-16
 
 ## Where We Are
 
-The project has a richer web-style prototype in `DevFeed.jsx`. P1 feed/post work is backend-backed, P2 DM/public chat has REST flows, and the social graph pass is now implemented locally: Explore search, follow/unfollow, public profiles, notifications, active like/save states, header SafeArea fixes, and email verification code flow. The next big step is deploying this update to Railway and testing on a physical phone.
+The project has a richer web-style prototype in `DevFeed.jsx`. P1 feed/post work is backend-backed, P2 DM/public chat has REST flows, the social graph pass is implemented locally, and Google/GitHub OAuth now has a backend-driven start/callback/complete flow. The next big step is deploying this update to Railway, configuring OAuth callback URLs, and testing on a physical phone.
 
 ## Important Files
 
@@ -23,7 +23,7 @@ The project has a richer web-style prototype in `DevFeed.jsx`. P1 feed/post work
 - `src/screens/PublicChatScreen.jsx` - public chat rooms/messages tab.
 - `src/screens/ExploreScreen.jsx` - user/post search and follow actions.
 - `src/screens/NotificationsScreen.jsx` - notification list and read actions.
-- `routes/auth.js` - backend auth routes, including email verification code flow.
+- `routes/auth.js` - backend auth routes, including email verification and Google/GitHub OAuth.
 - `routes/posts.js` - post create/read/like/bookmark/comment/job apply routes.
 - `routes/conversations.js` - DM conversations and messages.
 - `routes/chat.js` - public chat rooms, join/leave, messages.
@@ -35,14 +35,16 @@ The project has a richer web-style prototype in `DevFeed.jsx`. P1 feed/post work
 
 ## Current Known Issues
 
-- Social OAuth is not fully real yet. Frontend has Google/GitHub buttons and `socialSignIn`, but provider OAuth profile acquisition still needs to be implemented.
-- Password registration now requires email verification in production. Configure Railway variables `RESEND_API_KEY` and `EMAIL_FROM`, or set `EMAIL_VERIFICATION_REQUIRED=false` only for temporary testing.
+- Social OAuth code is implemented, but production still needs Railway variables and provider dashboard callbacks before live testing: `PUBLIC_BACKEND_URL`, `GOOGLE_CLIENT_ID_WEB`, `GOOGLE_CLIENT_SECRET`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`.
+- Google callback URL: `https://devfeedd-backend-production.up.railway.app/auth/oauth/callback/google`.
+- GitHub callback URL: `https://devfeedd-backend-production.up.railway.app/auth/oauth/callback/github`.
+- Password registration now requires email verification in production. `RESEND_API_KEY` and `EMAIL_FROM` are configured, but emails may still land in spam until domain reputation improves.
 - Token persistence still needs a real mobile storage dependency such as `expo-secure-store` or AsyncStorage. `App.jsx` currently has only a web `localStorage` fallback.
 - `API_BASE_URL` currently points to `https://devfeedd-backend-production.up.railway.app`; routes in this repo are mounted without `/api`.
 - `npm.cmd run web -- --offline` compiled successfully, but full browser/user-flow testing still needs to be done.
 - Media posts currently store title/link metadata only; real file upload is still pending.
 - Public chat is REST/manual-refresh now; realtime transport is still pending.
-- Updated backend code is not deployed until Railway receives this repo update.
+- Updated OAuth backend code is not deployed until Railway receives this repo update.
 - `middleware/contentFilter.js`, deleted uploaded avatar files, `server`, `android/`, `eas-inspect/`, and `scripts/` are dirty/untracked in the working tree; do not stage them blindly.
 
 ## Completed In This Pass
@@ -76,21 +78,28 @@ The project has a richer web-style prototype in `DevFeed.jsx`. P1 feed/post work
 - Added email OTP register/verify flow in backend and register screen.
 - Verified backend route syntax with `node --check`.
 - Verified changed JSX files with `@babel/parser`.
+- Added `expo-web-browser` and `expo-linking`.
+- Added app scheme `devfeed`.
+- Added backend OAuth state and one-time login session tables.
+- Added `/auth/oauth/start/:provider`, `/auth/oauth/callback/:provider`, and `/auth/oauth/complete`.
+- Wired `socialSignIn` to open the provider login page and complete login via the backend session.
+- Added OAuth account linking by provider ID or matching email.
 
 ## If Continuing In A New Session
 
 1. Read `devfeed_progress.md`.
 2. Read `NEXT_STEPS.md`.
-3. Deploy/update the backend on Railway so `/chat/*` and the new schema exist live.
-4. Verify the app can move through login/register -> onboarding -> main against the Railway backend.
+3. Deploy/update the backend on Railway so OAuth tables/routes exist live.
+4. Configure Railway OAuth variables and provider callback URLs.
+5. Verify the app can move through Google/GitHub login/register -> onboarding -> main against the Railway backend.
 5. Start Expo with LAN/tunnel and test on the phone.
 
 ## Last Intended Direction
 
 Continue in this order:
 
-1. Deploy backend update to Railway and verify `/health`, `/posts`, `/users/search`, `/notifications`, `/posts/search`.
-2. Add Railway email variables for real password registration: `RESEND_API_KEY`, `EMAIL_FROM`.
-3. Test Expo on phone with the live Railway API.
-4. Add token persistence for native mobile.
-5. Real Google/GitHub OAuth, realtime chat, media upload, and job boost.
+1. Commit/push the OAuth update and let Railway deploy.
+2. Add/check Railway OAuth variables and provider callback URLs.
+3. Verify `/health`, `/auth/oauth/start/google`, and `/auth/oauth/start/github`.
+4. Test Expo on phone with Google/GitHub login against the live Railway API.
+5. Add token persistence for native mobile, then continue realtime chat, media upload, and job boost.
