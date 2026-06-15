@@ -153,6 +153,61 @@ function SupportModal({ visible, profile, colors, config, submitting, onClose, o
   );
 }
 
+function ManualSupportModal({ visible, profile, colors, config, submitting, onClose, onSubmit }) {
+  const [amount, setAmount] = useState('1');
+  const [note, setNote] = useState('');
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
+  useEffect(() => {
+    if (visible) {
+      setAmount('1');
+      setNote('');
+    }
+  }, [visible]);
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={styles.modalOverlay}>
+        <View style={styles.sheet}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Dəstək ol</Text>
+            <TouchableOpacity onPress={onClose}>
+              <MaterialIcons name="close" size={24} color={colors.muted} />
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.supportTitle}>{profile?.name || 'DevFeed profili'} üçün dəstək</Text>
+          <Text style={styles.supportText}>
+            Bu mərhələdə ödəniş kartdan avtomatik tutulmur. Məbləği bank tətbiqindən aşağıdakı hesaba köçür, sonra bu formanı doldur.
+          </Text>
+
+          <View style={styles.accountBox}>
+            <Text style={styles.accountLabel}>KÖÇÜRMƏ ÜÇÜN HESAB</Text>
+            <Text style={styles.accountNumber}>{config?.accountNumber || 'AZ00 XXXX XXXX XXXX XXXX XXXX XXXX'}</Text>
+            <Text style={styles.accountMeta}>{config?.receiverName || 'DevFeed creator'}</Text>
+          </View>
+
+          <Text style={styles.supportStep}>1. Bank tətbiqində bu hesaba köçürmə et.</Text>
+          <Text style={styles.supportStep}>2. Məbləği burada yaz və qeydə al.</Text>
+          <Text style={styles.supportStep}>3. App sənə referans kodu verəcək.</Text>
+
+          <Text style={styles.fieldLabel}>MƏBLƏĞ (AZN)</Text>
+          <TextInput value={amount} onChangeText={setAmount} keyboardType="numeric" placeholder="1" placeholderTextColor={colors.muted} style={styles.input} />
+          <Text style={styles.fieldLabel}>QEYD</Text>
+          <TextInput value={note} onChangeText={setNote} placeholder="İstəyə bağlı qeyd" placeholderTextColor={colors.muted} style={styles.input} />
+
+          <TouchableOpacity
+            style={[styles.primaryButton, submitting && styles.disabledButton]}
+            onPress={() => onSubmit({ amount: Number(amount), note })}
+            disabled={submitting}
+          >
+            {submitting ? <ActivityIndicator color="#ffffff" /> : <Text style={styles.primaryButtonText}>Köçürməni qeydə al</Text>}
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 export default function ProfileScreen({ route, navigation }) {
   const { user, updateCurrentUser } = useContext(AuthContext);
   const { theme } = useContext(PreferencesContext);
@@ -438,7 +493,7 @@ export default function ProfileScreen({ route, navigation }) {
         onSave={handleSaveProfile}
         onPickAvatar={handlePickAvatar}
       />
-      <SupportModal
+      <ManualSupportModal
         visible={supportOpen}
         profile={profile}
         colors={colors}
@@ -780,6 +835,12 @@ function createStyles(colors) {
       color: colors.muted,
       lineHeight: 20,
       marginBottom: 12,
+    },
+    supportStep: {
+      color: colors.text,
+      fontSize: 12,
+      lineHeight: 18,
+      marginBottom: 5,
     },
     accountBox: {
       borderColor: colors.border,

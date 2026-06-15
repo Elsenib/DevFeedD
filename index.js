@@ -168,7 +168,23 @@ const createSchema = async () => {
     await client.query(`
       ALTER TABLE job_applications
       ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'APPLIED',
-      ADD COLUMN IF NOT EXISTS resume_url TEXT;
+      ADD COLUMN IF NOT EXISTS resume_url TEXT,
+      ADD COLUMN IF NOT EXISTS resume_file_name TEXT,
+      ADD COLUMN IF NOT EXISTS applicant_phone TEXT;
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS job_boosts (
+        id SERIAL PRIMARY KEY,
+        post_id INTEGER REFERENCES posts(id) ON DELETE CASCADE,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        amount NUMERIC(10,2) NOT NULL,
+        currency TEXT NOT NULL DEFAULT 'AZN',
+        status TEXT NOT NULL DEFAULT 'PENDING_MANUAL_CONFIRMATION',
+        reference TEXT UNIQUE NOT NULL,
+        note TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
     `);
 
     await client.query(`

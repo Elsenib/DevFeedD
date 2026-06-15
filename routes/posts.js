@@ -1,10 +1,37 @@
 const express = require('express');
+const fs = require('fs');
+const path = require('path');
+const multer = require('multer');
 const pool = require('../db');
 const { auth, optionalAuth } = require('../middleware/auth');
 const { containsIllegalWords, checkBadWords } = require('../middleware/contentFilter');
 const { createNotification } = require('../services/notifications');
 
 const router = express.Router();
+const resumesDir = path.join(__dirname, '../uploads/resumes');
+fs.mkdirSync(resumesDir, { recursive: true });
+
+const resumeUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, resumesDir),
+    filename: (req, file, cb) => {
+      const safeName = path.basename(file.originalname || 'cv.pdf').replace(/[^a-zA-Z0-9._-]/g, '-');
+      cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}-${safeName}`);
+    },
+  }),
+  limits: { fileSize: 8 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname || '').toLowerCase();
+    const allowed = file.mimetype === 'application/pdf' || (file.mimetype === 'application/octet-stream' && ext === '.pdf');
+    if (!allowed) return cb(new Error('CV yalnız PDF formatında olmalıdır.'));
+    cb(null, true);
+  },
+});
+
+function getPublicUploadUrl(req, folder, filename) {
+  const base = (process.env.PUBLIC_BACKEND_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
+  return `${base}/uploads/${folder}/${filename}`;
+}
 
 // GET /posts?limit=20&offset=0
 router.get('/', optionalAuth, async (req, res) => {
@@ -65,6 +92,49 @@ router.get('/search', optionalAuth, async (req, res) => {
   } catch (error) {
     console.error('GET /posts/search error:', error);
     res.status(500).json({ message: 'Postlar axtarılmadı.' });
+  }
+});
+
+router.post('/applications/resume', auth, resumeUpload.single('resume'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'CV PDF faylı lazımdır.' });
+    }
+    res.status(201).json({
+      resumeUrl: getPublicUploadUrl(req, 'resumes', req.file.filename),
+      resumeFileName: req.file.originalname || req.file.filename,
+      size: req.file.size,
+    });
+  } catch (error) {
+    if (req.file?.path) {
+      try { fs.unlinkSync(req.file.path); } catch (unlinkError) {}
+    }
+    console.error('POST /posts/applications/resume error:', error);
+    res.status(500).json({ message: error.message || 'CV yüklənmədi.' });
+  }
+});
+
+router.get('/applications/inbox', auth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT
+         ja.id, ja.post_id, ja.user_id, ja.status, ja.cover_letter, ja.resume_url,
+         ja.resume_file_name, ja.applicant_phone, ja.created_at,
+         p.title AS post_title, p.caption AS post_caption, p.post_type,
+         u.name AS applicant_name, u.email AS applicant_email, u.role AS applicant_role,
+         u.role_sub AS applicant_role_sub, u.avatar_url AS applicant_avatar_url
+       FROM job_applications ja
+       JOIN posts p ON p.id = ja.post_id
+       JOIN users u ON u.id = ja.user_id
+       WHERE p.user_id = $1
+       ORDER BY ja.created_at DESC
+       LIMIT 100`,
+      [req.user.id]
+    );
+    res.json(result.rows);
+  } catch (error) {
+    console.error('GET /posts/applications/inbox error:', error);
+    res.status(500).json({ message: 'Müraciətlər yüklənmədi.' });
   }
 });
 
@@ -352,6 +422,126 @@ router.get('/:id/comments', async (req, res) => {
 });
 
 // POST /posts/:id/apply
+router.post('/:id/apply', auth, async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+    const {
+      cover_letter = '',
+      resume_url = '',
+      resume_file_name = '',
+      applicant_phone = '',
+    } = req.body;
+
+    const postResult = await pool.query('SELECT id, user_id, title, caption, post_type FROM posts WHERE id = $1', [id]);
+    const jobPost = postResult.rows[0];
+    if (!jobPost) return res.status(404).json({ error: 'Post not found' });
+    if (jobPost.post_type !== 'JOB') return res.status(400).json({ error: 'Only JOB posts can be applied to' });
+    if (String(jobPost.user_id) === String(userId)) return res.status(400).json({ error: 'Öz iş elanına müraciət etmək olmaz.' });
+    if (!String(applicant_phone || '').trim()) return res.status(400).json({ error: 'Əlaqə nömrəsi lazımdır.' });
+    if (!String(resume_url || '').trim()) return res.status(400).json({ error: 'CV PDF faylı lazımdır.' });
+
+    if (
+      containsIllegalWords(cover_letter) ||
+      containsIllegalWords(resume_url) ||
+      containsIllegalWords(resume_file_name) ||
+      containsIllegalWords(applicant_phone)
+    ) {
+      return res.status(400).json({ error: 'Müraciət məzmunu uyğun deyil.' });
+    }
+
+    const applicationResult = await pool.query(
+      `INSERT INTO job_applications (post_id, user_id, status, cover_letter, resume_url, resume_file_name, applicant_phone)
+       VALUES ($1, $2, 'APPLIED', $3, $4, $5, $6)
+       ON CONFLICT (post_id, user_id)
+       DO UPDATE SET
+         status = EXCLUDED.status,
+         cover_letter = EXCLUDED.cover_letter,
+         resume_url = EXCLUDED.resume_url,
+         resume_file_name = EXCLUDED.resume_file_name,
+         applicant_phone = EXCLUDED.applicant_phone,
+         created_at = NOW()
+       RETURNING id, post_id, user_id, status, cover_letter, resume_url, resume_file_name, applicant_phone, created_at`,
+      [id, userId, cover_letter, resume_url, resume_file_name || null, applicant_phone]
+    );
+
+    const ownerId = jobPost.user_id;
+    const existingConversation = await pool.query(
+      `SELECT id FROM conversations
+       WHERE (user_a_id = $1 AND user_b_id = $2)
+          OR (user_a_id = $2 AND user_b_id = $1)`,
+      [userId, ownerId]
+    );
+
+    let conversationId;
+    if (existingConversation.rows.length > 0) {
+      conversationId = existingConversation.rows[0].id;
+    } else {
+      const conversationResult = await pool.query(
+        'INSERT INTO conversations (user_a_id, user_b_id, last_message, updated_at) VALUES ($1, $2, $3, NOW()) RETURNING id',
+        [userId, ownerId, 'İş müraciəti göndərildi']
+      );
+      conversationId = conversationResult.rows[0].id;
+    }
+
+    const jobTitle = jobPost.caption || jobPost.title || 'İş elanı';
+    const messageText = [
+      `Mən "${jobTitle}" elanına müraciət etdim.`,
+      `Telefon: ${applicant_phone}`,
+      `CV: ${resume_url}`,
+      cover_letter ? `Məktub: ${cover_letter}` : 'Məktub əlavə edilməyib.',
+    ].join('\n');
+
+    await pool.query(
+      'INSERT INTO messages (conversation_id, sender_id, text) VALUES ($1, $2, $3)',
+      [conversationId, userId, messageText]
+    );
+    await pool.query('UPDATE conversations SET last_message = $1, updated_at = NOW() WHERE id = $2', [messageText, conversationId]);
+
+    await createNotification({
+      userId: ownerId,
+      actorId: userId,
+      type: 'job_application',
+      entityType: 'post',
+      entityId: id,
+      text: `${req.user.name || 'Bir istifadəçi'} iş elanına müraciət etdi.`,
+    });
+
+    res.json({ message: 'Application submitted', conversationId, application: applicationResult.rows[0] });
+  } catch (error) {
+    if (error?.code === '42703') return next();
+    console.error('POST /posts/:id/apply real flow error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/:id/applications', auth, async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const postResult = await pool.query('SELECT user_id FROM posts WHERE id = $1', [id]);
+    if (postResult.rows.length === 0) return res.status(404).json({ error: 'Post not found' });
+    if (postResult.rows[0].user_id !== req.user.id) return res.status(403).json({ error: 'Not authorized to view applications' });
+
+    const applicationsResult = await pool.query(
+      `SELECT ja.id, ja.user_id, ja.status, ja.cover_letter, ja.resume_url, ja.resume_file_name,
+              ja.applicant_phone, ja.created_at,
+              u.name, u.email, u.role, u.role_sub, u.avatar_url
+       FROM job_applications ja
+       JOIN users u ON u.id = ja.user_id
+       WHERE ja.post_id = $1
+       ORDER BY ja.created_at DESC`,
+      [id]
+    );
+
+    res.json(applicationsResult.rows);
+  } catch (error) {
+    if (error?.code === '42703') return next();
+    console.error('GET /posts/:id/applications real flow error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Legacy fallback: POST /posts/:id/apply
 router.post('/:id/apply', auth, async (req, res) => {
   try {
     const { id } = req.params;

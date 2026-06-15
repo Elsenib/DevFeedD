@@ -66,6 +66,15 @@ export async function uploadAvatar({ uri, name = 'avatar.jpg', type = 'image/jpe
   return response.data;
 }
 
+export async function uploadJobResume({ uri, name = 'cv.pdf', type = 'application/pdf' }) {
+  const formData = new FormData();
+  formData.append('resume', { uri, name, type });
+  const response = await api.post('/posts/applications/resume', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return response.data;
+}
+
 export async function fetchPosts() {
   const response = await api.get('/posts');
   return response.data;
@@ -121,11 +130,23 @@ export async function removeBookmark(postId) {
   return response.data;
 }
 
-export async function applyToJob(postId, { coverLetter = '', resumeUrl = '' } = {}) {
+export async function applyToJob(postId, { coverLetter = '', resumeUrl = '', resumeFileName = '', phone = '' } = {}) {
   const response = await api.post(`/posts/${postId}/apply`, {
     cover_letter: coverLetter,
     resume_url: resumeUrl,
+    resume_file_name: resumeFileName,
+    applicant_phone: phone,
   });
+  return response.data;
+}
+
+export async function fetchJobApplicationInbox() {
+  const response = await api.get('/posts/applications/inbox');
+  return response.data;
+}
+
+export async function fetchPostApplications(postId) {
+  const response = await api.get(`/posts/${postId}/applications`);
   return response.data;
 }
 
@@ -229,6 +250,11 @@ export async function createSupportPayment({ receiverId, amount, note }) {
   return response.data;
 }
 
+export async function createJobBoostPayment({ postId, amount = 5, note = '' }) {
+  const response = await api.post('/support/job-boosts', { postId, amount, note });
+  return response.data;
+}
+
 export async function fetchNotifications() {
   const response = await api.get('/notifications');
   return response.data;
@@ -254,6 +280,7 @@ export default {
   completeOAuth,
   updateProfile,
   uploadAvatar,
+  uploadJobResume,
   fetchPosts,
   createPost,
   updatePost,
@@ -266,6 +293,8 @@ export default {
   bookmarkPost,
   removeBookmark,
   applyToJob,
+  fetchJobApplicationInbox,
+  fetchPostApplications,
   fetchProfile,
   fetchUserProfile,
   fetchUserPosts,
@@ -285,6 +314,7 @@ export default {
   sendChatMessage,
   fetchSupportConfig,
   createSupportPayment,
+  createJobBoostPayment,
   fetchNotifications,
   markNotificationRead,
   markAllNotificationsRead,

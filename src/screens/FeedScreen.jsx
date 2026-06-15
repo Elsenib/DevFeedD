@@ -17,6 +17,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { AuthContext } from '../context/AuthContext';
+import JobApplicationModal from '../components/JobApplicationModal';
 import * as api from '../api';
 
 const POST_TYPES = [
@@ -141,9 +142,17 @@ function MediaPayload({ post }) {
 }
 
 function JobPayload({ post, onApplyJob }) {
-  const requirements = post.metadata.requirements || [];
+  const metadata = post.metadata || {};
+  const requirements = metadata.requirements || [];
   return (
     <View style={styles.jobBox}>
+      <View style={styles.jobHeaderRow}>
+        <View style={styles.payloadBody}>
+          <Text style={styles.jobCompany}>{metadata.company || 'Şirkət qeyd edilməyib'}</Text>
+          <Text style={styles.jobMeta}>{metadata.location || 'Remote / Bakı'} · {metadata.employmentType || 'Full-time'}</Text>
+        </View>
+        {!!metadata.salary && <Text style={styles.salaryBadge}>{metadata.salary}</Text>}
+      </View>
       <View style={styles.chipWrap}>
         {requirements.map((item) => (
           <Text key={item} style={styles.jobChip}>{item}</Text>
@@ -248,9 +257,16 @@ function ComposeModal({ visible, onClose, onSubmit, submitting }) {
   const [tags, setTags] = useState([]);
   const [requirementInput, setRequirementInput] = useState('');
   const [requirements, setRequirements] = useState([]);
+  const [company, setCompany] = useState('');
+  const [location, setLocation] = useState('Remote');
+  const [salary, setSalary] = useState('');
+  const [employmentType, setEmploymentType] = useState('Full-time');
+  const [deadline, setDeadline] = useState('');
 
   const activeType = typeStyle(type);
-  const canSubmit = caption.trim().length > 0 && (type !== 'GIT' || repo.trim()) && (type !== 'JOB' || requirements.length > 0);
+  const canSubmit = caption.trim().length > 0
+    && (type !== 'GIT' || repo.trim())
+    && (type !== 'JOB' || (company.trim() && requirements.length > 0));
 
   const addTag = () => {
     const value = tagInput.trim().replace(/^#/, '');
@@ -277,6 +293,11 @@ function ComposeModal({ visible, onClose, onSubmit, submitting }) {
     setTags([]);
     setRequirementInput('');
     setRequirements([]);
+    setCompany('');
+    setLocation('Remote');
+    setSalary('');
+    setEmploymentType('Full-time');
+    setDeadline('');
     setType('TEXT');
   };
 
@@ -304,6 +325,11 @@ function ComposeModal({ visible, onClose, onSubmit, submitting }) {
       metadata.url = mediaUrl.trim();
     }
     if (type === 'JOB') {
+      metadata.company = company.trim();
+      metadata.location = location.trim() || 'Remote';
+      metadata.salary = salary.trim();
+      metadata.employmentType = employmentType.trim() || 'Full-time';
+      metadata.deadline = deadline.trim();
       metadata.requirements = requirements;
     }
 
@@ -344,6 +370,16 @@ function ComposeModal({ visible, onClose, onSubmit, submitting }) {
     if (type === 'JOB') {
       return (
         <View style={styles.extraBox}>
+          <Text style={styles.fieldLabel}>ŞİRKƏT *</Text>
+          <TextInput value={company} onChangeText={setCompany} placeholder="DevFeed MMC" placeholderTextColor="#4b5563" style={styles.modalInput} />
+          <Text style={styles.fieldLabel}>LOKASİYA</Text>
+          <TextInput value={location} onChangeText={setLocation} placeholder="Bakı, Remote, Hybrid..." placeholderTextColor="#4b5563" style={styles.modalInput} />
+          <Text style={styles.fieldLabel}>İŞ TİPİ</Text>
+          <TextInput value={employmentType} onChangeText={setEmploymentType} placeholder="Full-time, Part-time, Freelance" placeholderTextColor="#4b5563" style={styles.modalInput} />
+          <Text style={styles.fieldLabel}>MAAŞ ARALIĞI</Text>
+          <TextInput value={salary} onChangeText={setSalary} placeholder="1500-2500 AZN" placeholderTextColor="#4b5563" style={styles.modalInput} />
+          <Text style={styles.fieldLabel}>SON TARİX</Text>
+          <TextInput value={deadline} onChangeText={setDeadline} placeholder="30.06.2026" placeholderTextColor="#4b5563" style={styles.modalInput} />
           <Text style={styles.fieldLabel}>TELEBLER *</Text>
           <View style={styles.chipWrap}>
             {requirements.map((item) => (
@@ -473,6 +509,8 @@ export default function FeedScreen({ navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const [composeOpen, setComposeOpen] = useState(false);
   const [posting, setPosting] = useState(false);
+  const [selectedJob, setSelectedJob] = useState(null);
+  const [applyingJob, setApplyingJob] = useState(false);
 
   const normalizedPosts = useMemo(() => posts.map(normalizePost), [posts]);
 
@@ -592,13 +630,30 @@ export default function FeedScreen({ navigation }) {
   };
 
   const handleApplyJob = async (post) => {
+    setSelectedJob(post);
+  };
+
+  const handleSubmitJobApplication = async ({ coverLetter, phone, resume }) => {
+    if (!selectedJob) return;
+    setApplyingJob(true);
     try {
-      const result = await api.applyToJob(post.id, {
-        coverLetter: `DevFeed uzerinden "${post.caption}" elanina muraciet edildi.`,
+      const uploadedResume = await api.uploadJobResume({
+        uri: resume.uri,
+        name: resume.name || 'cv.pdf',
+        type: resume.mimeType || 'application/pdf',
       });
-      Alert.alert('Muraciet gonderildi', result.conversationId ? 'Chat mesajiniz da yaradildi.' : 'Muracietiniz qeyde alindi.');
+      const result = await api.applyToJob(selectedJob.id, {
+        coverLetter,
+        phone,
+        resumeUrl: uploadedResume.resumeUrl,
+        resumeFileName: uploadedResume.resumeFileName,
+      });
+      setSelectedJob(null);
+      Alert.alert('Müraciət göndərildi', result.conversationId ? 'Elan sahibinin DM və müraciətlər bölməsinə düşdü.' : 'Müraciətin qeydə alındı.');
     } catch (error) {
-      Alert.alert('Muraciet xetasi', error.response?.data?.error || error.response?.data?.message || error.message);
+      Alert.alert('Müraciət xətası', error.response?.data?.error || error.response?.data?.message || error.message);
+    } finally {
+      setApplyingJob(false);
     }
   };
 
@@ -668,6 +723,13 @@ export default function FeedScreen({ navigation }) {
         onClose={() => setComposeOpen(false)}
         onSubmit={handleCreatePost}
         submitting={posting}
+      />
+      <JobApplicationModal
+        visible={!!selectedJob}
+        post={selectedJob}
+        submitting={applyingJob}
+        onClose={() => setSelectedJob(null)}
+        onSubmit={handleSubmitJobApplication}
       />
     </SafeAreaView>
   );
@@ -875,6 +937,31 @@ const styles = StyleSheet.create({
     borderColor: '#3d2a00',
     borderWidth: 1,
     marginTop: 4,
+  },
+  jobHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 10,
+  },
+  jobCompany: {
+    color: '#fbbf24',
+    fontWeight: '900',
+    fontSize: 13,
+  },
+  jobMeta: {
+    color: '#d6a742',
+    fontSize: 11,
+    marginTop: 3,
+  },
+  salaryBadge: {
+    color: '#111827',
+    backgroundColor: '#fbbf24',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    fontSize: 11,
+    fontWeight: '900',
+    marginLeft: 10,
   },
   payloadHeader: {
     flexDirection: 'row',

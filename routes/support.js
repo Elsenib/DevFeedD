@@ -58,4 +58,45 @@ router.post('/payments', auth, async (req, res) => {
   }
 });
 
+router.post('/job-boosts', auth, async (req, res) => {
+  const postId = Number(req.body.postId || req.body.post_id);
+  const amount = Number(req.body.amount || 5);
+  const note = String(req.body.note || '').trim();
+
+  if (!postId) {
+    return res.status(400).json({ message: 'İş elanı seçilməyib.' });
+  }
+  if (!Number.isFinite(amount) || amount < 1) {
+    return res.status(400).json({ message: 'Minimum boost məbləği 1 AZN-dir.' });
+  }
+  if (note && invalidText(note)) {
+    return res.status(400).json({ message: 'Boost qeydi qaydalara uyğun deyil.' });
+  }
+
+  try {
+    const postResult = await db.query('SELECT id, user_id, post_type FROM posts WHERE id = $1', [postId]);
+    const post = postResult.rows[0];
+    if (!post) return res.status(404).json({ message: 'İş elanı tapılmadı.' });
+    if (post.post_type !== 'JOB') return res.status(400).json({ message: 'Yalnız iş elanları önə çıxarıla bilər.' });
+    if (String(post.user_id) !== String(req.user.id)) return res.status(403).json({ message: 'Bu elanı yalnız sahibi önə çıxara bilər.' });
+
+    const reference = `JB-${Date.now()}-${req.user.id}`;
+    const result = await db.query(
+      `INSERT INTO job_boosts (post_id, user_id, amount, currency, status, reference, note)
+       VALUES ($1, $2, $3, 'AZN', 'PENDING_MANUAL_CONFIRMATION', $4, $5)
+       RETURNING id, post_id, user_id, amount, currency, status, reference, note, created_at`,
+      [postId, req.user.id, amount, reference, note || null]
+    );
+
+    res.status(201).json({
+      boost: result.rows[0],
+      accountNumber: process.env.SUPPORT_ACCOUNT_NUMBER || DEFAULT_ACCOUNT_NUMBER,
+      receiverName: process.env.SUPPORT_RECEIVER_NAME || 'DevFeed creator',
+    });
+  } catch (error) {
+    console.error('POST /support/job-boosts error:', error);
+    res.status(500).json({ message: 'Boost ödənişi qeydə alınmadı.' });
+  }
+});
+
 module.exports = router;

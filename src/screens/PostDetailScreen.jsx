@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { AuthContext } from '../context/AuthContext';
+import JobApplicationModal from '../components/JobApplicationModal';
 import * as api from '../api';
 
 const POST_TYPES = {
@@ -213,9 +214,14 @@ export default function PostDetailScreen({ route, navigation }) {
   const [savingComment, setSavingComment] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  const [applyOpen, setApplyOpen] = useState(false);
+  const [applyingJob, setApplyingJob] = useState(false);
+  const [boostingJob, setBoostingJob] = useState(false);
+  const [applications, setApplications] = useState([]);
 
   const kind = POST_TYPES[post.type] || POST_TYPES.TEXT;
   const isOwner = String(user?.id || '') === String(post.user_id || post.userId || '');
+  const isJobPost = post.type === 'JOB';
 
   const loadPost = useCallback(async () => {
     try {
@@ -235,6 +241,13 @@ export default function PostDetailScreen({ route, navigation }) {
   useEffect(() => {
     loadPost();
   }, [loadPost]);
+
+  useEffect(() => {
+    if (!isOwner || !isJobPost || !post.id) return;
+    api.fetchPostApplications(post.id)
+      .then((data) => setApplications(Array.isArray(data) ? data : []))
+      .catch(() => setApplications([]));
+  }, [isOwner, isJobPost, post.id]);
 
   const handleAddComment = async () => {
     const text = commentText.trim();
@@ -310,6 +323,44 @@ export default function PostDetailScreen({ route, navigation }) {
     }
   };
 
+  const handleSubmitJobApplication = async ({ coverLetter, phone, resume }) => {
+    setApplyingJob(true);
+    try {
+      const uploadedResume = await api.uploadJobResume({
+        uri: resume.uri,
+        name: resume.name || 'cv.pdf',
+        type: resume.mimeType || 'application/pdf',
+      });
+      const result = await api.applyToJob(post.id, {
+        coverLetter,
+        phone,
+        resumeUrl: uploadedResume.resumeUrl,
+        resumeFileName: uploadedResume.resumeFileName,
+      });
+      setApplyOpen(false);
+      Alert.alert('Müraciət göndərildi', result.conversationId ? 'Elan sahibinin DM və müraciətlər bölməsinə düşdü.' : 'Müraciətin qeydə alındı.');
+    } catch (error) {
+      Alert.alert('Müraciət xətası', error.response?.data?.error || error.response?.data?.message || error.message);
+    } finally {
+      setApplyingJob(false);
+    }
+  };
+
+  const handleBoostJob = async () => {
+    setBoostingJob(true);
+    try {
+      const result = await api.createJobBoostPayment({ postId: post.id, amount: 5 });
+      Alert.alert(
+        'Boost qeydə alındı',
+        `5 AZN köçürməni bu hesaba et:\n${result.accountNumber}\nReferans: ${result.boost.reference}`
+      );
+    } catch (error) {
+      Alert.alert('Boost xətası', error.response?.data?.message || error.message);
+    } finally {
+      setBoostingJob(false);
+    }
+  };
+
   const handleAuthorPress = () => {
     const authorId = post.user_id || post.userId;
     if (!authorId) return;
@@ -318,6 +369,18 @@ export default function PostDetailScreen({ route, navigation }) {
       return;
     }
     navigation.navigate('UserProfile', { userId: authorId });
+  };
+
+  const handleMessageApplicant = async (application) => {
+    try {
+      const conversation = await api.createConversation({ userId: application.user_id });
+      navigation.navigate('Chat', {
+        conversationId: conversation.id,
+        title: conversation.title || application.name || application.applicant_name,
+      });
+    } catch (error) {
+      Alert.alert('Mesaj xətası', error.response?.data?.message || error.message);
+    }
   };
 
   const handleSaveEdit = async (payload) => {
@@ -403,6 +466,51 @@ export default function PostDetailScreen({ route, navigation }) {
         )}
         <PayloadPreview post={post} />
 
+        {isJobPost && !isOwner && (
+          <TouchableOpacity style={styles.applyButton} onPress={() => setApplyOpen(true)}>
+            <MaterialIcons name="assignment-turned-in" size={18} color="#111827" />
+            <Text style={styles.applyButtonText}>Müraciət et</Text>
+          </TouchableOpacity>
+        )}
+
+        {isJobPost && isOwner && (
+          <View style={styles.applicationsBox}>
+            <View style={styles.applicationsHeader}>
+              <Text style={styles.applicationsTitle}>Müraciətlər</Text>
+              <Text style={styles.applicationsCount}>{applications.length}</Text>
+            </View>
+            <TouchableOpacity style={styles.boostButton} onPress={handleBoostJob} disabled={boostingJob}>
+              {boostingJob ? (
+                <ActivityIndicator color="#111827" />
+              ) : (
+                <>
+                  <MaterialIcons name="trending-up" size={17} color="#111827" />
+                  <Text style={styles.boostButtonText}>Elanı önə çıxar · 5 AZN</Text>
+                </>
+              )}
+            </TouchableOpacity>
+            {applications.length > 0 ? (
+              applications.slice(0, 4).map((item) => (
+                <View key={String(item.id || item.user_id)} style={styles.applicationRow}>
+                  <View style={styles.applicationBody}>
+                    <Text style={styles.applicationName}>{item.name || item.applicant_name || 'İstifadəçi'}</Text>
+                    <Text style={styles.applicationMeta}>{item.applicant_phone || 'Telefon yoxdur'} · {item.resume_file_name || 'CV'}</Text>
+                    {!!item.cover_letter && <Text style={styles.applicationText} numberOfLines={2}>{item.cover_letter}</Text>}
+                  </View>
+                  <TouchableOpacity
+                    style={styles.applicationMessageButton}
+                    onPress={() => handleMessageApplicant(item)}
+                  >
+                    <MaterialIcons name="send" size={16} color="#ffffff" />
+                  </TouchableOpacity>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.applicationEmpty}>Hələ müraciət yoxdur.</Text>
+            )}
+          </View>
+        )}
+
         <View style={styles.metricsRow}>
           <TouchableOpacity style={styles.metricButton} onPress={handleLike}>
             <MaterialIcons name={post.likedByMe ? 'favorite' : 'favorite-border'} size={18} color={post.likedByMe ? '#f85149' : '#8b949e'} />
@@ -450,7 +558,7 @@ export default function PostDetailScreen({ route, navigation }) {
       <FlatList
         data={comments}
         keyExtractor={(item) => item.id?.toString() ?? Math.random().toString()}
-        ListHeaderComponent={renderHeader}
+        ListHeaderComponent={renderHeader()}
         contentContainerStyle={styles.listContent}
         renderItem={({ item }) => (
           <View style={styles.commentCard}>
@@ -469,6 +577,13 @@ export default function PostDetailScreen({ route, navigation }) {
         saving={savingEdit}
         onClose={() => setEditOpen(false)}
         onSave={handleSaveEdit}
+      />
+      <JobApplicationModal
+        visible={applyOpen}
+        post={post}
+        submitting={applyingJob}
+        onClose={() => setApplyOpen(false)}
+        onSubmit={handleSubmitJobApplication}
       />
     </SafeAreaView>
   );
@@ -721,6 +836,95 @@ const styles = StyleSheet.create({
     marginRight: 6,
     marginBottom: 6,
     fontSize: 11,
+  },
+  applyButton: {
+    marginTop: 12,
+    backgroundColor: '#f59e0b',
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+  },
+  applyButtonText: {
+    color: '#111827',
+    fontWeight: '900',
+    marginLeft: 8,
+  },
+  applicationsBox: {
+    marginTop: 12,
+    backgroundColor: '#0d1117',
+    borderColor: '#30363d',
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 12,
+  },
+  applicationsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  applicationsTitle: {
+    color: '#e6edf3',
+    fontWeight: '900',
+  },
+  applicationsCount: {
+    color: '#fbbf24',
+    fontWeight: '900',
+  },
+  boostButton: {
+    backgroundColor: '#fbbf24',
+    borderRadius: 9,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    marginBottom: 6,
+  },
+  boostButtonText: {
+    color: '#111827',
+    fontWeight: '900',
+    marginLeft: 7,
+  },
+  applicationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderTopColor: '#21262d',
+    borderTopWidth: 1,
+    paddingTop: 10,
+    marginTop: 10,
+  },
+  applicationBody: {
+    flex: 1,
+  },
+  applicationName: {
+    color: '#e6edf3',
+    fontWeight: '900',
+  },
+  applicationMeta: {
+    color: '#8b949e',
+    fontSize: 11,
+    marginTop: 3,
+  },
+  applicationText: {
+    color: '#c9d1d9',
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 5,
+  },
+  applicationMessageButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#6366f1',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 10,
+  },
+  applicationEmpty: {
+    color: '#8b949e',
+    fontSize: 12,
   },
   metricsRow: {
     flexDirection: 'row',

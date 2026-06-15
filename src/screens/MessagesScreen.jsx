@@ -4,6 +4,7 @@ import {
   Alert,
   FlatList,
   Image,
+  Linking,
   Modal,
   RefreshControl,
   StyleSheet,
@@ -25,9 +26,7 @@ function formatTime(value) {
 
 function ConversationAvatar({ title, avatarUrl }) {
   const letter = String(title || 'S').slice(0, 1).toUpperCase();
-  if (avatarUrl) {
-    return <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />;
-  }
+  if (avatarUrl) return <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />;
   return (
     <View style={styles.avatar}>
       <Text style={styles.avatarText}>{letter}</Text>
@@ -80,6 +79,8 @@ function NewConversationModal({ visible, creating, onClose, onCreate }) {
 
 export default function MessagesScreen({ navigation }) {
   const [conversations, setConversations] = useState([]);
+  const [applications, setApplications] = useState([]);
+  const [activeTab, setActiveTab] = useState('chats');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
@@ -87,10 +88,14 @@ export default function MessagesScreen({ navigation }) {
 
   const loadConversations = useCallback(async () => {
     try {
-      const data = await api.fetchConversations();
-      setConversations(Array.isArray(data) ? data : []);
+      const [conversationData, applicationData] = await Promise.all([
+        api.fetchConversations(),
+        api.fetchJobApplicationInbox().catch(() => []),
+      ]);
+      setConversations(Array.isArray(conversationData) ? conversationData : []);
+      setApplications(Array.isArray(applicationData) ? applicationData : []);
     } catch (error) {
-      Alert.alert('Mesaj xetasi', error.response?.data?.message || error.message);
+      Alert.alert('Mesaj xətası', error.response?.data?.message || error.message);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -117,11 +122,73 @@ export default function MessagesScreen({ navigation }) {
         title: conversation.title,
       });
     } catch (error) {
-      Alert.alert('Sohbet xetasi', error.response?.data?.message || error.message);
+      Alert.alert('Söhbət xətası', error.response?.data?.message || error.message);
     } finally {
       setCreating(false);
     }
   };
+
+  const handleReplyApplication = async (application) => {
+    try {
+      const conversation = await api.createConversation({ userId: application.user_id });
+      navigation.navigate('Chat', {
+        conversationId: conversation.id,
+        title: conversation.title || application.applicant_name || application.name,
+      });
+    } catch (error) {
+      Alert.alert('Geri dönüş xətası', error.response?.data?.message || error.message);
+    }
+  };
+
+  const handleOpenResume = async (resumeUrl) => {
+    if (!resumeUrl) return;
+    try {
+      await Linking.openURL(resumeUrl);
+    } catch (error) {
+      Alert.alert('CV açılmadı', error.message);
+    }
+  };
+
+  const renderConversation = ({ item }) => (
+    <TouchableOpacity
+      style={styles.chatCard}
+      onPress={() => navigation.navigate('Chat', { conversationId: item.id, title: item.title })}
+    >
+      <ConversationAvatar title={item.title} avatarUrl={item.avatar_url || item.otherUser?.avatar_url} />
+      <View style={styles.chatBody}>
+        <View style={styles.chatTopRow}>
+          <Text style={styles.chatTitle}>{item.title || 'Söhbət'}</Text>
+          <Text style={styles.chatTime}>{formatTime(item.updatedAt || item.time)}</Text>
+        </View>
+        <Text style={styles.chatLast} numberOfLines={1}>{item.lastMessage || 'Hələ mesaj yoxdur'}</Text>
+      </View>
+      <MaterialIcons name="chevron-right" size={24} color="#8b949e" />
+    </TouchableOpacity>
+  );
+
+  const renderApplication = ({ item }) => (
+    <View style={styles.applicationCard}>
+      <View style={styles.applicationTop}>
+        <ConversationAvatar title={item.applicant_name || item.name} avatarUrl={item.applicant_avatar_url || item.avatar_url} />
+        <View style={styles.chatBody}>
+          <Text style={styles.chatTitle}>{item.applicant_name || item.name || 'Namizəd'}</Text>
+          <Text style={styles.chatLast}>{item.post_caption || item.post_title || 'İş elanı'}</Text>
+          <Text style={styles.applicationPhone}>{item.applicant_phone || 'Telefon qeyd edilməyib'}</Text>
+        </View>
+      </View>
+      {!!item.cover_letter && <Text style={styles.applicationLetter} numberOfLines={3}>{item.cover_letter}</Text>}
+      <View style={styles.applicationActions}>
+        <TouchableOpacity style={styles.resumeButton} onPress={() => handleOpenResume(item.resume_url)} disabled={!item.resume_url}>
+          <MaterialIcons name="picture-as-pdf" size={16} color="#f87171" />
+          <Text style={styles.resumeButtonText}>{item.resume_file_name || 'CV PDF'}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.replyButton} onPress={() => handleReplyApplication(item)}>
+          <MaterialIcons name="send" size={16} color="#ffffff" />
+          <Text style={styles.replyButtonText}>Geri dönüş</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
 
   if (loading) {
     return (
@@ -132,7 +199,7 @@ export default function MessagesScreen({ navigation }) {
   }
 
   return (
-      <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <View>
           <Text style={styles.title}>Mesajlar</Text>
@@ -143,30 +210,32 @@ export default function MessagesScreen({ navigation }) {
         </TouchableOpacity>
       </View>
 
+      <View style={styles.tabs}>
+        <TouchableOpacity
+          style={[styles.tabButton, activeTab === 'chats' && styles.tabButtonActive]}
+          onPress={() => setActiveTab('chats')}
+        >
+          <Text style={[styles.tabText, activeTab === 'chats' && styles.tabTextActive]}>Söhbətlər</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tabButton, activeTab === 'applications' && styles.tabButtonActive]}
+          onPress={() => setActiveTab('applications')}
+        >
+          <Text style={[styles.tabText, activeTab === 'applications' && styles.tabTextActive]}>Müraciətlər</Text>
+        </TouchableOpacity>
+      </View>
+
       <FlatList
-        data={conversations}
-        keyExtractor={(item) => item.id?.toString() ?? Math.random().toString()}
+        data={activeTab === 'chats' ? conversations : applications}
+        keyExtractor={(item) => item.id?.toString() ?? `${activeTab}-${Math.random()}`}
         contentContainerStyle={styles.listContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#6366f1" />}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={styles.chatCard}
-            onPress={() => navigation.navigate('Chat', { conversationId: item.id, title: item.title })}
-          >
-            <ConversationAvatar title={item.title} avatarUrl={item.avatar_url || item.otherUser?.avatar_url} />
-            <View style={styles.chatBody}>
-              <View style={styles.chatTopRow}>
-                <Text style={styles.chatTitle}>{item.title || 'Sohbet'}</Text>
-                <Text style={styles.chatTime}>{formatTime(item.updatedAt || item.time)}</Text>
-              </View>
-              <Text style={styles.chatLast} numberOfLines={1}>
-                {item.lastMessage || 'Hələ mesaj yoxdur'}
-              </Text>
-            </View>
-            <MaterialIcons name="chevron-right" size={24} color="#8b949e" />
-          </TouchableOpacity>
-        )}
-        ListEmptyComponent={<Text style={styles.emptyText}>Hələ söhbət yoxdur. Email ilə ilk söhbəti aç.</Text>}
+        renderItem={activeTab === 'chats' ? renderConversation : renderApplication}
+        ListEmptyComponent={
+          <Text style={styles.emptyText}>
+            {activeTab === 'chats' ? 'Hələ söhbət yoxdur. Email ilə ilk söhbəti aç.' : 'Hələ iş müraciəti yoxdur.'}
+          </Text>
+        }
       />
 
       <NewConversationModal
@@ -217,6 +286,33 @@ const styles = StyleSheet.create({
     backgroundColor: '#6366f1',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  tabs: {
+    flexDirection: 'row',
+    padding: 10,
+    borderBottomColor: '#21262d',
+    borderBottomWidth: 1,
+  },
+  tabButton: {
+    flex: 1,
+    borderColor: '#30363d',
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: 'center',
+    marginHorizontal: 4,
+    backgroundColor: '#161b22',
+  },
+  tabButtonActive: {
+    backgroundColor: '#312e81',
+    borderColor: '#6366f1',
+  },
+  tabText: {
+    color: '#8b949e',
+    fontWeight: '900',
+  },
+  tabTextActive: {
+    color: '#ffffff',
   },
   listContent: {
     padding: 14,
@@ -273,6 +369,63 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     fontSize: 11,
     marginLeft: 8,
+  },
+  applicationCard: {
+    backgroundColor: '#161b22',
+    borderColor: '#21262d',
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 10,
+  },
+  applicationTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  applicationPhone: {
+    color: '#fbbf24',
+    fontSize: 12,
+    fontWeight: '800',
+    marginTop: 4,
+  },
+  applicationLetter: {
+    color: '#c9d1d9',
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 12,
+  },
+  applicationActions: {
+    flexDirection: 'row',
+    marginTop: 12,
+  },
+  resumeButton: {
+    flex: 1,
+    borderColor: '#30363d',
+    borderWidth: 1,
+    borderRadius: 9,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  resumeButtonText: {
+    color: '#e6edf3',
+    fontWeight: '800',
+    marginLeft: 6,
+  },
+  replyButton: {
+    backgroundColor: '#6366f1',
+    borderRadius: 9,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  replyButtonText: {
+    color: '#ffffff',
+    fontWeight: '900',
+    marginLeft: 6,
   },
   emptyText: {
     color: '#8b949e',
