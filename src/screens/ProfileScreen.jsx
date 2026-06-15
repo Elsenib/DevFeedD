@@ -153,7 +153,7 @@ function SupportModal({ visible, profile, colors, config, submitting, onClose, o
   );
 }
 
-export default function ProfileScreen({ route }) {
+export default function ProfileScreen({ route, navigation }) {
   const { user, updateCurrentUser } = useContext(AuthContext);
   const { theme } = useContext(PreferencesContext);
   const colors = theme.colors;
@@ -167,35 +167,40 @@ export default function ProfileScreen({ route }) {
   const [supportSubmitting, setSupportSubmitting] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [supportOpen, setSupportOpen] = useState(false);
+  const [activityHidden, setActivityHidden] = useState(false);
+  const targetUserId = route?.params?.userId;
+  const isOwnProfile = !targetUserId || String(targetUserId) === String(user?.id);
 
   const loadProfile = useCallback(async () => {
+    setLoading(true);
     try {
       const [profileData, postsData, configData] = await Promise.all([
-        api.fetchProfile(),
-        api.fetchMyPosts().catch(() => []),
+        isOwnProfile ? api.fetchProfile() : api.fetchUserProfile(targetUserId),
+        isOwnProfile ? api.fetchMyPosts().catch(() => []) : api.fetchUserPosts(targetUserId).catch(() => ({ posts: [] })),
         api.fetchSupportConfig().catch(() => null),
       ]);
       setProfile(profileData);
-      setMyPosts(Array.isArray(postsData) ? postsData : []);
+      setMyPosts(Array.isArray(postsData) ? postsData : (postsData.posts || []));
+      setActivityHidden(!Array.isArray(postsData) && !!postsData.hidden);
       setSupportConfig(configData);
     } catch (error) {
       Alert.alert('Profil xətası', error.response?.data?.message || error.message);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isOwnProfile, targetUserId]);
 
   useEffect(() => {
     loadProfile();
   }, [loadProfile]);
 
   useEffect(() => {
-    if (route?.params?.openEdit) {
+    if (isOwnProfile && route?.params?.openEdit) {
       setEditOpen(true);
     }
-  }, [route?.params?.openEdit]);
+  }, [isOwnProfile, route?.params?.openEdit]);
 
-  const displayName = profile?.name || user?.name || user?.email || 'Istifadeci';
+  const displayName = profile?.name || user?.name || user?.email || 'İstifadəçi';
   const stack = profile?.stack || profile?.skills || ['React Native', 'Node.js', 'PostgreSQL'];
 
   const handleSaveProfile = async (payload) => {
@@ -214,6 +219,7 @@ export default function ProfileScreen({ route }) {
   };
 
   const handlePickAvatar = async () => {
+    if (!isOwnProfile) return;
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
       Alert.alert('İcazə lazımdır', 'Profil şəkli seçmək üçün qalereya icazəsi ver.');
@@ -237,6 +243,7 @@ export default function ProfileScreen({ route }) {
         type: asset.mimeType || 'image/jpeg',
       });
       setProfile((prev) => ({ ...(prev || {}), avatar_url: uploaded.avatar_url }));
+      await updateCurrentUser({ avatar_url: uploaded.avatar_url }).catch(() => null);
       Alert.alert('Şəkil yeniləndi', 'Profil şəklin uğurla yükləndi.');
     } catch (error) {
       Alert.alert('Avatar xətası', error.response?.data?.message || error.message);
@@ -265,6 +272,42 @@ export default function ProfileScreen({ route }) {
     }
   };
 
+  const handleToggleFollow = async () => {
+    if (!profile?.id) return;
+    const nextFollowing = !profile.following_by_me;
+    setProfile((prev) => ({
+      ...(prev || {}),
+      following_by_me: nextFollowing,
+      followers_count: Math.max(0, Number(prev?.followers_count || 0) + (nextFollowing ? 1 : -1)),
+    }));
+
+    try {
+      const result = nextFollowing ? await api.followUser(profile.id) : await api.unfollowUser(profile.id);
+      setProfile((prev) => ({
+        ...(prev || {}),
+        following_by_me: result.following ?? nextFollowing,
+        followers_count: result.followers_count ?? prev?.followers_count,
+        following_count: result.following_count ?? prev?.following_count,
+      }));
+    } catch (error) {
+      Alert.alert('İzləmə xətası', error.response?.data?.message || error.message);
+      loadProfile();
+    }
+  };
+
+  const handleMessage = async () => {
+    if (!profile?.id) return;
+    try {
+      const conversation = await api.createConversation({ userId: profile.id });
+      navigation.navigate('Chat', {
+        conversationId: conversation.id,
+        title: conversation.title || profile.name,
+      });
+    } catch (error) {
+      Alert.alert('Mesaj xətası', error.response?.data?.message || error.message);
+    }
+  };
+
   if (loading) {
     return (
       <View style={styles.center}>
@@ -277,7 +320,7 @@ export default function ProfileScreen({ route }) {
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.headerCard}>
-          <TouchableOpacity style={styles.avatarWrap} onPress={handlePickAvatar} disabled={uploadingAvatar}>
+          <TouchableOpacity style={styles.avatarWrap} onPress={handlePickAvatar} disabled={uploadingAvatar || !isOwnProfile}>
             {profile?.avatar_url ? (
               <Image source={{ uri: profile.avatar_url }} style={styles.avatarImage} />
             ) : (
@@ -285,22 +328,56 @@ export default function ProfileScreen({ route }) {
                 <Text style={styles.avatarText}>{displayName.slice(0, 1).toUpperCase()}</Text>
               </View>
             )}
-            <View style={styles.cameraBadge}>
-              {uploadingAvatar ? <ActivityIndicator size="small" color="#ffffff" /> : <MaterialIcons name="photo-camera" size={14} color="#ffffff" />}
-            </View>
+            {isOwnProfile && (
+              <View style={styles.cameraBadge}>
+                {uploadingAvatar ? <ActivityIndicator size="small" color="#ffffff" /> : <MaterialIcons name="photo-camera" size={14} color="#ffffff" />}
+              </View>
+            )}
           </TouchableOpacity>
           <View style={styles.headerInfo}>
             <Text style={styles.name}>{displayName}</Text>
             <Text style={styles.email}>{profile?.email || user?.email}</Text>
             <Text style={styles.roleText}>{profile?.role_sub || profile?.role || 'DevFeed member'}</Text>
           </View>
+          {isOwnProfile && (
+            <TouchableOpacity style={styles.settingsButton} onPress={() => navigation.navigate('Settings')}>
+              <MaterialIcons name="settings" size={20} color={colors.text} />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        <View style={styles.statsRow}>
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>{profile?.posts ?? myPosts.length}</Text>
+            <Text style={styles.statLabel}>Paylaşım</Text>
+          </View>
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>{profile?.followers_count ?? 0}</Text>
+            <Text style={styles.statLabel}>İzləyici</Text>
+          </View>
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>{profile?.following_count ?? 0}</Text>
+            <Text style={styles.statLabel}>İzlənən</Text>
+          </View>
         </View>
 
         <View style={styles.actionRow}>
-          <TouchableOpacity style={styles.actionButton} onPress={() => setEditOpen(true)}>
+          <TouchableOpacity style={[styles.actionButton, !isOwnProfile && styles.hiddenAction]} onPress={() => setEditOpen(true)} disabled={!isOwnProfile}>
             <MaterialIcons name="edit" size={18} color="#ffffff" />
             <Text style={styles.actionButtonText}>Profili düzəlt</Text>
           </TouchableOpacity>
+          {!isOwnProfile && (
+            <TouchableOpacity style={styles.actionButton} onPress={handleToggleFollow}>
+              <MaterialIcons name={profile?.following_by_me ? 'person-remove' : 'person-add'} size={18} color="#ffffff" />
+              <Text style={styles.actionButtonText}>{profile?.following_by_me ? 'İzləmədən çıx' : 'İzlə'}</Text>
+            </TouchableOpacity>
+          )}
+          {!isOwnProfile && (
+            <TouchableOpacity style={[styles.actionButton, styles.messageButton]} onPress={handleMessage}>
+              <MaterialIcons name="send" size={18} color="#ffffff" />
+              <Text style={styles.actionButtonText}>Mesaj</Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity style={[styles.actionButton, styles.supportButton]} onPress={() => setSupportOpen(true)}>
             <MaterialIcons name="local-cafe" size={18} color="#111827" />
             <Text style={styles.supportButtonText}>Dəstək ol</Text>
@@ -333,16 +410,18 @@ export default function ProfileScreen({ route }) {
             <Text style={styles.sectionTitle}>Paylaşımlar</Text>
             <Text style={styles.countText}>{myPosts.length}</Text>
           </View>
-          {myPosts.length > 0 ? (
+          {activityHidden ? (
+            <Text style={styles.bodyText}>Bu istifadəçi fəaliyyətini gizlədib.</Text>
+          ) : myPosts.length > 0 ? (
             myPosts.map((post) => (
-              <View key={post.id} style={styles.postCard}>
+              <TouchableOpacity key={post.id} style={styles.postCard} onPress={() => navigation.navigate('PostDetail', { post })}>
                 <View style={styles.postTopRow}>
                   <Text style={styles.postType}>{postTypeLabel(post.post_type)}</Text>
                   <Text style={styles.postMeta}>{Number(post.like_count || 0)} bəyənmə</Text>
                 </View>
                 <Text style={styles.postTitle} numberOfLines={2}>{post.caption || post.title || post.body}</Text>
                 {!!post.body && <Text style={styles.postBody} numberOfLines={2}>{post.body}</Text>}
-              </View>
+              </TouchableOpacity>
             ))
           ) : (
             <Text style={styles.bodyText}>Hələ paylaşım yoxdur.</Text>
@@ -450,6 +529,17 @@ function createStyles(colors) {
     headerInfo: {
       flex: 1,
     },
+    settingsButton: {
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      backgroundColor: colors.surfaceStrong,
+      borderColor: colors.border,
+      borderWidth: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginLeft: 10,
+    },
     name: {
       color: colors.text,
       fontSize: 19,
@@ -466,6 +556,33 @@ function createStyles(colors) {
       fontWeight: '800',
       marginTop: 6,
     },
+    statsRow: {
+      flexDirection: 'row',
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      borderColor: colors.border,
+      borderWidth: 1,
+      marginBottom: 12,
+      overflow: 'hidden',
+    },
+    statItem: {
+      flex: 1,
+      alignItems: 'center',
+      paddingVertical: 12,
+      borderRightColor: colors.border,
+      borderRightWidth: 1,
+    },
+    statValue: {
+      color: colors.text,
+      fontSize: 18,
+      fontWeight: '900',
+    },
+    statLabel: {
+      color: colors.muted,
+      fontSize: 11,
+      marginTop: 3,
+      fontWeight: '800',
+    },
     actionRow: {
       flexDirection: 'row',
       marginBottom: 12,
@@ -479,6 +596,12 @@ function createStyles(colors) {
       justifyContent: 'center',
       flexDirection: 'row',
       marginRight: 8,
+    },
+    hiddenAction: {
+      display: 'none',
+    },
+    messageButton: {
+      backgroundColor: colors.success,
     },
     actionButtonText: {
       color: '#ffffff',

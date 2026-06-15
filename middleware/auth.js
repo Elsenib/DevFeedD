@@ -16,5 +16,21 @@ const auth = (req, res, next) => {
   }
 };
 
-module.exports = { auth };
+const optionalAuth = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    req.user = null;
+    return next();
+  }
+
+  const token = authHeader.split(' ')[1];
+  try {
+    req.user = jwt.verify(token, process.env.JWT_SECRET || 'devfeed-secret');
+  } catch (error) {
+    req.user = null;
+  }
+  return next();
+};
+
+module.exports = { auth, optionalAuth };
 

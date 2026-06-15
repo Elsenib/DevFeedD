@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Image,
   Modal,
   Pressable,
   RefreshControl,
@@ -13,6 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { AuthContext } from '../context/AuthContext';
 import * as api from '../api';
@@ -46,11 +48,14 @@ function normalizePost(row) {
     metadata,
     authorName: row.name || row.user?.name || row.userEmail || 'Istifadeci',
     authorRole: row.role_sub || row.role || 'DevFeed member',
+    authorAvatar: row.avatar_url || row.user?.avatar_url || row.authorAvatar || null,
     caption: row.caption || row.title || row.body || 'Yeni paylasim',
     body: row.body || row.caption || row.title || '',
     likeCount: Number(row.like_count ?? row.likes ?? 0),
     commentCount: Number(row.comment_count ?? row.comments?.length ?? row.comments ?? 0),
     bookmarkCount: Number(row.bookmark_count ?? 0),
+    likedByMe: !!(row.liked_by_me ?? row.likedByMe),
+    bookmarkedByMe: !!(row.bookmarked_by_me ?? row.bookmarkedByMe),
     createdAt: row.created_at || row.createdAt,
     tags: Array.isArray(row.tags) ? row.tags : [],
   };
@@ -67,8 +72,11 @@ function typeStyle(type) {
   return POST_TYPES.find((item) => item.id === type) || POST_TYPES[0];
 }
 
-function AuthorAvatar({ name }) {
+function AuthorAvatar({ name, avatarUrl }) {
   const letter = String(name || 'U').slice(0, 1).toUpperCase();
+  if (avatarUrl) {
+    return <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />;
+  }
   return (
     <View style={styles.avatar}>
       <Text style={styles.avatarText}>{letter}</Text>
@@ -162,16 +170,24 @@ function PostPayload({ post, onApplyJob }) {
   return null;
 }
 
-function PostCard({ post, onPress, onLike, onBookmark, onApplyJob }) {
+function PostCard({ post, onPress, onAuthorPress, onLike, onBookmark, onApplyJob }) {
   const kind = typeStyle(post.type);
   return (
     <Pressable style={styles.postCard} onPress={() => onPress(post)}>
       <View style={styles.postHeader}>
-        <AuthorAvatar name={post.authorName} />
-        <View style={styles.authorBlock}>
-          <Text style={styles.postUser}>{post.authorName}</Text>
-          <Text style={styles.postTime}>{post.authorRole} - {formatTime(post.createdAt)}</Text>
-        </View>
+        <TouchableOpacity
+          style={styles.authorTap}
+          onPress={(event) => {
+            event?.stopPropagation?.();
+            onAuthorPress?.(post);
+          }}
+        >
+          <AuthorAvatar name={post.authorName} avatarUrl={post.authorAvatar} />
+          <View style={styles.authorBlock}>
+            <Text style={styles.postUser}>{post.authorName}</Text>
+            <Text style={styles.postTime}>{post.authorRole} - {formatTime(post.createdAt)}</Text>
+          </View>
+        </TouchableOpacity>
         <View style={[styles.typeBadge, { borderColor: kind.color, backgroundColor: `${kind.color}18` }]}>
           <Text style={[styles.typeBadgeText, { color: kind.color }]}>{kind.label.toUpperCase()}</Text>
         </View>
@@ -196,8 +212,8 @@ function PostCard({ post, onPress, onLike, onBookmark, onApplyJob }) {
             onLike(post);
           }}
         >
-          <MaterialIcons name="favorite-border" size={18} color="#8b949e" />
-          <Text style={styles.metaText}>{post.likeCount}</Text>
+          <MaterialIcons name={post.likedByMe ? 'favorite' : 'favorite-border'} size={18} color={post.likedByMe ? '#f85149' : '#8b949e'} />
+          <Text style={[styles.metaText, post.likedByMe && styles.likeTextActive]}>{post.likeCount}</Text>
         </TouchableOpacity>
         <View style={styles.actionButton}>
           <MaterialIcons name="chat-bubble-outline" size={18} color="#8b949e" />
@@ -210,8 +226,8 @@ function PostCard({ post, onPress, onLike, onBookmark, onApplyJob }) {
             onBookmark(post);
           }}
         >
-          <MaterialIcons name="bookmark-border" size={18} color="#8b949e" />
-          <Text style={styles.metaText}>{post.bookmarkCount}</Text>
+          <MaterialIcons name={post.bookmarkedByMe ? 'bookmark' : 'bookmark-border'} size={18} color={post.bookmarkedByMe ? '#fbbf24' : '#8b949e'} />
+          <Text style={[styles.metaText, post.bookmarkedByMe && styles.bookmarkTextActive]}>{post.bookmarkCount}</Text>
         </TouchableOpacity>
       </View>
     </Pressable>
@@ -486,9 +502,12 @@ export default function FeedScreen({ navigation }) {
           name: user?.name || user?.email,
           role: user?.role,
           role_sub: user?.role_sub || user?.roleSub,
+          avatar_url: user?.avatar_url || user?.avatarUrl,
           like_count: 0,
           comment_count: 0,
           bookmark_count: 0,
+          liked_by_me: false,
+          bookmarked_by_me: false,
         },
         ...prev,
       ]);
@@ -501,33 +520,75 @@ export default function FeedScreen({ navigation }) {
   };
 
   const handleLike = async (post) => {
+    const nextLiked = !post.likedByMe;
     setPosts((prev) =>
       prev.map((item) => {
         if (String(item.id) !== String(post.id)) return item;
         const current = Number(item.like_count ?? item.likes ?? 0);
-        return { ...item, like_count: current + 1 };
+        return {
+          ...item,
+          like_count: Math.max(0, current + (nextLiked ? 1 : -1)),
+          liked_by_me: nextLiked,
+        };
       })
     );
     try {
-      await api.toggleLike(post.id);
+      const result = nextLiked ? await api.toggleLike(post.id) : await api.unlikePost(post.id);
+      setPosts((prev) =>
+        prev.map((item) =>
+          String(item.id) === String(post.id)
+            ? {
+                ...item,
+                like_count: result.like_count ?? item.like_count,
+                liked_by_me: result.liked ?? nextLiked,
+              }
+            : item
+        )
+      );
     } catch (error) {
       loadPosts();
     }
   };
 
   const handleBookmark = async (post) => {
+    const nextBookmarked = !post.bookmarkedByMe;
     setPosts((prev) =>
       prev.map((item) => {
         if (String(item.id) !== String(post.id)) return item;
         const current = Number(item.bookmark_count ?? 0);
-        return { ...item, bookmark_count: current + 1 };
+        return {
+          ...item,
+          bookmark_count: Math.max(0, current + (nextBookmarked ? 1 : -1)),
+          bookmarked_by_me: nextBookmarked,
+        };
       })
     );
     try {
-      await api.bookmarkPost(post.id);
+      const result = nextBookmarked ? await api.bookmarkPost(post.id) : await api.removeBookmark(post.id);
+      setPosts((prev) =>
+        prev.map((item) =>
+          String(item.id) === String(post.id)
+            ? {
+                ...item,
+                bookmark_count: result.bookmark_count ?? item.bookmark_count,
+                bookmarked_by_me: result.bookmarked ?? nextBookmarked,
+              }
+            : item
+        )
+      );
     } catch (error) {
       loadPosts();
     }
+  };
+
+  const handleAuthorPress = (post) => {
+    const authorId = post.user_id || post.userId;
+    if (!authorId) return;
+    if (String(authorId) === String(user?.id)) {
+      navigation.navigate('Profile');
+      return;
+    }
+    navigation.navigate('UserProfile', { userId: authorId });
   };
 
   const handleApplyJob = async (post) => {
@@ -547,7 +608,7 @@ export default function FeedScreen({ navigation }) {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <View>
           <View style={styles.brandRow}>
@@ -573,6 +634,7 @@ export default function FeedScreen({ navigation }) {
             <PostCard
               post={item}
               onPress={(post) => navigation.navigate('PostDetail', { post })}
+              onAuthorPress={handleAuthorPress}
               onLike={handleLike}
               onBookmark={handleBookmark}
               onApplyJob={handleApplyJob}
@@ -583,7 +645,7 @@ export default function FeedScreen({ navigation }) {
           ListHeaderComponent={
             <View>
               <TouchableOpacity style={styles.quickComposer} onPress={() => setComposeOpen(true)}>
-                <AuthorAvatar name={user?.name || user?.email || 'U'} />
+                <AuthorAvatar name={user?.name || user?.email || 'U'} avatarUrl={user?.avatar_url || user?.avatarUrl} />
                 <Text style={styles.quickComposerText}>Ne paylasmaq isteyirsen?</Text>
                 <MaterialIcons name="send" size={18} color="#6366f1" />
               </TouchableOpacity>
@@ -607,7 +669,7 @@ export default function FeedScreen({ navigation }) {
         onSubmit={handleCreatePost}
         submitting={posting}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -708,6 +770,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
   },
+  authorTap: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   avatar: {
     width: 42,
     height: 42,
@@ -720,6 +787,12 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 15,
     fontWeight: '900',
+  },
+  avatarImage: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#21262d',
   },
   authorBlock: {
     flex: 1,
@@ -744,6 +817,12 @@ const styles = StyleSheet.create({
   typeBadgeText: {
     fontSize: 10,
     fontWeight: '900',
+  },
+  likeTextActive: {
+    color: '#fca5a5',
+  },
+  bookmarkTextActive: {
+    color: '#fbbf24',
   },
   postCaption: {
     color: '#c9d1d9',

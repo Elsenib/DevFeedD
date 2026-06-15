@@ -1,26 +1,30 @@
 const express = require('express');
 const pool = require('../db');
-const { auth } = require('../middleware/auth');
+const { auth, optionalAuth } = require('../middleware/auth');
 const { containsIllegalWords, checkBadWords } = require('../middleware/contentFilter');
+const { createNotification } = require('../services/notifications');
 
 const router = express.Router();
 
 // GET /posts?limit=20&offset=0
-router.get('/', async (req, res) => {
+router.get('/', optionalAuth, async (req, res) => {
   try {
     const { limit = 20, offset = 0 } = req.query;
+    const viewerId = req.user?.id || 0;
     const result = await pool.query(
       `SELECT 
         p.id, p.user_id, p.title, p.caption, p.body, p.post_type, p.metadata, p.tags, p.views, p.likes, p.created_at,
-        u.name, u.role, u.avatar_url,
+        u.name, u.role, u.role_sub, u.avatar_url,
         (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id) as like_count,
         (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comment_count,
-        COALESCE((SELECT COUNT(*) FROM post_bookmarks WHERE post_id = p.id), 0) as bookmark_count
+        COALESCE((SELECT COUNT(*) FROM post_bookmarks WHERE post_id = p.id), 0) as bookmark_count,
+        EXISTS(SELECT 1 FROM post_likes WHERE post_id = p.id AND user_id = $1) as liked_by_me,
+        EXISTS(SELECT 1 FROM post_bookmarks WHERE post_id = p.id AND user_id = $1) as bookmarked_by_me
        FROM posts p
        JOIN users u ON p.user_id = u.id
        ORDER BY p.created_at DESC
-       LIMIT $1 OFFSET $2`,
-      [limit, offset]
+       LIMIT $2 OFFSET $3`,
+      [viewerId, limit, offset]
     );
     res.json(result.rows);
   } catch (error) {
@@ -29,21 +33,59 @@ router.get('/', async (req, res) => {
   }
 });
 
+// GET /posts/search?q=react
+router.get('/search', optionalAuth, async (req, res) => {
+  try {
+    const q = String(req.query.q || '').trim().slice(0, 80);
+    const pattern = `%${q}%`;
+    const viewerId = req.user?.id || 0;
+
+    const result = await pool.query(
+      `SELECT
+        p.id, p.user_id, p.title, p.caption, p.body, p.post_type, p.metadata, p.tags, p.views, p.likes, p.created_at,
+        u.name, u.role, u.role_sub, u.avatar_url,
+        (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id) as like_count,
+        (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comment_count,
+        COALESCE((SELECT COUNT(*) FROM post_bookmarks WHERE post_id = p.id), 0) as bookmark_count,
+        EXISTS(SELECT 1 FROM post_likes WHERE post_id = p.id AND user_id = $1) as liked_by_me,
+        EXISTS(SELECT 1 FROM post_bookmarks WHERE post_id = p.id AND user_id = $1) as bookmarked_by_me
+       FROM posts p
+       JOIN users u ON p.user_id = u.id
+       WHERE $2 = ''
+          OR p.title ILIKE $3
+          OR p.caption ILIKE $3
+          OR p.body ILIKE $3
+          OR EXISTS (SELECT 1 FROM unnest(p.tags) tag WHERE tag ILIKE $3)
+       ORDER BY p.created_at DESC
+       LIMIT 40`,
+      [viewerId, q, pattern]
+    );
+
+    res.json(result.rows);
+  } catch (error) {
+    console.error('GET /posts/search error:', error);
+    res.status(500).json({ message: 'Postlar axtarılmadı.' });
+  }
+});
+
 // GET /posts/:id
-router.get('/:id', async (req, res) => {
+router.get('/:id', optionalAuth, async (req, res) => {
   try {
     const { id } = req.params;
+    const viewerId = req.user?.id || 0;
     const result = await pool.query(
       `SELECT 
         p.id, p.user_id, p.title, p.caption, p.body, p.post_type, p.metadata, p.tags, p.views, p.likes, p.created_at,
-        u.name, u.role, u.avatar_url,
+        u.name, u.role, u.role_sub, u.avatar_url,
         (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id) as like_count,
         (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comment_count,
-        COALESCE((SELECT COUNT(*) FROM post_bookmarks WHERE post_id = p.id), 0) as bookmark_count
+        COALESCE((SELECT COUNT(*) FROM post_bookmarks WHERE post_id = p.id), 0) as bookmark_count,
+        EXISTS(SELECT 1 FROM post_likes WHERE post_id = p.id AND user_id = $1) as liked_by_me,
+        EXISTS(SELECT 1 FROM post_bookmarks WHERE post_id = p.id AND user_id = $1) as bookmarked_by_me
        FROM posts p
        JOIN users u ON p.user_id = u.id
-       WHERE p.id = $1`,
-      [id]
+       WHERE p.id = $2`,
+      [viewerId, id]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Post not found' });
@@ -151,12 +193,31 @@ router.post('/:id/like', auth, async (req, res) => {
     const { id } = req.params;
     const user_id = req.user.id;
 
-    await pool.query(
+    const postResult = await pool.query('SELECT user_id FROM posts WHERE id = $1', [id]);
+    if (postResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Post tapılmadı.' });
+    }
+
+    const insert = await pool.query(
       `INSERT INTO post_likes (post_id, user_id) VALUES ($1, $2)
-       ON CONFLICT (post_id, user_id) DO NOTHING`,
+       ON CONFLICT (post_id, user_id) DO NOTHING
+       RETURNING id`,
       [id, user_id]
     );
-    res.json({ message: 'Liked' });
+
+    if (insert.rows.length > 0) {
+      await createNotification({
+        userId: postResult.rows[0].user_id,
+        actorId: user_id,
+        type: 'post_like',
+        entityType: 'post',
+        entityId: id,
+        text: `${req.user.name || 'Bir istifadəçi'} paylaşımını bəyəndi.`,
+      });
+    }
+
+    const count = await pool.query('SELECT COUNT(*)::int AS count FROM post_likes WHERE post_id = $1', [id]);
+    res.json({ message: 'Bəyənildi', liked: true, like_count: count.rows[0].count });
   } catch (error) {
     console.error('POST /posts/:id/like error:', error);
     res.status(500).json({ error: error.message });
@@ -170,7 +231,8 @@ router.delete('/:id/like', auth, async (req, res) => {
     const user_id = req.user.id;
 
     await pool.query('DELETE FROM post_likes WHERE post_id = $1 AND user_id = $2', [id, user_id]);
-    res.json({ message: 'Unliked' });
+    const count = await pool.query('SELECT COUNT(*)::int AS count FROM post_likes WHERE post_id = $1', [id]);
+    res.json({ message: 'Bəyənmə silindi', liked: false, like_count: count.rows[0].count });
   } catch (error) {
     console.error('DELETE /posts/:id/like error:', error);
     res.status(500).json({ error: error.message });
@@ -183,12 +245,31 @@ router.post('/:id/bookmark', auth, async (req, res) => {
     const { id } = req.params;
     const user_id = req.user.id;
 
-    await pool.query(
+    const postResult = await pool.query('SELECT user_id FROM posts WHERE id = $1', [id]);
+    if (postResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Post tapılmadı.' });
+    }
+
+    const insert = await pool.query(
       `INSERT INTO post_bookmarks (post_id, user_id) VALUES ($1, $2)
-       ON CONFLICT (post_id, user_id) DO NOTHING`,
+       ON CONFLICT (post_id, user_id) DO NOTHING
+       RETURNING id`,
       [id, user_id]
     );
-    res.json({ message: 'Bookmarked' });
+
+    if (insert.rows.length > 0) {
+      await createNotification({
+        userId: postResult.rows[0].user_id,
+        actorId: user_id,
+        type: 'post_bookmark',
+        entityType: 'post',
+        entityId: id,
+        text: `${req.user.name || 'Bir istifadəçi'} paylaşımını yadda saxladı.`,
+      });
+    }
+
+    const count = await pool.query('SELECT COUNT(*)::int AS count FROM post_bookmarks WHERE post_id = $1', [id]);
+    res.json({ message: 'Yadda saxlandı', bookmarked: true, bookmark_count: count.rows[0].count });
   } catch (error) {
     console.error('POST /posts/:id/bookmark error:', error);
     res.status(500).json({ error: error.message });
@@ -202,7 +283,8 @@ router.delete('/:id/bookmark', auth, async (req, res) => {
     const user_id = req.user.id;
 
     await pool.query('DELETE FROM post_bookmarks WHERE post_id = $1 AND user_id = $2', [id, user_id]);
-    res.json({ message: 'Removed bookmark' });
+    const count = await pool.query('SELECT COUNT(*)::int AS count FROM post_bookmarks WHERE post_id = $1', [id]);
+    res.json({ message: 'Yadda saxlamadan çıxarıldı', bookmarked: false, bookmark_count: count.rows[0].count });
   } catch (error) {
     console.error('DELETE /posts/:id/bookmark error:', error);
     res.status(500).json({ error: error.message });
@@ -219,8 +301,13 @@ router.post('/:id/comments', auth, async (req, res) => {
     if (!text) {
       return res.status(400).json({ error: 'text is required' });
     }
-    if (containsIllegalWords(text)) {
-      return res.status(400).json({ error: 'Yorumunuzda yasaklı kelime var.' });
+    if (containsIllegalWords(text) || checkBadWords(text)) {
+      return res.status(400).json({ error: 'Şərh qaydalara uyğun deyil.' });
+    }
+
+    const postResult = await pool.query('SELECT user_id FROM posts WHERE id = $1', [id]);
+    if (postResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Post tapılmadı.' });
     }
 
     const result = await pool.query(
@@ -228,6 +315,16 @@ router.post('/:id/comments', auth, async (req, res) => {
        RETURNING *`,
       [id, user_id, text]
     );
+
+    await createNotification({
+      userId: postResult.rows[0].user_id,
+      actorId: user_id,
+      type: 'post_comment',
+      entityType: 'post',
+      entityId: id,
+      text: `${req.user.name || 'Bir istifadəçi'} paylaşımına şərh yazdı.`,
+    });
+
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error('POST /posts/:id/comments error:', error);
@@ -311,6 +408,15 @@ router.post('/:id/apply', auth, async (req, res) => {
       'UPDATE conversations SET last_message = $1, updated_at = NOW() WHERE id = $2',
       [messageText, conversationId]
     );
+
+    await createNotification({
+      userId: ownerId,
+      actorId: user_id,
+      type: 'job_application',
+      entityType: 'post',
+      entityId: id,
+      text: `${req.user.name || 'Bir istifadəçi'} iş elanına müraciət etdi.`,
+    });
 
     res.json({ message: 'Application submitted', conversationId });
   } catch (error) {

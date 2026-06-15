@@ -12,6 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { AuthContext } from '../context/AuthContext';
 import * as api from '../api';
@@ -33,7 +34,7 @@ export default function ChatScreen({ route, navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const [sending, setSending] = useState(false);
 
-  const screenTitle = useMemo(() => conversation?.title || title || 'Sohbet', [conversation?.title, title]);
+  const screenTitle = useMemo(() => conversation?.title || title || 'Söhbət', [conversation?.title, title]);
 
   const loadConversation = useCallback(async () => {
     if (!conversationId) return;
@@ -42,7 +43,7 @@ export default function ChatScreen({ route, navigation }) {
       setConversation(data);
       setMessages(Array.isArray(data.messages) ? data.messages : []);
     } catch (error) {
-      Alert.alert('Sohbet xetasi', error.response?.data?.message || error.message);
+      Alert.alert('Söhbət xətası', error.response?.data?.message || error.message);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -67,7 +68,7 @@ export default function ChatScreen({ route, navigation }) {
       setMessages((prev) => [...prev, sent]);
       setText('');
     } catch (error) {
-      Alert.alert('Mesaj xetasi', error.response?.data?.message || error.message);
+      Alert.alert('Mesaj xətası', error.response?.data?.message || error.message);
     } finally {
       setSending(false);
     }
@@ -79,7 +80,7 @@ export default function ChatScreen({ route, navigation }) {
       <View style={[styles.messageRow, mine && styles.messageRowMine]}>
         <View style={[styles.messageBubble, mine && styles.messageBubbleMine]}>
           <Text style={[styles.senderName, mine && styles.senderNameMine]}>
-            {mine ? 'Sen' : item.sender?.name || item.sender_name || screenTitle}
+            {mine ? 'Sən' : item.sender?.name || item.sender_name || screenTitle}
           </Text>
           <Text style={[styles.messageText, mine && styles.messageTextMine]}>{item.text}</Text>
           <Text style={[styles.messageTime, mine && styles.messageTimeMine]}>{formatTime(item.createdAt || item.created_at)}</Text>
@@ -97,11 +98,12 @@ export default function ChatScreen({ route, navigation }) {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 72 : 0}
-    >
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <KeyboardAvoidingView
+        style={styles.keyboard}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 72 : 0}
+      >
       <View style={styles.header}>
         <TouchableOpacity style={styles.iconButton} onPress={() => navigation.goBack()}>
           <MaterialIcons name="arrow-back" size={22} color="#e6edf3" />
@@ -121,7 +123,7 @@ export default function ChatScreen({ route, navigation }) {
         renderItem={renderMessage}
         contentContainerStyle={styles.messagesContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#6366f1" />}
-        ListEmptyComponent={<Text style={styles.emptyText}>Hele mesaj yoxdur. Ilk mesaji yaz.</Text>}
+        ListEmptyComponent={<Text style={styles.emptyText}>Hələ mesaj yoxdur. İlk mesajı yaz.</Text>}
       />
 
       <View style={styles.composer}>
@@ -141,7 +143,8 @@ export default function ChatScreen({ route, navigation }) {
           {sending ? <ActivityIndicator color="#ffffff" /> : <MaterialIcons name="send" size={19} color="#ffffff" />}
         </TouchableOpacity>
       </View>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
@@ -149,6 +152,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#0d1117',
+  },
+  keyboard: {
+    flex: 1,
   },
   center: {
     flex: 1,

@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
 const db = require('../db');
-const { auth } = require('../middleware/auth');
+const { auth, optionalAuth } = require('../middleware/auth');
 const { validateFileUpload, validateAvatar, containsIllegalWords, checkBadWords } = require('../middleware/contentFilter');
 
 const router = express.Router();
@@ -32,18 +32,36 @@ const upload = multer({
   },
 });
 
+async function getProfileCounts(userId, viewerId = 0) {
+  const result = await db.query(
+    `SELECT
+       (SELECT COUNT(*)::int FROM posts WHERE user_id = $1) AS posts_count,
+       (SELECT COUNT(*)::int FROM follows WHERE following_id = $1) AS followers_count,
+       (SELECT COUNT(*)::int FROM follows WHERE follower_id = $1) AS following_count,
+       EXISTS(SELECT 1 FROM follows WHERE follower_id = $2 AND following_id = $1) AS following_by_me`,
+    [userId, viewerId]
+  );
+  return result.rows[0] || {};
+}
+
 router.get('/', auth, async (req, res) => {
   try {
-    const result = await db.query('SELECT id, name, email, bio, role, role_sub, skills, languages, website, avatar_url FROM users WHERE id = $1', [req.user.id]);
+    const result = await db.query(
+      'SELECT id, name, email, bio, role, role_sub, skills, languages, website, avatar_url, activity_visible, email_verified FROM users WHERE id = $1',
+      [req.user.id]
+    );
     const user = result.rows[0];
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    const postsCount = await db.query('SELECT COUNT(*)::int FROM posts WHERE user_id = $1', [req.user.id]);
+    const counts = await getProfileCounts(req.user.id, req.user.id);
     const stack = (user.skills && user.skills.length) ? user.skills : (user.languages && user.languages.length ? user.languages : ['React Native', 'Node.js', 'PostgreSQL']);
     res.json({
       ...user,
       stack,
-      posts: postsCount.rows[0].count,
+      posts: counts.posts_count,
+      followers_count: counts.followers_count,
+      following_count: counts.following_count,
+      following_by_me: false,
     });
   } catch (error) {
     console.error(error);
@@ -82,10 +100,12 @@ router.get('/posts', auth, async (req, res) => {
     const result = await db.query(
       `SELECT
         p.id, p.user_id, p.title, p.caption, p.body, p.post_type, p.metadata, p.tags, p.views, p.likes, p.created_at,
-        u.name, u.role, u.avatar_url,
+        u.name, u.role, u.role_sub, u.avatar_url,
         (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id) as like_count,
         (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comment_count,
-        COALESCE((SELECT COUNT(*) FROM post_bookmarks WHERE post_id = p.id), 0) as bookmark_count
+        COALESCE((SELECT COUNT(*) FROM post_bookmarks WHERE post_id = p.id), 0) as bookmark_count,
+        EXISTS(SELECT 1 FROM post_likes WHERE post_id = p.id AND user_id = $1) as liked_by_me,
+        EXISTS(SELECT 1 FROM post_bookmarks WHERE post_id = p.id AND user_id = $1) as bookmarked_by_me
        FROM posts p
        JOIN users u ON p.user_id = u.id
        WHERE p.user_id = $1
@@ -99,23 +119,69 @@ router.get('/posts', auth, async (req, res) => {
   }
 });
 
-router.get('/:id', auth, async (req, res) => {
+router.get('/:id/posts', optionalAuth, async (req, res) => {
+  try {
+    const userId = parseInt(req.params.id, 10);
+    const viewerId = req.user?.id || 0;
+    if (Number.isNaN(userId)) {
+      return res.status(400).json({ message: 'İstifadəçi id-si yanlışdır.' });
+    }
+
+    const profileResult = await db.query('SELECT id, activity_visible FROM users WHERE id = $1', [userId]);
+    const profile = profileResult.rows[0];
+    if (!profile) return res.status(404).json({ message: 'İstifadəçi tapılmadı.' });
+    if (!profile.activity_visible && String(viewerId) !== String(userId)) {
+      return res.json({ hidden: true, posts: [] });
+    }
+
+    const result = await db.query(
+      `SELECT
+        p.id, p.user_id, p.title, p.caption, p.body, p.post_type, p.metadata, p.tags, p.views, p.likes, p.created_at,
+        u.name, u.role, u.role_sub, u.avatar_url,
+        (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id) as like_count,
+        (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comment_count,
+        COALESCE((SELECT COUNT(*) FROM post_bookmarks WHERE post_id = p.id), 0) as bookmark_count,
+        EXISTS(SELECT 1 FROM post_likes WHERE post_id = p.id AND user_id = $2) as liked_by_me,
+        EXISTS(SELECT 1 FROM post_bookmarks WHERE post_id = p.id AND user_id = $2) as bookmarked_by_me
+       FROM posts p
+       JOIN users u ON p.user_id = u.id
+       WHERE p.user_id = $1
+       ORDER BY p.created_at DESC`,
+      [userId, viewerId]
+    );
+
+    res.json({ hidden: false, posts: result.rows });
+  } catch (error) {
+    console.error('GET /profile/:id/posts error:', error);
+    res.status(500).json({ message: 'Profil paylaşımları yüklənmədi.' });
+  }
+});
+
+router.get('/:id', optionalAuth, async (req, res) => {
   try {
     const userId = parseInt(req.params.id, 10);
     if (Number.isNaN(userId)) {
       return res.status(400).json({ message: 'Invalid user id' });
     }
 
-    const result = await db.query('SELECT id, name, email, bio, role, role_sub, skills, languages, website, avatar_url FROM users WHERE id = $1', [userId]);
+    const viewerId = req.user?.id || 0;
+    const result = await db.query(
+      'SELECT id, name, email, bio, role, role_sub, skills, languages, website, avatar_url, activity_visible, email_verified FROM users WHERE id = $1',
+      [userId]
+    );
     const user = result.rows[0];
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    const postsCount = await db.query('SELECT COUNT(*)::int FROM posts WHERE user_id = $1', [userId]);
+    const counts = await getProfileCounts(userId, viewerId);
     const stack = (user.skills && user.skills.length) ? user.skills : (user.languages && user.languages.length ? user.languages : ['React Native', 'Node.js', 'PostgreSQL']);
     res.json({
       ...user,
       stack,
-      posts: postsCount.rows[0].count,
+      posts: counts.posts_count,
+      followers_count: counts.followers_count,
+      following_count: counts.following_count,
+      following_by_me: !!counts.following_by_me,
+      is_me: String(viewerId) === String(userId),
     });
   } catch (error) {
     console.error(error);
@@ -125,8 +191,11 @@ router.get('/:id', auth, async (req, res) => {
 
 // Update profile (role, sub-role, skills, languages, bio, website, avatar_url)
 router.patch('/', auth, async (req, res) => {
-  const { role, roleSub, subRole, skills, languages, bio, website, name, avatar_url } = req.body;
+  const { role, roleSub, subRole, skills, languages, bio, website, name, avatar_url, activityVisible, activity_visible } = req.body;
   const roleSubValue = roleSub || subRole || null;
+  const activityVisibleValue = typeof activityVisible === 'boolean'
+    ? activityVisible
+    : (typeof activity_visible === 'boolean' ? activity_visible : null);
   try {
     if (name && containsIllegalWords(name)) {
       return res.status(400).json({ message: 'Ad qadağan edilmiş sözlər ehtiva edir' });
@@ -153,9 +222,10 @@ router.patch('/', auth, async (req, res) => {
          languages = COALESCE($5::jsonb, languages),
          bio = COALESCE($6, bio),
          website = COALESCE($7, website),
-         avatar_url = COALESCE($8, avatar_url)
-       WHERE id = $9
-       RETURNING id, name, email, role, role_sub, skills, languages, bio, website, avatar_url`,
+         avatar_url = COALESCE($8, avatar_url),
+         activity_visible = COALESCE($9, activity_visible)
+       WHERE id = $10
+       RETURNING id, name, email, role, role_sub, skills, languages, bio, website, avatar_url, activity_visible, email_verified`,
       [
         name || null,
         role || null,
@@ -165,6 +235,7 @@ router.patch('/', auth, async (req, res) => {
         bio || null,
         website || null,
         avatar_url || null,
+        activityVisibleValue,
         req.user.id,
       ]
     );

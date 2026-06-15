@@ -26,10 +26,10 @@ export const LANGUAGES = {
     label: 'Türkcə',
     settings: 'Ayarlar',
     account: 'Hesap',
-    appearance: 'Gorunum',
+    appearance: 'Görünüm',
     language: 'Dil',
-    editProfile: 'Profili duzenle',
-    signOut: 'Cikis',
+    editProfile: 'Profili düzenle',
+    signOut: 'Çıkış',
   },
 };
 

@@ -24,6 +24,11 @@ export async function register(name, email, password) {
   return response.data;
 }
 
+export async function verifyEmailRegistration(email, code) {
+  const response = await api.post('/auth/verify-email', { email, code });
+  return response.data;
+}
+
 export async function socialLogin({ provider, providerId, email, name, avatarUrl }) {
   const response = await api.post('/auth/social-login', {
     provider,
@@ -89,6 +94,11 @@ export async function toggleLike(postId) {
   return response.data;
 }
 
+export async function unlikePost(postId) {
+  const response = await api.delete(`/posts/${postId}/like`);
+  return response.data;
+}
+
 export async function bookmarkPost(postId) {
   const response = await api.post(`/posts/${postId}/bookmark`);
   return response.data;
@@ -114,6 +124,36 @@ export async function fetchProfile() {
 
 export async function fetchMyPosts() {
   const response = await api.get('/profile/posts');
+  return response.data;
+}
+
+export async function fetchUserProfile(userId) {
+  const response = await api.get(`/profile/${userId}`);
+  return response.data;
+}
+
+export async function fetchUserPosts(userId) {
+  const response = await api.get(`/profile/${userId}/posts`);
+  return response.data;
+}
+
+export async function searchUsers(query = '') {
+  const response = await api.get('/users/search', { params: { q: query } });
+  return response.data;
+}
+
+export async function searchPosts(query = '') {
+  const response = await api.get('/posts/search', { params: { q: query } });
+  return response.data;
+}
+
+export async function followUser(userId) {
+  const response = await api.post(`/users/${userId}/follow`);
+  return response.data;
+}
+
+export async function unfollowUser(userId) {
+  const response = await api.delete(`/users/${userId}/follow`);
   return response.data;
 }
 
@@ -177,10 +217,26 @@ export async function createSupportPayment({ receiverId, amount, note }) {
   return response.data;
 }
 
+export async function fetchNotifications() {
+  const response = await api.get('/notifications');
+  return response.data;
+}
+
+export async function markNotificationRead(notificationId) {
+  const response = await api.patch(`/notifications/${notificationId}/read`);
+  return response.data;
+}
+
+export async function markAllNotificationsRead() {
+  const response = await api.patch('/notifications/read-all');
+  return response.data;
+}
+
 export default {
   setToken,
   login,
   register,
+  verifyEmailRegistration,
   socialLogin,
   updateProfile,
   uploadAvatar,
@@ -192,10 +248,17 @@ export default {
   fetchComments,
   addComment,
   toggleLike,
+  unlikePost,
   bookmarkPost,
   removeBookmark,
   applyToJob,
   fetchProfile,
+  fetchUserProfile,
+  fetchUserPosts,
+  searchUsers,
+  searchPosts,
+  followUser,
+  unfollowUser,
   fetchConversations,
   fetchConversation,
   createConversation,
@@ -208,5 +271,8 @@ export default {
   sendChatMessage,
   fetchSupportConfig,
   createSupportPayment,
+  fetchNotifications,
+  markNotificationRead,
+  markAllNotificationsRead,
   fetchMyPosts,
 };

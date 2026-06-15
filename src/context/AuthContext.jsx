@@ -6,6 +6,7 @@ export const AuthContext = createContext({
   signIn: async () => {},
   signOut: () => {},
   signUp: async () => {},
+  verifyEmailRegistration: async () => {},
   socialSignIn: async () => {},
   completeOnboarding: async () => {},
   updateCurrentUser: async () => {},

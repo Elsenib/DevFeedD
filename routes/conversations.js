@@ -2,6 +2,7 @@ const express = require('express');
 const db = require('../db');
 const { auth } = require('../middleware/auth');
 const { containsIllegalWords } = require('../middleware/contentFilter');
+const { createNotification } = require('../services/notifications');
 
 const router = express.Router();
 
@@ -9,7 +10,8 @@ router.get('/', auth, async (req, res) => {
   try {
     const result = await db.query(
       `SELECT c.id, c.updated_at, c.last_message, c.user_a_id, c.user_b_id,
-              ua.name AS user_a_name, ub.name AS user_b_name
+              ua.name AS user_a_name, ua.avatar_url AS user_a_avatar_url,
+              ub.name AS user_b_name, ub.avatar_url AS user_b_avatar_url
        FROM conversations c
        JOIN users ua ON ua.id = c.user_a_id
        JOIN users ub ON ub.id = c.user_b_id
@@ -20,11 +22,13 @@ router.get('/', auth, async (req, res) => {
 
     const conversations = result.rows.map((row) => {
       const otherUser = row.user_a_id === req.user.id
-        ? { id: row.user_b_id, name: row.user_b_name }
-        : { id: row.user_a_id, name: row.user_a_name };
+        ? { id: row.user_b_id, name: row.user_b_name, avatar_url: row.user_b_avatar_url }
+        : { id: row.user_a_id, name: row.user_a_name, avatar_url: row.user_a_avatar_url };
       return {
         id: row.id,
         title: otherUser.name,
+        otherUser,
+        avatar_url: otherUser.avatar_url,
         lastMessage: row.last_message,
         time: row.updated_at,
       };
@@ -42,7 +46,8 @@ router.get('/:id', auth, async (req, res) => {
   try {
     const result = await db.query(
       `SELECT c.id, c.user_a_id, c.user_b_id, c.last_message, c.updated_at,
-              ua.name AS user_a_name, ub.name AS user_b_name
+              ua.name AS user_a_name, ua.avatar_url AS user_a_avatar_url,
+              ub.name AS user_b_name, ub.avatar_url AS user_b_avatar_url
        FROM conversations c
        JOIN users ua ON ua.id = c.user_a_id
        JOIN users ub ON ub.id = c.user_b_id
@@ -57,11 +62,11 @@ router.get('/:id', auth, async (req, res) => {
     }
 
     const otherUser = conversation.user_a_id === req.user.id
-      ? { id: conversation.user_b_id, name: conversation.user_b_name }
-      : { id: conversation.user_a_id, name: conversation.user_a_name };
+      ? { id: conversation.user_b_id, name: conversation.user_b_name, avatar_url: conversation.user_b_avatar_url }
+      : { id: conversation.user_a_id, name: conversation.user_a_name, avatar_url: conversation.user_a_avatar_url };
 
     const messagesResult = await db.query(
-      `SELECT m.id, m.text, m.created_at, m.sender_id, u.name AS sender_name
+      `SELECT m.id, m.text, m.created_at, m.sender_id, u.name AS sender_name, u.avatar_url AS sender_avatar_url
        FROM messages m
        JOIN users u ON u.id = m.sender_id
        WHERE m.conversation_id = $1
@@ -82,7 +87,7 @@ router.get('/:id', auth, async (req, res) => {
         id: row.id,
         text: row.text,
         createdAt: row.created_at,
-        sender: { id: row.sender_id, name: row.sender_name },
+        sender: { id: row.sender_id, name: row.sender_name, avatar_url: row.sender_avatar_url },
       })),
     });
   } catch (error) {
@@ -176,6 +181,18 @@ router.post('/:id/messages', auth, async (req, res) => {
       'UPDATE conversations SET last_message = $1, updated_at = NOW() WHERE id = $2',
       [text.trim(), id]
     );
+
+    const participants = await db.query('SELECT user_a_id, user_b_id FROM conversations WHERE id = $1', [id]);
+    const conversation = participants.rows[0];
+    const receiverId = conversation?.user_a_id === req.user.id ? conversation.user_b_id : conversation?.user_a_id;
+    await createNotification({
+      userId: receiverId,
+      actorId: req.user.id,
+      type: 'message',
+      entityType: 'conversation',
+      entityId: id,
+      text: `${req.user.name || 'Bir istifadəçi'} sənə mesaj göndərdi.`,
+    });
 
     res.json({
       id: message.id,

@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Image,
   Modal,
   RefreshControl,
   StyleSheet,
@@ -11,6 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as api from '../api';
 
@@ -21,8 +23,11 @@ function formatTime(value) {
   return date.toLocaleDateString();
 }
 
-function ConversationAvatar({ title }) {
+function ConversationAvatar({ title, avatarUrl }) {
   const letter = String(title || 'S').slice(0, 1).toUpperCase();
+  if (avatarUrl) {
+    return <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />;
+  }
   return (
     <View style={styles.avatar}>
       <Text style={styles.avatarText}>{letter}</Text>
@@ -45,12 +50,12 @@ function NewConversationModal({ visible, creating, onClose, onCreate }) {
       <View style={styles.modalOverlay}>
         <View style={styles.newChatSheet}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Yeni sohbet</Text>
+            <Text style={styles.modalTitle}>Yeni söhbət</Text>
             <TouchableOpacity onPress={onClose}>
               <MaterialIcons name="close" size={24} color="#8b949e" />
             </TouchableOpacity>
           </View>
-          <Text style={styles.fieldLabel}>ISTIFADECI EMAILI</Text>
+          <Text style={styles.fieldLabel}>İSTİFADƏÇİ EMAILİ</Text>
           <TextInput
             value={email}
             onChangeText={setEmail}
@@ -65,7 +70,7 @@ function NewConversationModal({ visible, creating, onClose, onCreate }) {
             onPress={handleSubmit}
             disabled={creating || !email.trim()}
           >
-            {creating ? <ActivityIndicator color="#ffffff" /> : <Text style={styles.createButtonText}>Sohbet ac</Text>}
+            {creating ? <ActivityIndicator color="#ffffff" /> : <Text style={styles.createButtonText}>Söhbət aç</Text>}
           </TouchableOpacity>
         </View>
       </View>
@@ -127,11 +132,11 @@ export default function MessagesScreen({ navigation }) {
   }
 
   return (
-    <View style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <View>
           <Text style={styles.title}>Mesajlar</Text>
-          <Text style={styles.subtitle}>DM sohbetleri ve is muracietleri</Text>
+          <Text style={styles.subtitle}>DM söhbətləri və iş müraciətləri</Text>
         </View>
         <TouchableOpacity style={styles.plusButton} onPress={() => setModalOpen(true)}>
           <MaterialIcons name="add" size={24} color="#ffffff" />
@@ -148,20 +153,20 @@ export default function MessagesScreen({ navigation }) {
             style={styles.chatCard}
             onPress={() => navigation.navigate('Chat', { conversationId: item.id, title: item.title })}
           >
-            <ConversationAvatar title={item.title} />
+            <ConversationAvatar title={item.title} avatarUrl={item.avatar_url || item.otherUser?.avatar_url} />
             <View style={styles.chatBody}>
               <View style={styles.chatTopRow}>
                 <Text style={styles.chatTitle}>{item.title || 'Sohbet'}</Text>
                 <Text style={styles.chatTime}>{formatTime(item.updatedAt || item.time)}</Text>
               </View>
               <Text style={styles.chatLast} numberOfLines={1}>
-                {item.lastMessage || 'Hec mesaj yoxdur'}
+                {item.lastMessage || 'Hələ mesaj yoxdur'}
               </Text>
             </View>
             <MaterialIcons name="chevron-right" size={24} color="#8b949e" />
           </TouchableOpacity>
         )}
-        ListEmptyComponent={<Text style={styles.emptyText}>Hele sohbet yoxdur. Email ile ilk sohbeti ac.</Text>}
+        ListEmptyComponent={<Text style={styles.emptyText}>Hələ söhbət yoxdur. Email ilə ilk söhbəti aç.</Text>}
       />
 
       <NewConversationModal
@@ -170,7 +175,7 @@ export default function MessagesScreen({ navigation }) {
         onClose={() => setModalOpen(false)}
         onCreate={handleCreate}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -238,6 +243,12 @@ const styles = StyleSheet.create({
   avatarText: {
     color: '#ffffff',
     fontWeight: '900',
+  },
+  avatarImage: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#21262d',
   },
   chatBody: {
     flex: 1,

@@ -2,6 +2,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const dns = require('dns').promises;
+const crypto = require('crypto');
 const db = require('../db');
 
 const router = express.Router();
@@ -86,6 +87,54 @@ async function validateEmail(email) {
   return { valid: true };
 }
 
+function verificationRequired() {
+  return process.env.EMAIL_VERIFICATION_REQUIRED !== 'false';
+}
+
+function makeVerificationCode() {
+  return crypto.randomInt(100000, 1000000).toString();
+}
+
+function makeToken(user) {
+  return jwt.sign({ id: user.id, email: user.email, name: user.name }, jwtSecret, { expiresIn: '30d' });
+}
+
+async function sendVerificationEmail(email, code) {
+  const appName = process.env.APP_NAME || 'DevFeed';
+  const resendKey = process.env.RESEND_API_KEY;
+  const from = process.env.EMAIL_FROM || 'DevFeed <onboarding@resend.dev>';
+
+  if (resendKey) {
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${resendKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from,
+        to: email,
+        subject: `${appName} təsdiq kodu`,
+        html: `<p>DevFeed qeydiyyat kodun:</p><h2>${code}</h2><p>Bu kod 15 dəqiqə etibarlıdır.</p>`,
+      }),
+    });
+
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(`Email göndərilmədi: ${body.slice(0, 160)}`);
+    }
+
+    return { sent: true };
+  }
+
+  if (process.env.NODE_ENV !== 'production' || process.env.EMAIL_VERIFICATION_DEV_MODE === 'true') {
+    console.log(`[email-verification] ${email} code: ${code}`);
+    return { sent: false, devCode: code };
+  }
+
+  throw new Error('Email təsdiqləmə servisi qoşulmayıb. Railway Variables bölməsinə RESEND_API_KEY və EMAIL_FROM əlavə et.');
+}
+
 router.post('/register', async (req, res) => {
   const { name, email, password, role, skills, languages } = req.body;
   const normalizedEmail = normalizeEmail(email);
@@ -115,19 +164,101 @@ router.post('/register', async (req, res) => {
     const skillsJson = Array.isArray(skills) ? skills : (skills ? [skills] : []);
     const langsJson = Array.isArray(languages) ? languages : (languages ? [languages] : []);
 
+    if (verificationRequired()) {
+      const code = makeVerificationCode();
+      const codeHash = await bcrypt.hash(code, 10);
+      await db.query(
+        `INSERT INTO email_verification_codes (email, name, password_hash, role, skills, languages, code_hash, attempts, expires_at)
+         VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7, 0, NOW() + INTERVAL '15 minutes')
+         ON CONFLICT (email)
+         DO UPDATE SET
+           name = EXCLUDED.name,
+           password_hash = EXCLUDED.password_hash,
+           role = EXCLUDED.role,
+           skills = EXCLUDED.skills,
+           languages = EXCLUDED.languages,
+           code_hash = EXCLUDED.code_hash,
+           attempts = 0,
+           expires_at = EXCLUDED.expires_at,
+           created_at = NOW()`,
+        [normalizedEmail, trimmedName, hashed, role || null, JSON.stringify(skillsJson), JSON.stringify(langsJson), codeHash]
+      );
+
+      const delivery = await sendVerificationEmail(normalizedEmail, code);
+      return res.json({
+        verificationRequired: true,
+        email: normalizedEmail,
+        message: 'Təsdiq kodu email ünvanına göndərildi.',
+        devCode: delivery.devCode,
+      });
+    }
+
     const result = await db.query(
-      `INSERT INTO users (name, email, password_hash, role, skills, languages)
-       VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb)
-       RETURNING id, name, email, role, skills, languages`,
+      `INSERT INTO users (name, email, password_hash, role, skills, languages, email_verified)
+       VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, true)
+       RETURNING id, name, email, role, skills, languages, email_verified`,
       [trimmedName, normalizedEmail, hashed, role || null, JSON.stringify(skillsJson), JSON.stringify(langsJson)]
     );
 
     const user = result.rows[0];
-    const token = jwt.sign({ id: user.id, email: user.email, name: user.name }, jwtSecret, { expiresIn: '30d' });
+    const token = makeToken(user);
     res.json({ token, user });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Registration failed' });
+    res.status(500).json({ message: error.message || 'Registration failed' });
+  }
+});
+
+router.post('/verify-email', async (req, res) => {
+  const normalizedEmail = normalizeEmail(req.body.email);
+  const code = String(req.body.code || '').trim();
+
+  if (!normalizedEmail || !code) {
+    return res.status(400).json({ message: 'Email və təsdiq kodu lazımdır.' });
+  }
+
+  try {
+    const pendingResult = await db.query('SELECT * FROM email_verification_codes WHERE email = $1', [normalizedEmail]);
+    const pending = pendingResult.rows[0];
+    if (!pending) {
+      return res.status(404).json({ message: 'Təsdiq kodu tapılmadı. Yenidən qeydiyyatdan keç.' });
+    }
+    if (new Date(pending.expires_at).getTime() < Date.now()) {
+      await db.query('DELETE FROM email_verification_codes WHERE email = $1', [normalizedEmail]);
+      return res.status(400).json({ message: 'Təsdiq kodunun vaxtı bitib. Yenidən qeydiyyatdan keç.' });
+    }
+    if (Number(pending.attempts || 0) >= 5) {
+      return res.status(429).json({ message: 'Çox cəhd edildi. Yeni kod istə.' });
+    }
+
+    const validCode = await bcrypt.compare(code, pending.code_hash);
+    if (!validCode) {
+      await db.query('UPDATE email_verification_codes SET attempts = attempts + 1 WHERE email = $1', [normalizedEmail]);
+      return res.status(400).json({ message: 'Təsdiq kodu yanlışdır.' });
+    }
+
+    const existing = await db.query('SELECT id FROM users WHERE email = $1', [normalizedEmail]);
+    if (existing.rows.length > 0) {
+      await db.query('DELETE FROM email_verification_codes WHERE email = $1', [normalizedEmail]);
+      return res.status(400).json({ message: 'Bu email artıq qeydiyyatdan keçib.' });
+    }
+
+    const skillsJson = Array.isArray(pending.skills) ? pending.skills : [];
+    const langsJson = Array.isArray(pending.languages) ? pending.languages : [];
+    const result = await db.query(
+      `INSERT INTO users (name, email, password_hash, role, skills, languages, email_verified)
+       VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, true)
+       RETURNING id, name, email, role, skills, languages, email_verified`,
+      [pending.name, normalizedEmail, pending.password_hash, pending.role || null, JSON.stringify(skillsJson), JSON.stringify(langsJson)]
+    );
+    await db.query('DELETE FROM email_verification_codes WHERE email = $1', [normalizedEmail]);
+
+    const user = result.rows[0];
+    const token = makeToken(user);
+    res.json({ token, user });
+  } catch (error) {
+    console.error('POST /auth/verify-email error:', error);
+    res.status(500).json({ message: error.message || 'Email təsdiqlənmədi.' });
   }
 });
 
@@ -140,7 +271,7 @@ router.post('/login', async (req, res) => {
 
   try {
     const result = await db.query(
-      'SELECT id, name, email, role, skills, languages, bio, website, avatar_url, password_hash FROM users WHERE email = $1',
+      'SELECT id, name, email, role, role_sub, skills, languages, bio, website, avatar_url, activity_visible, email_verified, password_hash FROM users WHERE email = $1',
       [normalizedEmail]
     );
     const user = result.rows[0];
@@ -153,7 +284,7 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ message: 'Invalid credentials.' });
     }
 
-    const token = jwt.sign({ id: user.id, email: user.email, name: user.name }, jwtSecret, { expiresIn: '30d' });
+    const token = makeToken(user);
     delete user.password_hash;
     res.json({ token, user });
   } catch (error) {
@@ -172,34 +303,35 @@ router.post('/social-login', async (req, res) => {
   try {
     let user = null;
     const existingByProvider = await db.query(
-      'SELECT id, name, email, provider, provider_id, avatar_url, role, skills, languages, bio, website FROM users WHERE provider = $1 AND provider_id = $2',
+      'SELECT id, name, email, provider, provider_id, avatar_url, role, role_sub, skills, languages, bio, website, activity_visible, email_verified FROM users WHERE provider = $1 AND provider_id = $2',
       [provider, providerId]
     );
     if (existingByProvider.rows.length > 0) {
       user = existingByProvider.rows[0];
     } else {
       const existingByEmail = await db.query(
-        'SELECT id, name, email, provider, provider_id, avatar_url, role, skills, languages, bio, website FROM users WHERE email = $1',
+        'SELECT id, name, email, provider, provider_id, avatar_url, role, role_sub, skills, languages, bio, website, activity_visible, email_verified FROM users WHERE email = $1',
         [normalizedEmail]
       );
       if (existingByEmail.rows.length > 0) {
         user = existingByEmail.rows[0];
         await db.query(
-          'UPDATE users SET provider = $1, provider_id = $2, avatar_url = $3 WHERE id = $4',
+          'UPDATE users SET provider = $1, provider_id = $2, avatar_url = $3, email_verified = true WHERE id = $4',
           [provider, providerId, avatarUrl || user.avatar_url, user.id]
         );
+        user.email_verified = true;
       } else {
         const result = await db.query(
-          `INSERT INTO users (name, email, password_hash, provider, provider_id, avatar_url)
-           VALUES ($1, $2, NULL, $3, $4, $5)
-           RETURNING id, name, email, provider, provider_id, avatar_url, role, skills, languages, bio, website`,
+          `INSERT INTO users (name, email, password_hash, provider, provider_id, avatar_url, email_verified)
+           VALUES ($1, $2, NULL, $3, $4, $5, true)
+           RETURNING id, name, email, provider, provider_id, avatar_url, role, role_sub, skills, languages, bio, website, activity_visible, email_verified`,
           [name, normalizedEmail, provider, providerId, avatarUrl || null]
         );
         user = result.rows[0];
       }
     }
 
-    const token = jwt.sign({ id: user.id, email: user.email, name: user.name }, jwtSecret, { expiresIn: '30d' });
+    const token = makeToken(user);
     res.json({ token, user });
   } catch (error) {
     console.error(error);
@@ -295,7 +427,7 @@ async function performSocialLogin(payload) {
 
   // Check if user exists
   const existingUser = await db.query(
-    'SELECT id, role FROM users WHERE email = $1',
+    'SELECT id, role, name, avatar_url FROM users WHERE email = $1',
     [email]
   );
 
@@ -303,15 +435,11 @@ async function performSocialLogin(payload) {
     // User exists - update provider ID if needed
     const user = existingUser.rows[0];
     await db.query(
-      'UPDATE users SET avatar_url = $1 WHERE id = $2',
+      'UPDATE users SET avatar_url = $1, email_verified = true WHERE id = $2',
       [avatarUrl || null, user.id]
     );
 
-    const token = jwt.sign(
-      { id: user.id, email, role: user.role || null },
-      process.env.JWT_SECRET || 'dev-secret-change-in-production',
-      { expiresIn: '7d' }
-    );
+    const token = makeToken({ id: user.id, email, name: user.name || name });
 
     return {
       token,
@@ -320,9 +448,11 @@ async function performSocialLogin(payload) {
         email,
         name,
         avatarUrl,
+        avatar_url: avatarUrl || user.avatar_url,
         provider,
         providerId,
         role: user.role || null,
+        email_verified: true,
         onboardingPending: !user.role
       }
     };
@@ -330,16 +460,12 @@ async function performSocialLogin(payload) {
 
   // Create new user
   const newUser = await db.query(
-    'INSERT INTO users (email, password_hash, name, avatar_url) VALUES ($1, $2, $3, $4) RETURNING id',
+    'INSERT INTO users (email, password_hash, name, avatar_url, email_verified) VALUES ($1, $2, $3, $4, true) RETURNING id',
     [email, null, name || email, avatarUrl || null]
   );
 
   const userId = newUser.rows[0].id;
-  const token = jwt.sign(
-    { id: userId, email, role: null },
-    process.env.JWT_SECRET || 'dev-secret-change-in-production',
-    { expiresIn: '7d' }
-  );
+  const token = makeToken({ id: userId, email, name: name || email });
 
   return {
     token,
@@ -348,9 +474,11 @@ async function performSocialLogin(payload) {
       email,
       name,
       avatarUrl,
+      avatar_url: avatarUrl || null,
       provider,
       providerId,
       role: null,
+      email_verified: true,
       onboardingPending: true
     }
   };

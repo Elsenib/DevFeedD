@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Image,
   Modal,
   StyleSheet,
   Text,
@@ -10,6 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { AuthContext } from '../context/AuthContext';
 import * as api from '../api';
@@ -43,9 +45,12 @@ function normalizePost(row) {
     body: row?.body || row?.caption || row?.title || '',
     authorName: row?.name || row?.user?.name || 'Istifadeci',
     authorRole: row?.role_sub || row?.role || 'DevFeed member',
+    authorAvatar: row?.avatar_url || row?.user?.avatar_url || row?.authorAvatar || null,
     likeCount: Number(row?.like_count ?? row?.likes ?? 0),
     commentCount: Number(row?.comment_count ?? row?.comments ?? 0),
     bookmarkCount: Number(row?.bookmark_count ?? 0),
+    likedByMe: !!(row?.liked_by_me ?? row?.likedByMe),
+    bookmarkedByMe: !!(row?.bookmarked_by_me ?? row?.bookmarkedByMe),
     tags: Array.isArray(row?.tags) ? row.tags : [],
   };
 }
@@ -57,8 +62,11 @@ function formatDate(value) {
   return date.toLocaleDateString();
 }
 
-function AuthorAvatar({ name }) {
+function AuthorAvatar({ name, avatarUrl }) {
   const letter = String(name || 'U').slice(0, 1).toUpperCase();
+  if (avatarUrl) {
+    return <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />;
+  }
   return (
     <View style={styles.avatar}>
       <Text style={styles.avatarText}>{letter}</Text>
@@ -251,12 +259,65 @@ export default function PostDetailScreen({ route, navigation }) {
   };
 
   const handleLike = async () => {
-    setPost((prev) => ({ ...prev, likeCount: prev.likeCount + 1, like_count: prev.likeCount + 1 }));
+    const nextLiked = !post.likedByMe;
+    setPost((prev) => {
+      const nextCount = Math.max(0, prev.likeCount + (nextLiked ? 1 : -1));
+      return {
+        ...prev,
+        likedByMe: nextLiked,
+        liked_by_me: nextLiked,
+        likeCount: nextCount,
+        like_count: nextCount,
+      };
+    });
     try {
-      await api.toggleLike(post.id);
+      const result = nextLiked ? await api.toggleLike(post.id) : await api.unlikePost(post.id);
+      setPost((prev) => ({
+        ...prev,
+        likedByMe: result.liked ?? nextLiked,
+        liked_by_me: result.liked ?? nextLiked,
+        likeCount: result.like_count ?? prev.likeCount,
+        like_count: result.like_count ?? prev.likeCount,
+      }));
     } catch (error) {
       loadPost();
     }
+  };
+
+  const handleBookmark = async () => {
+    const nextBookmarked = !post.bookmarkedByMe;
+    setPost((prev) => {
+      const nextCount = Math.max(0, prev.bookmarkCount + (nextBookmarked ? 1 : -1));
+      return {
+        ...prev,
+        bookmarkedByMe: nextBookmarked,
+        bookmarked_by_me: nextBookmarked,
+        bookmarkCount: nextCount,
+        bookmark_count: nextCount,
+      };
+    });
+    try {
+      const result = nextBookmarked ? await api.bookmarkPost(post.id) : await api.removeBookmark(post.id);
+      setPost((prev) => ({
+        ...prev,
+        bookmarkedByMe: result.bookmarked ?? nextBookmarked,
+        bookmarked_by_me: result.bookmarked ?? nextBookmarked,
+        bookmarkCount: result.bookmark_count ?? prev.bookmarkCount,
+        bookmark_count: result.bookmark_count ?? prev.bookmarkCount,
+      }));
+    } catch (error) {
+      loadPost();
+    }
+  };
+
+  const handleAuthorPress = () => {
+    const authorId = post.user_id || post.userId;
+    if (!authorId) return;
+    if (String(authorId) === String(user?.id)) {
+      navigation.navigate('Main', { screen: 'Profile' });
+      return;
+    }
+    navigation.navigate('UserProfile', { userId: authorId });
   };
 
   const handleSaveEdit = async (payload) => {
@@ -318,11 +379,13 @@ export default function PostDetailScreen({ route, navigation }) {
 
       <View style={styles.card}>
         <View style={styles.postHeader}>
-          <AuthorAvatar name={post.authorName} />
-          <View style={styles.authorBlock}>
-            <Text style={styles.postUser}>{post.authorName}</Text>
-            <Text style={styles.postTime}>{post.authorRole} - {formatDate(post.created_at || post.createdAt)}</Text>
-          </View>
+          <TouchableOpacity style={styles.authorTap} onPress={handleAuthorPress}>
+            <AuthorAvatar name={post.authorName} avatarUrl={post.authorAvatar} />
+            <View style={styles.authorBlock}>
+              <Text style={styles.postUser}>{post.authorName}</Text>
+              <Text style={styles.postTime}>{post.authorRole} - {formatDate(post.created_at || post.createdAt)}</Text>
+            </View>
+          </TouchableOpacity>
           <View style={[styles.typeBadge, { borderColor: kind.color, backgroundColor: `${kind.color}18` }]}>
             <MaterialIcons name={kind.icon} size={13} color={kind.color} />
             <Text style={[styles.typeBadgeText, { color: kind.color }]}>{kind.label}</Text>
@@ -342,17 +405,17 @@ export default function PostDetailScreen({ route, navigation }) {
 
         <View style={styles.metricsRow}>
           <TouchableOpacity style={styles.metricButton} onPress={handleLike}>
-            <MaterialIcons name="favorite-border" size={18} color="#8b949e" />
-            <Text style={styles.metricText}>{post.likeCount}</Text>
+            <MaterialIcons name={post.likedByMe ? 'favorite' : 'favorite-border'} size={18} color={post.likedByMe ? '#f85149' : '#8b949e'} />
+            <Text style={[styles.metricText, post.likedByMe && styles.likeTextActive]}>{post.likeCount}</Text>
           </TouchableOpacity>
           <View style={styles.metricButton}>
             <MaterialIcons name="chat-bubble-outline" size={18} color="#8b949e" />
             <Text style={styles.metricText}>{post.commentCount || comments.length}</Text>
           </View>
-          <View style={styles.metricButton}>
-            <MaterialIcons name="bookmark-border" size={18} color="#8b949e" />
-            <Text style={styles.metricText}>{post.bookmarkCount}</Text>
-          </View>
+          <TouchableOpacity style={styles.metricButton} onPress={handleBookmark}>
+            <MaterialIcons name={post.bookmarkedByMe ? 'bookmark' : 'bookmark-border'} size={18} color={post.bookmarkedByMe ? '#fbbf24' : '#8b949e'} />
+            <Text style={[styles.metricText, post.bookmarkedByMe && styles.bookmarkTextActive]}>{post.bookmarkCount}</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -383,7 +446,7 @@ export default function PostDetailScreen({ route, navigation }) {
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <FlatList
         data={comments}
         keyExtractor={(item) => item.id?.toString() ?? Math.random().toString()}
@@ -391,7 +454,7 @@ export default function PostDetailScreen({ route, navigation }) {
         contentContainerStyle={styles.listContent}
         renderItem={({ item }) => (
           <View style={styles.commentCard}>
-            <AuthorAvatar name={item.name || item.user?.name || item.sender?.name} />
+            <AuthorAvatar name={item.name || item.user?.name || item.sender?.name} avatarUrl={item.avatar_url || item.user?.avatar_url || item.sender?.avatar_url} />
             <View style={styles.commentBody}>
               <Text style={styles.commentAuthor}>{item.name || item.user?.name || item.userEmail || 'Istifadeci'}</Text>
               <Text style={styles.commentText}>{item.text}</Text>
@@ -407,7 +470,7 @@ export default function PostDetailScreen({ route, navigation }) {
         onClose={() => setEditOpen(false)}
         onSave={handleSaveEdit}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -472,6 +535,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 14,
   },
+  authorTap: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   avatar: {
     width: 40,
     height: 40,
@@ -484,6 +552,12 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 14,
     fontWeight: '900',
+  },
+  avatarImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#21262d',
   },
   authorBlock: {
     flex: 1,
@@ -664,6 +738,12 @@ const styles = StyleSheet.create({
     color: '#8b949e',
     fontSize: 12,
     marginLeft: 5,
+  },
+  likeTextActive: {
+    color: '#fca5a5',
+  },
+  bookmarkTextActive: {
+    color: '#fbbf24',
   },
   commentBox: {
     backgroundColor: '#161b22',

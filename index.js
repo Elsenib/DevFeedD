@@ -10,6 +10,8 @@ const profileRoutes = require('./routes/profile');
 const conversationsRoutes = require('./routes/conversations');
 const chatRoutes = require('./routes/chat');
 const supportRoutes = require('./routes/support');
+const usersRoutes = require('./routes/users');
+const notificationsRoutes = require('./routes/notifications');
 
 dotenv.config();
 const app = express();
@@ -31,6 +33,8 @@ app.use('/profile', profileRoutes);
 app.use('/conversations', conversationsRoutes);
 app.use('/chat', chatRoutes);
 app.use('/support', supportRoutes);
+app.use('/users', usersRoutes);
+app.use('/notifications', notificationsRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -62,6 +66,8 @@ const createSchema = async () => {
         skills JSONB DEFAULT '[]'::jsonb,
         languages JSONB DEFAULT '[]'::jsonb,
         website TEXT,
+        activity_visible BOOLEAN DEFAULT true,
+        email_verified BOOLEAN DEFAULT false,
         created_at TIMESTAMPTZ DEFAULT NOW()
       );
     `);
@@ -76,7 +82,9 @@ const createSchema = async () => {
       ADD COLUMN IF NOT EXISTS role_sub TEXT,
       ADD COLUMN IF NOT EXISTS skills JSONB DEFAULT '[]'::jsonb,
       ADD COLUMN IF NOT EXISTS languages JSONB DEFAULT '[]'::jsonb,
-      ADD COLUMN IF NOT EXISTS website TEXT;
+      ADD COLUMN IF NOT EXISTS website TEXT,
+      ADD COLUMN IF NOT EXISTS activity_visible BOOLEAN DEFAULT true,
+      ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT false;
     `);
     await client.query(`
       CREATE TABLE IF NOT EXISTS posts (
@@ -169,6 +177,47 @@ const createSchema = async () => {
         description TEXT,
         created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
         is_public BOOLEAN DEFAULT true,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS follows (
+        id SERIAL PRIMARY KEY,
+        follower_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        following_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(follower_id, following_id),
+        CHECK (follower_id <> following_id)
+      );
+    `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS notifications (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        actor_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        type TEXT NOT NULL,
+        entity_type TEXT,
+        entity_id INTEGER,
+        text TEXT NOT NULL,
+        read_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_notifications_user_created
+      ON notifications(user_id, created_at DESC);
+    `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS email_verification_codes (
+        email TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        password_hash TEXT NOT NULL,
+        role TEXT,
+        skills JSONB DEFAULT '[]'::jsonb,
+        languages JSONB DEFAULT '[]'::jsonb,
+        code_hash TEXT NOT NULL,
+        attempts INTEGER DEFAULT 0,
+        expires_at TIMESTAMPTZ NOT NULL,
         created_at TIMESTAMPTZ DEFAULT NOW()
       );
     `);

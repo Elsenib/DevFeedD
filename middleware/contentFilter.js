@@ -28,6 +28,17 @@ const ILLEGAL_TERMS = [
   'attack',
   'suicide',
   'self-harm',
+  'gijdillaq',
+  'gijdıllaq',
+  'peyser',
+  'peysər',
+  'qehbe',
+  'qəhbə',
+  'sik',
+  'amciq',
+  'suka',
+  'soxum',
+  'dillaq'
 ];
 
 const NSFW_KEYWORDS = [

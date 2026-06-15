@@ -1,21 +1,36 @@
-import { useContext, useMemo } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useContext, useEffect, useMemo, useState } from 'react';
+import { Alert, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AuthContext } from '../context/AuthContext';
 import { LANGUAGES, PreferencesContext, THEME_MODES } from '../context/PreferencesContext';
 
 export default function SettingsScreen({ navigation }) {
-  const { signOut } = useContext(AuthContext);
+  const { user, signOut, updateCurrentUser } = useContext(AuthContext);
   const { theme, themeMode, language, setThemeMode, setLanguage, t } = useContext(PreferencesContext);
   const colors = theme.colors;
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const [activityVisible, setActivityVisible] = useState(user?.activity_visible !== false);
+
+  useEffect(() => {
+    setActivityVisible(user?.activity_visible !== false);
+  }, [user?.activity_visible]);
 
   const handleSignOut = () => {
     Alert.alert('Çıxış', 'Hesabdan çıxmaq istəyirsiniz?', [
       { text: 'Xeyr', style: 'cancel' },
       { text: 'Bəli', style: 'destructive', onPress: signOut },
     ]);
+  };
+
+  const handleActivityVisible = async (nextValue) => {
+    setActivityVisible(nextValue);
+    try {
+      await updateCurrentUser({ activityVisible: nextValue });
+    } catch (error) {
+      setActivityVisible(!nextValue);
+      Alert.alert('Tənzimləmə xətası', error.response?.data?.message || error.message);
+    }
   };
 
   return (
@@ -27,7 +42,7 @@ export default function SettingsScreen({ navigation }) {
       </View>
 
       <Text style={styles.sectionTitle}>{t.account}</Text>
-      <TouchableOpacity style={styles.cardRow} onPress={() => navigation.navigate('Profile', { openEdit: true })}>
+      <TouchableOpacity style={styles.cardRow} onPress={() => navigation.navigate('Main', { screen: 'Profile', params: { openEdit: true } })}>
         <View style={styles.cardIcon}>
           <MaterialIcons name="edit" size={20} color="#ffffff" />
         </View>
@@ -47,6 +62,23 @@ export default function SettingsScreen({ navigation }) {
           <Text style={styles.cardSubtitle}>Hesabdan çıx və tokeni təmizlə</Text>
         </View>
       </TouchableOpacity>
+
+      <Text style={styles.sectionTitle}>Məxfilik</Text>
+      <View style={styles.cardRow}>
+        <View style={[styles.cardIcon, styles.privacyIcon]}>
+          <MaterialIcons name="visibility" size={20} color="#ffffff" />
+        </View>
+        <View style={styles.cardBody}>
+          <Text style={styles.cardTitle}>Fəaliyyət görünürlüğü</Text>
+          <Text style={styles.cardSubtitle}>Profilində paylaşımlarını başqalarına göstər və ya gizlət</Text>
+        </View>
+        <Switch
+          value={activityVisible}
+          onValueChange={handleActivityVisible}
+          trackColor={{ false: colors.border, true: colors.primary }}
+          thumbColor="#ffffff"
+        />
+      </View>
 
       <Text style={styles.sectionTitle}>{t.appearance}</Text>
       <View style={styles.card}>
@@ -89,7 +121,7 @@ export default function SettingsScreen({ navigation }) {
       </View>
 
       <Text style={styles.sectionTitle}>Destek</Text>
-      <TouchableOpacity style={styles.cardRow} onPress={() => navigation.navigate('Profile')}>
+      <TouchableOpacity style={styles.cardRow} onPress={() => navigation.navigate('Main', { screen: 'Profile' })}>
         <View style={[styles.cardIcon, styles.supportIcon]}>
           <MaterialIcons name="local-cafe" size={20} color="#111827" />
         </View>
@@ -169,6 +201,9 @@ function createStyles(colors) {
     },
     supportIcon: {
       backgroundColor: colors.warning,
+    },
+    privacyIcon: {
+      backgroundColor: colors.success,
     },
     cardBody: {
       flex: 1,

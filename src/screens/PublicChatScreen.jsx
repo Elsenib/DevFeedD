@@ -14,6 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { AuthContext } from '../context/AuthContext';
 import * as api from '../api';
@@ -59,7 +60,7 @@ function RoomModal({ visible, creating, onClose, onCreate }) {
           <TextInput
             value={description}
             onChangeText={setDescription}
-            placeholder="Movzu, qayda ve ya istiqamet"
+            placeholder="Mövzu, qayda və ya istiqamət"
             placeholderTextColor="#4b5563"
             style={styles.modalInput}
           />
@@ -187,7 +188,7 @@ export default function PublicChatScreen() {
       <View style={[styles.messageRow, mine && styles.messageRowMine]}>
         <View style={[styles.messageBubble, mine && styles.messageBubbleMine]}>
           <Text style={[styles.senderName, mine && styles.senderNameMine]}>
-            {mine ? 'Sen' : item.name || 'Istifadeci'}
+            {mine ? 'Sən' : item.name || 'İstifadəçi'}
           </Text>
           <Text style={[styles.messageText, mine && styles.messageTextMine]}>{item.text}</Text>
           <Text style={[styles.messageTime, mine && styles.messageTimeMine]}>{formatTime(item.created_at || item.createdAt)}</Text>
@@ -205,11 +206,12 @@ export default function PublicChatScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 72 : 0}
-    >
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <KeyboardAvoidingView
+        style={styles.keyboard}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 72 : 0}
+      >
       <View style={styles.header}>
         <View>
           <Text style={styles.title}>Public Chat</Text>
@@ -249,7 +251,7 @@ export default function PublicChatScreen() {
           renderItem={renderMessage}
           contentContainerStyle={styles.messagesContent}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#6366f1" />}
-          ListEmptyComponent={<Text style={styles.emptyText}>Bu otaqda hele mesaj yoxdur.</Text>}
+          ListEmptyComponent={<Text style={styles.emptyText}>Bu otaqda hələ mesaj yoxdur.</Text>}
         />
       )}
 
@@ -257,7 +259,7 @@ export default function PublicChatScreen() {
         <TextInput
           value={text}
           onChangeText={setText}
-          placeholder="Mesaj, kod ve ya link yaz..."
+          placeholder="Mesaj, kod və ya link yaz..."
           placeholderTextColor="#4b5563"
           style={styles.input}
           multiline
@@ -277,7 +279,8 @@ export default function PublicChatScreen() {
         onClose={() => setRoomModalOpen(false)}
         onCreate={handleCreateRoom}
       />
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
@@ -285,6 +288,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#0d1117',
+  },
+  keyboard: {
+    flex: 1,
   },
   center: {
     flex: 1,

@@ -3,10 +3,11 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useContext } from 'react';
 import { PreferencesContext } from '../context/PreferencesContext';
 import FeedScreen from '../screens/FeedScreen';
+import ExploreScreen from '../screens/ExploreScreen';
+import NotificationsScreen from '../screens/NotificationsScreen';
 import MessagesScreen from '../screens/MessagesScreen';
 import PublicChatScreen from '../screens/PublicChatScreen';
 import ProfileScreen from '../screens/ProfileScreen';
-import SettingsScreen from '../screens/SettingsScreen';
 
 const Tab = createBottomTabNavigator();
 
@@ -25,19 +26,21 @@ export default function TabNavigator() {
         tabBarIcon: ({ color, size }) => {
           let iconName;
           if (route.name === 'Feed') iconName = 'dynamic-feed';
+          if (route.name === 'Explore') iconName = 'search';
+          if (route.name === 'Notifications') iconName = 'notifications';
           if (route.name === 'Messages') iconName = 'message';
           if (route.name === 'PublicChat') iconName = 'forum';
           if (route.name === 'Profile') iconName = 'person';
-          if (route.name === 'Settings') iconName = 'settings';
           return <MaterialIcons name={iconName} size={size} color={color} />;
         },
       })}
     >
       <Tab.Screen name="Feed" component={FeedScreen} />
+      <Tab.Screen name="Explore" component={ExploreScreen} options={{ title: 'Kəşf' }} />
+      <Tab.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Bildirişlər' }} />
       <Tab.Screen name="Messages" component={MessagesScreen} />
       <Tab.Screen name="PublicChat" component={PublicChatScreen} options={{ title: 'Chat' }} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
-      <Tab.Screen name="Settings" component={SettingsScreen} />
     </Tab.Navigator>
   );
 }

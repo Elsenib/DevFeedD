@@ -7,6 +7,21 @@ Bu fayl `DevFeed.jsx` prototipinde olan hedefleri ve repo-da real gorunen veziyy
 
 ---
 
+## 2026-06-15 Son Implementation Update
+
+- Feed, Messages, Chat, Public Chat ve Post Detail header-lari SafeArea ile duzeldildi.
+- Feed/Post Detail real `avatar_url` gosterir; avatar upload-dan sonra global user state yenilenir.
+- Like ve bookmark artiq backendden `liked_by_me`/`bookmarked_by_me` alir, tekrar basanda geri cixir ve aktiv reng gosterir.
+- Explore/Kesf tab-i elave edildi: istifadeci ve post axtarisi, follow/unfollow, profil/post detail kecidi.
+- Follow sistemi backendde `follows` cedveli ile elave edildi; profilde followers/following saylari gorunur.
+- Basqa user profilinde `Izle`, `Mesaj`, `Destek ol` action-lari var.
+- Notifications sistemi elave edildi: like, comment, bookmark, follow, message ve job apply bildiris yaradir.
+- Settings-de activity visibility toggle elave edildi; profil paylasimlari basqalari ucun gizledile bilir.
+- Email/password register flow-u OTP email verification-a kecdi. Production ucun `RESEND_API_KEY` ve `EMAIL_FROM` lazimdir.
+- Yeni backend route-lar: `/users/search`, `/users/:id/follow`, `/notifications`, `/profile/:id/posts`, `/posts/search`.
+
+---
+
 ## 1. Layihe Terifi
 
 **DevFeed** - developer, designer, devops, data, HR ve startup adamlari ucun sosial platforma:
@@ -121,6 +136,7 @@ Bu fayl `DevFeed.jsx` prototipinde olan hedefleri ve repo-da real gorunen veziyy
 | Token persistence | PARTIAL | Web `localStorage` fallback var; mobile SecureStore/AsyncStorage qalib |
 | Google OAuth mobile/web flow-un tam test edilmesi | TODO | Client ID, redirect URI, backend callback |
 | GitHub OAuth flow-un elave edilmesi | TODO | GitHub app ID/secret, callback, provider mapping |
+| Email/password register verification | PARTIAL | OTP flow hazirdir; Railway-de `RESEND_API_KEY` ve `EMAIL_FROM` qurulmalidir |
 
 ### P1 - Feed ve post sistemi
 
@@ -166,20 +182,22 @@ Bu fayl `DevFeed.jsx` prototipinde olan hedefleri ve repo-da real gorunen veziyy
 | Is elanlarini odenisle ireli cekmek | TODO | Boost paketi, muddet, siralama prioriteti |
 | Boost payment/order modeli | TODO | `job_boosts` ve ya `payments` cedveli lazimdir |
 | Hesab nomresi ile manual odenis tesdiqi | TODO | Admin/env-de hesab nomresi; reference/qebz flow-u |
-| Profilde "Destek ol" | TODO | DevFeed.jsx-de mock SupportModal var |
-| Minimum 1 manat destek | TODO | 1 AZN minimum validation |
-| Destek odenisi hesab nomresi ile | TODO | Hesab nomresi gosterilecek, odenis manual tesdiqlenecek |
-| Destek tarixcesi | TODO | Kim, kime, mebleg, status |
+| Profilde "Destek ol" | DONE | Profile SupportModal real API ile baglandi |
+| Minimum 1 manat destek | DONE | Backend ve frontend minimum 1 AZN validation |
+| Destek odenisi hesab nomresi ile | DONE | `SUPPORT_ACCOUNT_NUMBER`/`SUPPORT_RECEIVER_NAME` env-den gelir |
+| Destek tarixcesi | PARTIAL | `support_payments` yazilir; UI/admin tarixce qalir |
 
 ### P5 - Kesf, bildiris, ayarlar, polish
 
 | Is | Status | Qeyd |
 | --- | --- | --- |
-| Explore/Kesf et tab-i | TODO | DevFeed.jsx-de var, real TabNavigator-da yoxdur |
-| Axtaris ve filter | TODO | User/post/tag search backend + UI |
-| Notifications sistemi | PARTIAL | DevFeed.jsx mock; backend real deyil |
-| Dark/light/system theme | PARTIAL | Settings mock/prototip var, real app-de sade |
-| Dil secimi | TODO | i18n strukturu lazimdir |
+| Explore/Kesf et tab-i | DONE | Real `ExploreScreen.jsx` ve tab elave edildi |
+| Axtaris ve filter | DONE | User/post search backend + UI elave edildi |
+| Notifications sistemi | DONE | Backend notifications + frontend tab elave edildi |
+| Follow/unfollow sistemi | DONE | `follows` cedveli, route-lar, profil saylari |
+| Public profil action-lari | DONE | Izle, mesaj gonder, destek ol |
+| Dark/light/system theme | PARTIAL | Dark/light var; system mode yoxdur |
+| Dil secimi | PARTIAL | Dil secimi var; ekranlarin tam tercume/i18n pass-i qalir |
 | Offline mode | TODO | AsyncStorage queue/cache |
 | Deployment hazirligi | TODO | env, migrations, EAS/backend hosting |
 | Testler | TODO | Auth, posts, filter, messaging, payment flow |

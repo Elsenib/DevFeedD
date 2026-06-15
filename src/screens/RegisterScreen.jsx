@@ -3,11 +3,14 @@ import { ActivityIndicator, Alert, StyleSheet, Text, TextInput, TouchableOpacity
 import { AuthContext } from '../context/AuthContext';
 
 export default function RegisterScreen({ navigation }) {
-  const { signUp, socialSignIn } = useContext(AuthContext);
+  const { signUp, verifyEmailRegistration, socialSignIn } = useContext(AuthContext);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [pendingEmail, setPendingEmail] = useState('');
+  const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
+  const [verifying, setVerifying] = useState(false);
   const [socialLoading, setSocialLoading] = useState(null);
 
   const handleRegister = async () => {
@@ -17,11 +20,35 @@ export default function RegisterScreen({ navigation }) {
     }
     setLoading(true);
     try {
-      await signUp({ name, email, password });
+      const result = await signUp({ name, email, password });
+      if (result?.verificationRequired) {
+        setPendingEmail(result.email || email.trim().toLowerCase());
+        Alert.alert(
+          'Email təsdiqi',
+          result.devCode
+            ? `Test kodu: ${result.devCode}`
+            : 'Email ünvanına 6 rəqəmli təsdiq kodu göndərildi.'
+        );
+      }
     } catch (error) {
-      Alert.alert('Qeydiyyat xetasi', error.response?.data?.message || error.message);
+      Alert.alert('Qeydiyyat xətası', error.response?.data?.message || error.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleVerify = async () => {
+    if (!pendingEmail || !code.trim()) {
+      Alert.alert('Kod lazımdır', 'Emailə gələn 6 rəqəmli kodu daxil et.');
+      return;
+    }
+    setVerifying(true);
+    try {
+      await verifyEmailRegistration({ email: pendingEmail, code: code.trim() });
+    } catch (error) {
+      Alert.alert('Email təsdiqi alınmadı', error.response?.data?.message || error.message);
+    } finally {
+      setVerifying(false);
     }
   };
 
@@ -55,49 +82,75 @@ export default function RegisterScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Yeni hesab ac</Text>
-      <Text style={styles.subtitle}>Bir nece saniyede qeydiyyatdan kec ve feed-e basla.</Text>
+      <Text style={styles.title}>Yeni hesab aç</Text>
+      <Text style={styles.subtitle}>Bir neçə saniyədə qeydiyyatdan keç və feed-ə başla.</Text>
       <View style={styles.formCard}>
-        <TextInput
-          value={name}
-          onChangeText={setName}
-          placeholder="Ad Soyad"
-          placeholderTextColor="#94a3b8"
-          style={styles.input}
-        />
-        <TextInput
-          value={email}
-          onChangeText={setEmail}
-          placeholder="E-mail"
-          placeholderTextColor="#94a3b8"
-          keyboardType="email-address"
-          autoCapitalize="none"
-          style={styles.input}
-        />
-        <TextInput
-          value={password}
-          onChangeText={setPassword}
-          placeholder="Sifre"
-          placeholderTextColor="#94a3b8"
-          secureTextEntry
-          style={styles.input}
-        />
-        <TouchableOpacity style={styles.button} onPress={handleRegister} disabled={loading}>
-          {loading ? <ActivityIndicator color="#ffffff" /> : <Text style={styles.buttonText}>Qeydiyyat</Text>}
-        </TouchableOpacity>
+        {pendingEmail ? (
+          <>
+            <Text style={styles.pendingText}>{pendingEmail} ünvanına gələn təsdiq kodunu daxil et.</Text>
+            <TextInput
+              value={code}
+              onChangeText={setCode}
+              placeholder="6 rəqəmli kod"
+              placeholderTextColor="#94a3b8"
+              keyboardType="number-pad"
+              style={styles.input}
+            />
+            <TouchableOpacity style={styles.button} onPress={handleVerify} disabled={verifying}>
+              {verifying ? <ActivityIndicator color="#ffffff" /> : <Text style={styles.buttonText}>Emaili təsdiqlə</Text>}
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setPendingEmail('')}>
+              <Text style={styles.switchText}>Məlumatları dəyiş</Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <>
+            <TextInput
+              value={name}
+              onChangeText={setName}
+              placeholder="Ad Soyad"
+              placeholderTextColor="#94a3b8"
+              style={styles.input}
+            />
+            <TextInput
+              value={email}
+              onChangeText={setEmail}
+              placeholder="E-mail"
+              placeholderTextColor="#94a3b8"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              style={styles.input}
+            />
+            <TextInput
+              value={password}
+              onChangeText={setPassword}
+              placeholder="Şifrə"
+              placeholderTextColor="#94a3b8"
+              secureTextEntry
+              style={styles.input}
+            />
+            <TouchableOpacity style={styles.button} onPress={handleRegister} disabled={loading}>
+              {loading ? <ActivityIndicator color="#ffffff" /> : <Text style={styles.buttonText}>Qeydiyyat</Text>}
+            </TouchableOpacity>
+          </>
+        )}
 
-        <View style={styles.dividerContainer}>
-          <View style={styles.divider} />
-          <Text style={styles.dividerText}>ve ya</Text>
-          <View style={styles.divider} />
-        </View>
+        {!pendingEmail && (
+          <>
+            <View style={styles.dividerContainer}>
+              <View style={styles.divider} />
+              <Text style={styles.dividerText}>və ya</Text>
+              <View style={styles.divider} />
+            </View>
 
-        {renderSocialButton('github', 'GitHub ile davam et', 'GH')}
-        {renderSocialButton('google', 'Google ile davam et', 'G')}
+            {renderSocialButton('github', 'GitHub ilə davam et', 'GH')}
+            {renderSocialButton('google', 'Google ilə davam et', 'G')}
 
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.switchText}>Artiq hesabin varsa, daxil ol</Text>
-        </TouchableOpacity>
+            <TouchableOpacity onPress={() => navigation.goBack()}>
+              <Text style={styles.switchText}>Artıq hesabın varsa, daxil ol</Text>
+            </TouchableOpacity>
+          </>
+        )}
       </View>
     </View>
   );
@@ -163,6 +216,11 @@ const styles = StyleSheet.create({
     marginHorizontal: 12,
     color: '#64748b',
     fontSize: 13,
+  },
+  pendingText: {
+    color: '#cbd5e1',
+    lineHeight: 20,
+    marginBottom: 14,
   },
   socialButton: {
     backgroundColor: '#1e293b',
