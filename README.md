@@ -11,7 +11,7 @@ Production-ready DevFeed backend and Expo mobile frontend.
 
 ## Directories
 
-- `server/` - Express backend with PostgreSQL
+- `routes/`, `index.js`, `db.js` - Express backend with PostgreSQL
 - `src/` - Expo mobile app source (React Native)
 - `app.json`, `App.jsx` - Expo configuration and entry point
 
@@ -19,15 +19,14 @@ Production-ready DevFeed backend and Expo mobile frontend.
 
 ### Backend
 
-1. Copy `server/.env.example` to `server/.env` and fill in:
+1. Create/update `.env` in the project root and fill in:
    - `DATABASE_URL` from Railway PostgreSQL
    - Generate strong `JWT_SECRET` (e.g., `openssl rand -hex 32`)
 
 2. Install and run:
    ```bash
-   cd server
-   npm install
-   npm start
+   npm.cmd install
+   npm.cmd run dev
    ```
 
 Server listens on `http://localhost:4000` and has a `/health` endpoint.
@@ -41,22 +40,22 @@ Server listens on `http://localhost:4000` and has a `/health` endpoint.
 
 2. Set up dependencies:
    ```bash
-   npm install
+   npm.cmd install
    ```
 
 3. Update `src/constants/config.js` to point to your backend:
    ```javascript
-   export const API_BASE_URL = 'http://localhost:4000/api'; // or tunnel URL
+   export const API_BASE_URL = 'http://localhost:4000'; // or deployed Railway URL
    ```
 
 4. Start Expo:
    ```bash
-   npm start
+   npm.cmd run web
    ```
 
 Use tunnel mode for testing on physical devices:
 ```bash
-npx expo start --tunnel
+npx.cmd expo start --tunnel
 ```
 
 ## Production Deployment
@@ -101,14 +100,15 @@ See `.env.example` and `server/.env.example` for required variables.
 - `POST /posts/:id/like` - Toggle like
 - `GET /profile` - Get current user profile
 - `GET /conversations` - List conversations
+- `GET /conversations/:id` - Conversation detail
+- `POST /conversations/:id/messages` - Send DM
+- `GET /chat/rooms` - Public chat rooms
+- `POST /chat/rooms/:id/messages` - Send public chat message
 - `GET /health` - Health check
 
 ## Database
 
-Migrations are in `server/migrations/`. Apply before starting server in production:
-```bash
-npm run migrate:sql
-```
+The root `index.js` creates/extends the required schema on startup. SQL migration files also live in `migrations/`.
 
 ---
 

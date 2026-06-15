@@ -1,50 +1,545 @@
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View, RefreshControl } from 'react-native';
+import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Modal,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
+import { AuthContext } from '../context/AuthContext';
 import * as api from '../api';
 
-function PostItem({ post, onPress }) {
+const POST_TYPES = [
+  { id: 'TEXT', label: 'Post', icon: 'terminal', color: '#8b949e' },
+  { id: 'GIT', label: 'Git', icon: 'code', color: '#58a6ff' },
+  { id: 'DEPLOY', label: 'Deploy', icon: 'cloud-upload', color: '#3fb950' },
+  { id: 'MEDIA', label: 'Media', icon: 'videocam', color: '#818cf8' },
+  { id: 'JOB', label: 'Is', icon: 'work', color: '#fbbf24' },
+];
+
+const TRENDING = ['#reactnative', '#golang', '#kubernetes', '#ai'];
+
+function parseMetadata(metadata) {
+  if (!metadata) return {};
+  if (typeof metadata === 'object') return metadata;
+  try {
+    return JSON.parse(metadata);
+  } catch (error) {
+    return {};
+  }
+}
+
+function normalizePost(row) {
+  const metadata = parseMetadata(row.metadata);
+  const type = String(row.post_type || row.type || 'TEXT').toUpperCase();
+  return {
+    ...row,
+    type,
+    metadata,
+    authorName: row.name || row.user?.name || row.userEmail || 'Istifadeci',
+    authorRole: row.role_sub || row.role || 'DevFeed member',
+    caption: row.caption || row.title || row.body || 'Yeni paylasim',
+    body: row.body || row.caption || row.title || '',
+    likeCount: Number(row.like_count ?? row.likes ?? 0),
+    commentCount: Number(row.comment_count ?? row.comments?.length ?? row.comments ?? 0),
+    bookmarkCount: Number(row.bookmark_count ?? 0),
+    createdAt: row.created_at || row.createdAt,
+    tags: Array.isArray(row.tags) ? row.tags : [],
+  };
+}
+
+function formatTime(value) {
+  if (!value) return 'Indi';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Indi';
+  return date.toLocaleDateString();
+}
+
+function typeStyle(type) {
+  return POST_TYPES.find((item) => item.id === type) || POST_TYPES[0];
+}
+
+function AuthorAvatar({ name }) {
+  const letter = String(name || 'U').slice(0, 1).toUpperCase();
+  return (
+    <View style={styles.avatar}>
+      <Text style={styles.avatarText}>{letter}</Text>
+    </View>
+  );
+}
+
+function GitPayload({ post }) {
+  const { metadata } = post;
+  const commits = Array.isArray(metadata.commits) ? metadata.commits : [];
+  return (
+    <View style={styles.gitBox}>
+      <View style={styles.payloadHeader}>
+        <MaterialIcons name="code" size={16} color="#58a6ff" />
+        <Text style={styles.gitRepo}>{metadata.repo || 'repo qeyd edilmeyib'}</Text>
+        <Text style={styles.payloadMuted}>{metadata.branch || 'main'}</Text>
+      </View>
+      {commits.length > 0 ? (
+        commits.map((commit, index) => (
+          <View key={`${commit.hash || index}`} style={styles.commitRow}>
+            <Text style={styles.commitHash}>{commit.hash || 'commit'}</Text>
+            <Text style={styles.commitText}>{commit.msg || commit.message}</Text>
+          </View>
+        ))
+      ) : (
+        <Text style={styles.payloadMuted}>Commit mesaji elave edilmeyib.</Text>
+      )}
+      <View style={styles.statsRow}>
+        <Text style={styles.additionText}>+{metadata.stats?.additions ?? 0}</Text>
+        <Text style={styles.deletionText}>-{metadata.stats?.deletions ?? 0}</Text>
+        <Text style={styles.payloadMuted}>{metadata.stats?.files ?? 1} fayl</Text>
+      </View>
+    </View>
+  );
+}
+
+function DeployPayload({ post }) {
+  const { metadata } = post;
+  return (
+    <View style={styles.deployBox}>
+      <View style={styles.payloadHeader}>
+        <MaterialIcons name="cloud-upload" size={18} color="#3fb950" />
+        <View style={styles.payloadBody}>
+          <Text style={styles.payloadTitle}>{metadata.service || 'Deploy'} -> {metadata.env || 'Production'}</Text>
+          <Text style={styles.deployText}>Deploy ugurlu - {metadata.duration || '2m 30s'}</Text>
+        </View>
+        <Text style={styles.liveBadge}>LIVE</Text>
+      </View>
+    </View>
+  );
+}
+
+function MediaPayload({ post }) {
+  const { metadata } = post;
+  return (
+    <View style={styles.mediaBox}>
+      <MaterialIcons name="play-circle-outline" size={42} color="#818cf8" />
+      <Text style={styles.mediaTitle}>{metadata.title || 'Media paylasim'}</Text>
+      <Text style={styles.mediaLink}>{metadata.url || 'Demo/link elave edilmeyib'}</Text>
+    </View>
+  );
+}
+
+function JobPayload({ post, onApplyJob }) {
+  const requirements = post.metadata.requirements || [];
+  return (
+    <View style={styles.jobBox}>
+      <View style={styles.chipWrap}>
+        {requirements.map((item) => (
+          <Text key={item} style={styles.jobChip}>{item}</Text>
+        ))}
+      </View>
+      <TouchableOpacity
+        style={styles.jobApplyButton}
+        onPress={(event) => {
+          event?.stopPropagation?.();
+          onApplyJob(post);
+        }}
+      >
+        <Text style={styles.jobApplyText}>Muraciet et</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+function PostPayload({ post, onApplyJob }) {
+  if (post.type === 'GIT') return <GitPayload post={post} />;
+  if (post.type === 'DEPLOY') return <DeployPayload post={post} />;
+  if (post.type === 'MEDIA') return <MediaPayload post={post} />;
+  if (post.type === 'JOB') return <JobPayload post={post} onApplyJob={onApplyJob} />;
+  return null;
+}
+
+function PostCard({ post, onPress, onLike, onBookmark, onApplyJob }) {
+  const kind = typeStyle(post.type);
   return (
     <Pressable style={styles.postCard} onPress={() => onPress(post)}>
       <View style={styles.postHeader}>
-        <Text style={styles.postUser}>{post.user?.name || post.userEmail || 'İstifadəçi'}</Text>
-        <Text style={styles.postTime}>{post.createdAt ? new Date(post.createdAt).toLocaleString() : 'İndi'}</Text>
+        <AuthorAvatar name={post.authorName} />
+        <View style={styles.authorBlock}>
+          <Text style={styles.postUser}>{post.authorName}</Text>
+          <Text style={styles.postTime}>{post.authorRole} - {formatTime(post.createdAt)}</Text>
+        </View>
+        <View style={[styles.typeBadge, { borderColor: kind.color, backgroundColor: `${kind.color}18` }]}>
+          <Text style={[styles.typeBadgeText, { color: kind.color }]}>{kind.label.toUpperCase()}</Text>
+        </View>
       </View>
-      <Text style={styles.postCaption}>{post.caption || post.title || 'Yeni paylaşım'}</Text>
-      {post.tags?.length > 0 && (
+
+      <Text style={styles.postCaption}>{post.caption}</Text>
+      {post.tags.length > 0 && (
         <View style={styles.tagsRow}>
           {post.tags.map((tag) => (
-            <Text key={tag} style={styles.tagItem}>#{tag.replace(/^#/, '')}</Text>
+            <Text key={tag} style={styles.tagItem}>#{String(tag).replace(/^#/, '')}</Text>
           ))}
         </View>
       )}
+
+      <PostPayload post={post} onApplyJob={onApplyJob} />
+
       <View style={styles.postFooter}>
-        <Text style={styles.metaText}>❤️ {post.likes ?? 0}</Text>
-        <Text style={styles.metaText}>💬 {post.comments?.length ?? post.comments ?? 0}</Text>
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={(event) => {
+            event?.stopPropagation?.();
+            onLike(post);
+          }}
+        >
+          <MaterialIcons name="favorite-border" size={18} color="#8b949e" />
+          <Text style={styles.metaText}>{post.likeCount}</Text>
+        </TouchableOpacity>
+        <View style={styles.actionButton}>
+          <MaterialIcons name="chat-bubble-outline" size={18} color="#8b949e" />
+          <Text style={styles.metaText}>{post.commentCount}</Text>
+        </View>
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={(event) => {
+            event?.stopPropagation?.();
+            onBookmark(post);
+          }}
+        >
+          <MaterialIcons name="bookmark-border" size={18} color="#8b949e" />
+          <Text style={styles.metaText}>{post.bookmarkCount}</Text>
+        </TouchableOpacity>
       </View>
     </Pressable>
   );
 }
 
+function ComposeModal({ visible, onClose, onSubmit, submitting }) {
+  const [type, setType] = useState('TEXT');
+  const [caption, setCaption] = useState('');
+  const [repo, setRepo] = useState('');
+  const [branch, setBranch] = useState('');
+  const [commitMsg, setCommitMsg] = useState('');
+  const [service, setService] = useState('Railway');
+  const [env, setEnv] = useState('Production');
+  const [mediaTitle, setMediaTitle] = useState('');
+  const [mediaUrl, setMediaUrl] = useState('');
+  const [tagInput, setTagInput] = useState('');
+  const [tags, setTags] = useState([]);
+  const [requirementInput, setRequirementInput] = useState('');
+  const [requirements, setRequirements] = useState([]);
+
+  const activeType = typeStyle(type);
+  const canSubmit = caption.trim().length > 0 && (type !== 'GIT' || repo.trim()) && (type !== 'JOB' || requirements.length > 0);
+
+  const addTag = () => {
+    const value = tagInput.trim().replace(/^#/, '');
+    if (value && !tags.includes(value)) setTags((prev) => [...prev, value]);
+    setTagInput('');
+  };
+
+  const addRequirement = () => {
+    const value = requirementInput.trim();
+    if (value && !requirements.includes(value)) setRequirements((prev) => [...prev, value]);
+    setRequirementInput('');
+  };
+
+  const reset = () => {
+    setCaption('');
+    setRepo('');
+    setBranch('');
+    setCommitMsg('');
+    setService('Railway');
+    setEnv('Production');
+    setMediaTitle('');
+    setMediaUrl('');
+    setTagInput('');
+    setTags([]);
+    setRequirementInput('');
+    setRequirements([]);
+    setType('TEXT');
+  };
+
+  const handleSubmit = async () => {
+    if (!canSubmit) return;
+    const metadata = {};
+    if (type === 'GIT') {
+      metadata.repo = repo.trim();
+      metadata.branch = branch.trim() || 'main';
+      metadata.commits = [
+        {
+          hash: Math.random().toString(16).slice(2, 9),
+          msg: commitMsg.trim() || caption.trim(),
+        },
+      ];
+      metadata.stats = { additions: 0, deletions: 0, files: 1 };
+    }
+    if (type === 'DEPLOY') {
+      metadata.service = service.trim() || 'Deploy';
+      metadata.env = env.trim() || 'Production';
+      metadata.duration = '2m 30s';
+    }
+    if (type === 'MEDIA') {
+      metadata.title = mediaTitle.trim() || 'Media paylasim';
+      metadata.url = mediaUrl.trim();
+    }
+    if (type === 'JOB') {
+      metadata.requirements = requirements;
+    }
+
+    await onSubmit({
+      title: caption.trim().slice(0, 80),
+      caption: caption.trim(),
+      body: caption.trim(),
+      post_type: type,
+      metadata,
+      tags,
+    });
+    reset();
+  };
+
+  const renderExtraFields = () => {
+    if (type === 'GIT') {
+      return (
+        <View style={styles.extraBox}>
+          <Text style={styles.fieldLabel}>REPO ADI *</Text>
+          <TextInput value={repo} onChangeText={setRepo} placeholder="username/my-project" placeholderTextColor="#4b5563" style={styles.modalInput} autoCapitalize="none" />
+          <Text style={styles.fieldLabel}>BRANCH</Text>
+          <TextInput value={branch} onChangeText={setBranch} placeholder="feat/new-feature" placeholderTextColor="#4b5563" style={styles.modalInput} autoCapitalize="none" />
+          <Text style={styles.fieldLabel}>COMMIT MESAJI</Text>
+          <TextInput value={commitMsg} onChangeText={setCommitMsg} placeholder="Fix: login validation" placeholderTextColor="#4b5563" style={styles.modalInput} />
+        </View>
+      );
+    }
+    if (type === 'DEPLOY') {
+      return (
+        <View style={styles.extraBox}>
+          <Text style={styles.fieldLabel}>SERVIS</Text>
+          <TextInput value={service} onChangeText={setService} placeholder="Railway, Vercel, Kubernetes" placeholderTextColor="#4b5563" style={styles.modalInput} />
+          <Text style={styles.fieldLabel}>MUHIT</Text>
+          <TextInput value={env} onChangeText={setEnv} placeholder="Production" placeholderTextColor="#4b5563" style={styles.modalInput} />
+        </View>
+      );
+    }
+    if (type === 'JOB') {
+      return (
+        <View style={styles.extraBox}>
+          <Text style={styles.fieldLabel}>TELEBLER *</Text>
+          <View style={styles.chipWrap}>
+            {requirements.map((item) => (
+              <TouchableOpacity key={item} style={styles.removeChip} onPress={() => setRequirements((prev) => prev.filter((entry) => entry !== item))}>
+                <Text style={styles.removeChipText}>{item} x</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <View style={styles.inlineInputRow}>
+            <TextInput value={requirementInput} onChangeText={setRequirementInput} placeholder="Node.js, Docker..." placeholderTextColor="#4b5563" style={styles.inlineInput} />
+            <TouchableOpacity style={styles.addSmallButton} onPress={addRequirement}>
+              <Text style={styles.addSmallButtonText}>+</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      );
+    }
+    if (type === 'MEDIA') {
+      return (
+        <View style={styles.extraBox}>
+          <Text style={styles.fieldLabel}>MEDIA BASLIGI</Text>
+          <TextInput value={mediaTitle} onChangeText={setMediaTitle} placeholder="Demo video, UI preview..." placeholderTextColor="#4b5563" style={styles.modalInput} />
+          <Text style={styles.fieldLabel}>DEMO / MEDIA LINKI</Text>
+          <TextInput value={mediaUrl} onChangeText={setMediaUrl} placeholder="https://..." placeholderTextColor="#4b5563" style={styles.modalInput} autoCapitalize="none" />
+        </View>
+      );
+    }
+    return null;
+  };
+
+  const renderTagFields = () => {
+    return (
+      <View style={styles.extraBox}>
+        <Text style={styles.fieldLabel}>HASHTAG</Text>
+        <View style={styles.chipWrap}>
+          {tags.map((tag) => (
+            <TouchableOpacity key={tag} style={styles.removeChip} onPress={() => setTags((prev) => prev.filter((entry) => entry !== tag))}>
+              <Text style={styles.removeChipText}>#{tag} x</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <View style={styles.inlineInputRow}>
+          <TextInput value={tagInput} onChangeText={setTagInput} placeholder="#reactnative" placeholderTextColor="#4b5563" style={styles.inlineInput} autoCapitalize="none" />
+          <TouchableOpacity style={styles.addSmallButton} onPress={addTag}>
+            <Text style={styles.addSmallButtonText}>+</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  };
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={styles.modalOverlay}>
+        <View style={styles.composeSheet}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Yeni Paylasim</Text>
+            <TouchableOpacity onPress={onClose}>
+              <MaterialIcons name="close" size={24} color="#8b949e" />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.typeTabs}>
+            {POST_TYPES.map((item) => {
+              const active = item.id === type;
+              return (
+                <TouchableOpacity
+                  key={item.id}
+                  style={[styles.typeTab, active && { borderColor: item.color, backgroundColor: `${item.color}18` }]}
+                  onPress={() => setType(item.id)}
+                >
+                  <MaterialIcons name={item.icon} size={15} color={active ? item.color : '#8b949e'} />
+                  <Text style={[styles.typeTabText, active && { color: item.color }]}>{item.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+
+          <TextInput
+            value={caption}
+            onChangeText={setCaption}
+            placeholder={
+              type === 'GIT'
+                ? 'Commit haqqinda ne bildirmek isteyirsen?'
+                : type === 'DEPLOY'
+                  ? 'Deploy haqqinda qeyd...'
+                  : type === 'JOB'
+                    ? 'Vakansiya haqqinda etrafli izah...'
+                    : 'Ne dusunursen?'
+            }
+            placeholderTextColor="#4b5563"
+            style={styles.captionInput}
+            multiline
+            numberOfLines={4}
+          />
+
+          {renderExtraFields()}
+          {renderTagFields()}
+
+          <View style={styles.modalFooter}>
+            <View style={styles.publicInfo}>
+              <MaterialIcons name="public" size={15} color="#8b949e" />
+              <Text style={styles.publicInfoText}>Hamiya aciq</Text>
+            </View>
+            <TouchableOpacity
+              style={[styles.submitButton, { backgroundColor: canSubmit ? activeType.color : '#21262d' }]}
+              onPress={handleSubmit}
+              disabled={!canSubmit || submitting}
+            >
+              {submitting ? (
+                <ActivityIndicator color="#ffffff" />
+              ) : (
+                <Text style={styles.submitButtonText}>Paylas</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 export default function FeedScreen({ navigation }) {
+  const { user } = useContext(AuthContext);
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [composeOpen, setComposeOpen] = useState(false);
+  const [posting, setPosting] = useState(false);
 
-  const loadPosts = async () => {
+  const normalizedPosts = useMemo(() => posts.map(normalizePost), [posts]);
+
+  const loadPosts = useCallback(async () => {
     try {
       const data = await api.fetchPosts();
       setPosts(Array.isArray(data) ? data : []);
     } catch (error) {
-      console.warn(error);
+      Alert.alert('Feed xetasi', error.response?.data?.message || error.message);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadPosts();
-  }, []);
+  }, [loadPosts]);
+
+  const handleCreatePost = async (payload) => {
+    setPosting(true);
+    try {
+      const created = await api.createPost(payload);
+      setPosts((prev) => [
+        {
+          ...created,
+          name: user?.name || user?.email,
+          role: user?.role,
+          role_sub: user?.role_sub || user?.roleSub,
+          like_count: 0,
+          comment_count: 0,
+          bookmark_count: 0,
+        },
+        ...prev,
+      ]);
+      setComposeOpen(false);
+    } catch (error) {
+      Alert.alert('Paylasim xetasi', error.response?.data?.error || error.response?.data?.message || error.message);
+    } finally {
+      setPosting(false);
+    }
+  };
+
+  const handleLike = async (post) => {
+    setPosts((prev) =>
+      prev.map((item) => {
+        if (String(item.id) !== String(post.id)) return item;
+        const current = Number(item.like_count ?? item.likes ?? 0);
+        return { ...item, like_count: current + 1 };
+      })
+    );
+    try {
+      await api.toggleLike(post.id);
+    } catch (error) {
+      loadPosts();
+    }
+  };
+
+  const handleBookmark = async (post) => {
+    setPosts((prev) =>
+      prev.map((item) => {
+        if (String(item.id) !== String(post.id)) return item;
+        const current = Number(item.bookmark_count ?? 0);
+        return { ...item, bookmark_count: current + 1 };
+      })
+    );
+    try {
+      await api.bookmarkPost(post.id);
+    } catch (error) {
+      loadPosts();
+    }
+  };
+
+  const handleApplyJob = async (post) => {
+    try {
+      const result = await api.applyToJob(post.id, {
+        coverLetter: `DevFeed uzerinden "${post.caption}" elanina muraciet edildi.`,
+      });
+      Alert.alert('Muraciet gonderildi', result.conversationId ? 'Chat mesajiniz da yaradildi.' : 'Muracietiniz qeyde alindi.');
+    } catch (error) {
+      Alert.alert('Muraciet xetasi', error.response?.data?.error || error.response?.data?.message || error.message);
+    }
+  };
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -53,20 +548,65 @@ export default function FeedScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
+      <View style={styles.header}>
+        <View>
+          <View style={styles.brandRow}>
+            <MaterialIcons name="terminal" size={22} color="#6366f1" />
+            <Text style={styles.brandText}>dev<Text style={styles.brandAccent}>feed</Text></Text>
+          </View>
+          <Text style={styles.headerSubtitle}>Kod, deploy, media ve is elanlari</Text>
+        </View>
+        <TouchableOpacity style={styles.plusButton} onPress={() => setComposeOpen(true)}>
+          <MaterialIcons name="add" size={24} color="#ffffff" />
+        </TouchableOpacity>
+      </View>
+
       {loading ? (
         <View style={styles.loaderContainer}>
           <ActivityIndicator size="large" color="#7c3aed" />
         </View>
       ) : (
         <FlatList
-          data={posts}
+          data={normalizedPosts}
           keyExtractor={(item) => item.id?.toString() ?? Math.random().toString()}
-          renderItem={({ item }) => <PostItem post={item} onPress={(post) => navigation.navigate('PostDetail', { post })} />}
+          renderItem={({ item }) => (
+            <PostCard
+              post={item}
+              onPress={(post) => navigation.navigate('PostDetail', { post })}
+              onLike={handleLike}
+              onBookmark={handleBookmark}
+              onApplyJob={handleApplyJob}
+            />
+          )}
           contentContainerStyle={styles.listContent}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#7c3aed" />}
-          ListEmptyComponent={<Text style={styles.emptyText}>Heç bir paylaşım yoxdur.</Text>}
+          ListHeaderComponent={
+            <View>
+              <TouchableOpacity style={styles.quickComposer} onPress={() => setComposeOpen(true)}>
+                <AuthorAvatar name={user?.name || user?.email || 'U'} />
+                <Text style={styles.quickComposerText}>Ne paylasmaq isteyirsen?</Text>
+                <MaterialIcons name="send" size={18} color="#6366f1" />
+              </TouchableOpacity>
+
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.trendingRow}>
+                {TRENDING.map((tag) => (
+                  <View key={tag} style={styles.trendingChip}>
+                    <Text style={styles.trendingText}>{tag}</Text>
+                  </View>
+                ))}
+              </ScrollView>
+            </View>
+          }
+          ListEmptyComponent={<Text style={styles.emptyText}>Hele paylasim yoxdur. Ilk postu sen yaz.</Text>}
         />
       )}
+
+      <ComposeModal
+        visible={composeOpen}
+        onClose={() => setComposeOpen(false)}
+        onSubmit={handleCreatePost}
+        submitting={posting}
+      />
     </View>
   );
 }
@@ -74,7 +614,44 @@ export default function FeedScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#020617',
+    backgroundColor: '#0d1117',
+  },
+  header: {
+    paddingHorizontal: 18,
+    paddingTop: 18,
+    paddingBottom: 14,
+    borderBottomColor: '#21262d',
+    borderBottomWidth: 1,
+    backgroundColor: '#0d1117',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  brandText: {
+    color: '#e6edf3',
+    fontSize: 22,
+    fontWeight: '900',
+    marginLeft: 8,
+  },
+  brandAccent: {
+    color: '#6366f1',
+  },
+  headerSubtitle: {
+    color: '#8b949e',
+    fontSize: 12,
+    marginTop: 3,
+  },
+  plusButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#6366f1',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   loaderContainer: {
     flex: 1,
@@ -82,56 +659,420 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   listContent: {
-    padding: 16,
+    padding: 14,
+    paddingBottom: 100,
+  },
+  quickComposer: {
+    backgroundColor: '#161b22',
+    borderRadius: 14,
+    borderColor: '#21262d',
+    borderWidth: 1,
+    padding: 14,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  quickComposerText: {
+    color: '#8b949e',
+    flex: 1,
+    marginLeft: 10,
+    fontSize: 13,
+  },
+  trendingRow: {
+    marginBottom: 12,
+  },
+  trendingChip: {
+    backgroundColor: '#161b22',
+    borderColor: '#30363d',
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    marginRight: 8,
+  },
+  trendingText: {
+    color: '#58a6ff',
+    fontSize: 12,
+    fontWeight: '700',
   },
   postCard: {
-    backgroundColor: '#0f172a',
-    borderRadius: 18,
-    padding: 18,
-    marginBottom: 14,
+    backgroundColor: '#161b22',
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#111827',
+    borderColor: '#21262d',
   },
   postHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 10,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  avatar: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#6366f1',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  authorBlock: {
+    flex: 1,
+    marginLeft: 10,
   },
   postUser: {
-    color: '#e2e8f0',
-    fontWeight: '700',
+    color: '#e6edf3',
+    fontWeight: '800',
+    fontSize: 14,
   },
   postTime: {
-    color: '#94a3b8',
-    fontSize: 12,
+    color: '#8b949e',
+    fontSize: 11,
+    marginTop: 2,
+  },
+  typeBadge: {
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  typeBadgeText: {
+    fontSize: 10,
+    fontWeight: '900',
   },
   postCaption: {
-    color: '#cbd5e1',
-    lineHeight: 20,
-    marginBottom: 12,
+    color: '#c9d1d9',
+    lineHeight: 21,
+    marginBottom: 10,
+    fontSize: 14,
   },
   tagsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   tagItem: {
-    color: '#7c3aed',
+    color: '#58a6ff',
     fontSize: 12,
     marginRight: 8,
+    marginBottom: 4,
+  },
+  gitBox: {
+    backgroundColor: '#0d1117',
+    borderRadius: 10,
+    padding: 14,
+    borderColor: '#21262d',
+    borderWidth: 1,
+    marginTop: 4,
+  },
+  deployBox: {
+    backgroundColor: '#0f2018',
+    borderRadius: 10,
+    padding: 14,
+    borderColor: '#1f3a1f',
+    borderWidth: 1,
+    marginTop: 4,
+  },
+  mediaBox: {
+    backgroundColor: '#151126',
+    borderRadius: 10,
+    minHeight: 150,
+    borderColor: '#30215a',
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    marginTop: 4,
+  },
+  jobBox: {
+    backgroundColor: '#1c1200',
+    borderRadius: 10,
+    padding: 14,
+    borderColor: '#3d2a00',
+    borderWidth: 1,
+    marginTop: 4,
+  },
+  payloadHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  payloadBody: {
+    flex: 1,
+    marginLeft: 10,
+  },
+  payloadTitle: {
+    color: '#e6edf3',
+    fontWeight: '800',
+    fontSize: 13,
+  },
+  payloadMuted: {
+    color: '#8b949e',
+    fontSize: 11,
+    marginLeft: 8,
+  },
+  gitRepo: {
+    color: '#58a6ff',
+    fontWeight: '800',
+    fontSize: 13,
+    flex: 1,
+    marginLeft: 8,
+  },
+  commitRow: {
+    borderTopColor: '#21262d',
+    borderTopWidth: 1,
+    paddingTop: 8,
+    marginTop: 8,
+  },
+  commitHash: {
+    color: '#8b949e',
+    fontSize: 10,
+  },
+  commitText: {
+    color: '#e6edf3',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    marginTop: 10,
+  },
+  additionText: {
+    color: '#3fb950',
+    fontSize: 11,
+    marginRight: 14,
+  },
+  deletionText: {
+    color: '#f85149',
+    fontSize: 11,
+    marginRight: 14,
+  },
+  deployText: {
+    color: '#3fb950',
+    fontSize: 11,
+    marginTop: 3,
+  },
+  liveBadge: {
+    color: '#3fb950',
+    borderColor: '#3fb950',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    fontSize: 10,
+    fontWeight: '900',
+  },
+  mediaTitle: {
+    color: '#818cf8',
+    fontWeight: '800',
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  mediaLink: {
+    color: '#a5b4fc',
+    fontSize: 12,
+    textAlign: 'center',
+  },
+  chipWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  jobChip: {
+    color: '#fbbf24',
+    borderColor: 'rgba(245,158,11,0.3)',
+    borderWidth: 1,
+    backgroundColor: 'rgba(245,158,11,0.1)',
+    borderRadius: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginRight: 6,
     marginBottom: 6,
+    fontSize: 11,
+  },
+  jobApplyButton: {
+    marginTop: 10,
+    backgroundColor: '#f59e0b',
+    borderRadius: 8,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  jobApplyText: {
+    color: '#000000',
+    fontWeight: '900',
   },
   postFooter: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    marginTop: 14,
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 18,
   },
   metaText: {
-    color: '#94a3b8',
+    color: '#8b949e',
     fontSize: 12,
+    marginLeft: 5,
   },
   emptyText: {
     color: '#94a3b8',
     textAlign: 'center',
     marginTop: 24,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    justifyContent: 'flex-end',
+  },
+  composeSheet: {
+    backgroundColor: '#161b22',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    borderColor: '#21262d',
+    borderWidth: 1,
+    padding: 18,
+    maxHeight: '92%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  modalTitle: {
+    color: '#e6edf3',
+    fontSize: 17,
+    fontWeight: '900',
+  },
+  typeTabs: {
+    marginBottom: 14,
+  },
+  typeTab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderColor: '#30363d',
+    borderWidth: 1,
+    borderRadius: 18,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+    marginRight: 8,
+  },
+  typeTabText: {
+    color: '#8b949e',
+    fontSize: 12,
+    fontWeight: '800',
+    marginLeft: 5,
+  },
+  captionInput: {
+    backgroundColor: '#0d1117',
+    borderColor: '#30363d',
+    borderWidth: 1,
+    borderRadius: 12,
+    color: '#e6edf3',
+    minHeight: 104,
+    padding: 12,
+    textAlignVertical: 'top',
+    fontSize: 14,
+    marginBottom: 12,
+  },
+  extraBox: {
+    backgroundColor: '#0d1117',
+    borderColor: '#21262d',
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+  },
+  fieldLabel: {
+    color: '#8b949e',
+    fontSize: 11,
+    fontWeight: '900',
+    marginBottom: 6,
+    marginTop: 4,
+  },
+  modalInput: {
+    backgroundColor: '#161b22',
+    borderColor: '#30363d',
+    borderWidth: 1,
+    borderRadius: 9,
+    color: '#e6edf3',
+    paddingHorizontal: 11,
+    paddingVertical: 10,
+    marginBottom: 8,
+  },
+  inlineInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  inlineInput: {
+    flex: 1,
+    backgroundColor: '#161b22',
+    borderColor: '#30363d',
+    borderWidth: 1,
+    borderRadius: 9,
+    color: '#e6edf3',
+    paddingHorizontal: 11,
+    paddingVertical: 10,
+  },
+  addSmallButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 9,
+    backgroundColor: '#21262d',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 8,
+  },
+  addSmallButtonText: {
+    color: '#e6edf3',
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  removeChip: {
+    borderColor: '#30363d',
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    marginRight: 6,
+    marginBottom: 8,
+    backgroundColor: '#161b22',
+  },
+  removeChipText: {
+    color: '#58a6ff',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  modalFooter: {
+    borderTopColor: '#21262d',
+    borderTopWidth: 1,
+    paddingTop: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  publicInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  publicInfoText: {
+    color: '#8b949e',
+    fontSize: 12,
+    marginLeft: 5,
+  },
+  submitButton: {
+    borderRadius: 10,
+    paddingHorizontal: 22,
+    paddingVertical: 11,
+    minWidth: 92,
+    alignItems: 'center',
+  },
+  submitButtonText: {
+    color: '#ffffff',
+    fontWeight: '900',
   },
 });

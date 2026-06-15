@@ -5,489 +5,309 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { AuthContext } from '../context/AuthContext';
 
-// Roller və sub-roller DevFeed.jsx-dən
 const ROLES = [
-  { id: 'developer', label: 'Developer', icon: '💻', desc: 'Kod yazır, layihə qurur' },
-  { id: 'designer', label: 'Designer', icon: '🎨', desc: 'UI/UX, qrafik dizayn' },
-  { id: 'devops', label: 'DevOps / SRE', icon: '🔐', desc: 'İnfrastruktur, CI/CD' },
-  { id: 'hr', label: 'HR / Recruiter', icon: '🎯', desc: 'İstedad axtarır' },
-  { id: 'manager', label: 'Product Manager', icon: '📊', desc: 'Məhsulu idarə edir' },
-  { id: 'student', label: 'Tələbə', icon: '📚', desc: 'Öyrənir, inkişaf edir' },
-  { id: 'founder', label: 'Founder / CTO', icon: '🚀', desc: 'Şirkət qurur' },
-  { id: 'data', label: 'Data / ML Eng.', icon: '🤖', desc: 'Data analiz, ML modellər' },
+  { id: 'developer', label: 'Developer', desc: 'Kod yazir, layihe qurur' },
+  { id: 'designer', label: 'Designer', desc: 'UI/UX ve qrafik dizayn' },
+  { id: 'devops', label: 'DevOps / SRE', desc: 'Infrastructure, CI/CD, cloud' },
+  { id: 'hr', label: 'HR / Recruiter', desc: 'Istedad axtarir' },
+  { id: 'manager', label: 'Product Manager', desc: 'Mehsulu idare edir' },
+  { id: 'student', label: 'Telebe', desc: 'Oyrenir ve inkisaf edir' },
+  { id: 'founder', label: 'Founder / CTO', desc: 'Sirket ve komanda qurur' },
+  { id: 'data', label: 'Data / ML Eng.', desc: 'Data, analiz ve ML' },
 ];
 
 const SUB_ROLES = {
-  developer: [
-    { id: 'frontend', label: 'Frontend', icon: '🖥️' },
-    { id: 'backend', label: 'Backend', icon: '⚙️' },
-    { id: 'fullstack', label: 'Full Stack', icon: '🔄' },
-    { id: 'mobile', label: 'Mobile', icon: '📱' },
-    { id: 'embedded', label: 'Embedded / IoT', icon: '🔌' },
-    { id: 'game', label: 'Game Dev', icon: '🎮' },
-  ],
-  designer: [
-    { id: 'ux', label: 'UX Designer', icon: '🔬' },
-    { id: 'ui', label: 'UI Designer', icon: '🎨' },
-    { id: 'product', label: 'Product Designer', icon: '✏️' },
-    { id: 'motion', label: 'Motion Designer', icon: '🎬' },
-    { id: 'brand', label: 'Brand Designer', icon: '💎' },
-  ],
-  devops: [
-    { id: 'cloud', label: 'Cloud Engineer', icon: '☁️' },
-    { id: 'sre', label: 'SRE', icon: '📊' },
-    { id: 'security', label: 'Security Eng.', icon: '🔐' },
-    { id: 'cicd', label: 'CI/CD Specialist', icon: '🔁' },
-  ],
-  data: [
-    { id: 'analyst', label: 'Data Analyst', icon: '📈' },
-    { id: 'engineer', label: 'Data Engineer', icon: '🏗️' },
-    { id: 'scientist', label: 'Data Scientist', icon: '🧪' },
-    { id: 'ml', label: 'ML Engineer', icon: '🤖' },
-  ],
-  hr: [
-    { id: 'recruiter', label: 'Recruiter', icon: '🎯' },
-    { id: 'hrbp', label: 'HR Business Partner', icon: '🤝' },
-    { id: 'talent', label: 'Talent Manager', icon: '⭐' },
-  ],
-  manager: [
-    { id: 'pm', label: 'Product Manager', icon: '📋' },
-    { id: 'scrum', label: 'Scrum Master', icon: '🔄' },
-    { id: 'director', label: 'Engineering Director', icon: '🏢' },
-  ],
-  student: [
-    { id: 'cs', label: 'Kompüter Elmləri', icon: '💻' },
-    { id: 'bootcamp', label: 'Bootcamp', icon: '🚀' },
-    { id: 'selftaught', label: 'Self-taught', icon: '📚' },
-  ],
-  founder: [
-    { id: 'cto', label: 'CTO', icon: '⚡' },
-    { id: 'ceo', label: 'CEO/Co-founder', icon: '🏆' },
-    { id: 'indie', label: 'Indie Hacker', icon: '🛠️' },
-  ],
+  developer: ['Frontend', 'Backend', 'Full Stack', 'Mobile', 'Embedded / IoT', 'Game Dev'],
+  designer: ['UX Designer', 'UI Designer', 'Product Designer', 'Motion Designer', 'Brand Designer'],
+  devops: ['Cloud Engineer', 'SRE', 'Security Eng.', 'CI/CD Specialist'],
+  hr: ['Recruiter', 'HRBP', 'Talent Manager'],
+  manager: ['Product Manager', 'Scrum Master', 'Engineering Director'],
+  student: ['Computer Science', 'Bootcamp', 'Self-taught'],
+  founder: ['CTO', 'CEO / Co-founder', 'Indie Hacker'],
+  data: ['Data Analyst', 'Data Engineer', 'Data Scientist', 'ML Engineer'],
 };
 
 const TECH_STACKS = {
-  frontend: ['React', 'Vue', 'Angular', 'Next.js', 'TypeScript', 'Tailwind', 'Svelte'],
-  backend: ['Node.js', 'Python', 'Go', 'Java', 'Rust', 'PHP', 'Ruby', 'C#'],
-  fullstack: ['React + Node', 'Next.js', 'Nuxt', 'Django', 'Laravel', 'Rails'],
-  mobile: ['React Native', 'Flutter', 'Swift', 'Kotlin', 'Expo', 'Ionic'],
-  cloud: ['AWS', 'GCP', 'Azure', 'DigitalOcean', 'Heroku'],
-  devops: ['Docker', 'Kubernetes', 'Terraform', 'Jenkins', 'GitLab CI'],
-  data: ['Python', 'SQL', 'Spark', 'TensorFlow', 'PyTorch'],
+  developer: ['React', 'Node.js', 'PostgreSQL', 'TypeScript', 'Python', 'Go', 'Docker', 'React Native'],
+  designer: ['Figma', 'Adobe XD', 'Framer', 'Illustrator', 'Motion'],
+  devops: ['Docker', 'Kubernetes', 'AWS', 'GCP', 'Azure', 'Terraform', 'Jenkins'],
+  data: ['Python', 'SQL', 'Spark', 'TensorFlow', 'PyTorch', 'dbt'],
   default: ['Git', 'Figma', 'Jira', 'Slack', 'Notion'],
 };
 
-export default function RegisterOnboardingScreen({ navigation }) {
-  const { completeOnboarding, signOut } = useContext(AuthContext);
-  
-  // Onboarding state
-  const [step, setStep] = useState(0); // 0: role, 1: subRole, 2: skills, 3: profile
+const LANGUAGES = ['Azerbaycanca', 'English', 'Turkce', 'Rusca'];
+
+export default function RegisterOnboardingScreen() {
+  const { completeOnboarding, signOut, user } = useContext(AuthContext);
+  const [step, setStep] = useState(0);
   const [selectedRole, setSelectedRole] = useState(null);
   const [selectedSubRole, setSelectedSubRole] = useState(null);
   const [selectedSkills, setSelectedSkills] = useState([]);
   const [selectedLanguages, setSelectedLanguages] = useState([]);
   const [profileData, setProfileData] = useState({
-    name: '',
+    name: user?.name || '',
     bio: '',
     website: '',
   });
   const [loading, setLoading] = useState(false);
 
-  const handleRoleSelect = (roleId) => {
-    setSelectedRole(roleId);
-    setSelectedSubRole(null);
-    setStep(1);
-  };
+  const availableSkills = TECH_STACKS[selectedRole] || TECH_STACKS.default;
+  const subRoles = selectedRole ? SUB_ROLES[selectedRole] || [] : [];
 
-  const handleSubRoleSelect = (subRoleId) => {
-    setSelectedSubRole(subRoleId);
-    setStep(2);
-  };
-
-  const toggleSkill = (skill) => {
-    setSelectedSkills((prev) =>
-      prev.includes(skill) ? prev.filter((s) => s !== skill) : [...prev, skill]
-    );
-  };
-
-  const toggleLanguage = (lang) => {
-    setSelectedLanguages((prev) =>
-      prev.includes(lang) ? prev.filter((l) => l !== lang) : [...prev, lang]
-    );
+  const toggleValue = (value, setter) => {
+    setter((prev) => (prev.includes(value) ? prev.filter((item) => item !== value) : [...prev, value]));
   };
 
   const handleContinue = () => {
-    if (step === 1) {
-      if (!selectedSubRole) {
-        Alert.alert('Xəta', 'Xahiş edirəm alt rolu seçin');
-        return;
-      }
-      setStep(2);
-    } else if (step === 2) {
-      if (selectedSkills.length === 0) {
-        Alert.alert('Xəta', 'Ən azı bir texnologiya seçin');
-        return;
-      }
-      setStep(3);
+    if (step === 0 && !selectedRole) {
+      Alert.alert('Xeta', 'Rolu secin');
+      return;
     }
+    if (step === 1 && subRoles.length > 0 && !selectedSubRole) {
+      Alert.alert('Xeta', 'Alt rolu secin');
+      return;
+    }
+    if (step === 2 && selectedSkills.length === 0) {
+      Alert.alert('Xeta', 'En azi bir texnologiya secin');
+      return;
+    }
+    setStep((current) => Math.min(current + 1, 3));
   };
 
-  const handleBackStep = () => {
-    if (step > 0) {
-      setStep(step - 1);
-    }
-  };
-
-  const handleLogout = async () => {
-    try {
-      await signOut();
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'Login' }],
-      });
-    } catch (error) {
-      Alert.alert('Xəta', 'Çıxış edə bilmədi');
-    }
-  };
-
-  const handleCompleteProfile = async () => {
-    if (!profileData.name || !profileData.bio) {
-      Alert.alert('Xəta', 'Ad və bio-nu doldurun');
+  const handleComplete = async () => {
+    if (!profileData.name.trim() || !profileData.bio.trim()) {
+      Alert.alert('Xeta', 'Ad ve bio sahesini doldurun');
       return;
     }
 
     setLoading(true);
     try {
-      const onboardingData = {
+      await completeOnboarding({
         role: selectedRole,
         subRole: selectedSubRole,
         skills: selectedSkills,
         languages: selectedLanguages,
-        name: profileData.name,
-        bio: profileData.bio,
-        website: profileData.website,
-      };
-
-      await completeOnboarding(onboardingData);
-      // Navigation handled by AuthContext
+        name: profileData.name.trim(),
+        bio: profileData.bio.trim(),
+        website: profileData.website.trim(),
+      });
     } catch (error) {
-      Alert.alert('Xəta', error.message || 'Profil tamamlanamadı');
+      Alert.alert('Xeta', error.response?.data?.message || error.message || 'Profil tamamlanmadi');
     } finally {
       setLoading(false);
     }
   };
 
-  // Step 0: Role Selection
-  if (step === 0) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Rolunuzu seçin</Text>
-          <Text style={styles.subtitle}>Hansı rolda işləyirsiniz?</Text>
-        </View>
-
-        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-          <View style={styles.grid}>
-            {ROLES.map((role) => (
-              <TouchableOpacity
-                key={role.id}
-                style={styles.roleCard}
-                onPress={() => handleRoleSelect(role.id)}
-              >
-                <Text style={styles.roleIcon}>{role.icon}</Text>
-                <Text style={styles.roleLabel}>{role.label}</Text>
-                <Text style={styles.roleDesc}>{role.desc}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </ScrollView>
-
-        <View style={styles.footer}>
-          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-            <Text style={styles.logoutButtonText}>✕</Text>
-          </TouchableOpacity>
-        </View>
+  const renderRoleStep = () => (
+    <>
+      <Text style={styles.title}>Rolunu sec</Text>
+      <Text style={styles.subtitle}>Feed ve profil bu melumatlara gore qurulacaq.</Text>
+      <View style={styles.grid}>
+        {ROLES.map((role) => {
+          const active = selectedRole === role.id;
+          return (
+            <TouchableOpacity
+              key={role.id}
+              style={[styles.card, active && styles.cardActive]}
+              onPress={() => {
+                setSelectedRole(role.id);
+                setSelectedSubRole(null);
+              }}
+            >
+              <Text style={styles.cardTitle}>{role.label}</Text>
+              <Text style={styles.cardDesc}>{role.desc}</Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
-    );
-  }
+    </>
+  );
 
-  // Step 1: Sub-role Selection
-  if (step === 1 && selectedRole) {
-    const subRolesForRole = SUB_ROLES[selectedRole] || [];
-    return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Ustalaşdığınız alan</Text>
-          <Text style={styles.subtitle}>
-            Əlavə bir seçim edin: {ROLES.find((r) => r.id === selectedRole)?.label}
-          </Text>
-        </View>
-
-        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-          <View style={styles.grid}>
-            {subRolesForRole.map((subRole) => (
-              <TouchableOpacity
-                key={subRole.id}
-                style={styles.roleCard}
-                onPress={() => handleSubRoleSelect(subRole.id)}
-              >
-                <Text style={styles.roleIcon}>{subRole.icon}</Text>
-                <Text style={styles.roleLabel}>{subRole.label}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </ScrollView>
-
-        <View style={styles.footer}>
-          <TouchableOpacity style={styles.backButton} onPress={handleBackStep}>
-            <Text style={styles.backButtonText}>← Geri</Text>
-          </TouchableOpacity>
-        </View>
+  const renderSubRoleStep = () => (
+    <>
+      <Text style={styles.title}>Daha deqiq sec</Text>
+      <Text style={styles.subtitle}>Saheni sec, sonra texnologiyalara keceyik.</Text>
+      <View style={styles.list}>
+        {subRoles.map((subRole) => {
+          const active = selectedSubRole === subRole;
+          return (
+            <TouchableOpacity
+              key={subRole}
+              style={[styles.rowCard, active && styles.cardActive]}
+              onPress={() => setSelectedSubRole(subRole)}
+            >
+              <Text style={styles.cardTitle}>{subRole}</Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
-    );
-  }
+    </>
+  );
 
-  // Step 2: Skills & Languages
-  if (step === 2) {
-    const availableSkills = TECH_STACKS[selectedSubRole] || TECH_STACKS.default;
-    const languages = ['Azərbaycanca', 'İngilis', 'Rus', 'Türkçə', 'Almanca'];
-
-    return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Texnologiyalar</Text>
-          <Text style={styles.subtitle}>Hansı texnologiyalarla işləyirsiniz?</Text>
-        </View>
-
-        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Texnologiyalar (Ən azı 1)</Text>
-            <View style={styles.tagGrid}>
-              {availableSkills.map((skill) => (
-                <TouchableOpacity
-                  key={skill}
-                  style={[
-                    styles.tag,
-                    selectedSkills.includes(skill) && styles.tagSelected,
-                  ]}
-                  onPress={() => toggleSkill(skill)}
-                >
-                  <Text
-                    style={[
-                      styles.tagText,
-                      selectedSkills.includes(skill) && styles.tagTextSelected,
-                    ]}
-                  >
-                    {skill}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Dillər (isteğe bağlı)</Text>
-            <View style={styles.tagGrid}>
-              {languages.map((lang) => (
-                <TouchableOpacity
-                  key={lang}
-                  style={[
-                    styles.tag,
-                    selectedLanguages.includes(lang) && styles.tagSelected,
-                  ]}
-                  onPress={() => toggleLanguage(lang)}
-                >
-                  <Text
-                    style={[
-                      styles.tagText,
-                      selectedLanguages.includes(lang) && styles.tagTextSelected,
-                    ]}
-                  >
-                    {lang}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        </ScrollView>
-
-        <View style={styles.footer}>
-          <TouchableOpacity style={styles.backButton} onPress={handleBackStep}>
-            <Text style={styles.backButtonText}>← Geri</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.continueButton}
-            onPress={handleContinue}
-            disabled={selectedSkills.length === 0}
-          >
-            <Text style={styles.continueButtonText}>Davam et →</Text>
-          </TouchableOpacity>
-        </View>
+  const renderSkillsStep = () => (
+    <>
+      <Text style={styles.title}>Stack ve diller</Text>
+      <Text style={styles.subtitle}>En azi bir texnologiya sec.</Text>
+      <Text style={styles.sectionTitle}>Texnologiyalar</Text>
+      <View style={styles.chipWrap}>
+        {availableSkills.map((skill) => {
+          const active = selectedSkills.includes(skill);
+          return (
+            <TouchableOpacity
+              key={skill}
+              style={[styles.chip, active && styles.chipActive]}
+              onPress={() => toggleValue(skill, setSelectedSkills)}
+            >
+              <Text style={[styles.chipText, active && styles.chipTextActive]}>{skill}</Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
-    );
-  }
+      <Text style={styles.sectionTitle}>Diller</Text>
+      <View style={styles.chipWrap}>
+        {LANGUAGES.map((language) => {
+          const active = selectedLanguages.includes(language);
+          return (
+            <TouchableOpacity
+              key={language}
+              style={[styles.chip, active && styles.chipActive]}
+              onPress={() => toggleValue(language, setSelectedLanguages)}
+            >
+              <Text style={[styles.chipText, active && styles.chipTextActive]}>{language}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </>
+  );
 
-  // Step 3: Profile Completion
-  if (step === 3) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Profilunuzu tamamlayın</Text>
-          <Text style={styles.subtitle}>Daha çox detallar əlavə edin</Text>
+  const renderProfileStep = () => (
+    <>
+      <Text style={styles.title}>Profili tamamla</Text>
+      <Text style={styles.subtitle}>Ad, bio ve isteye bagli sayt melumati.</Text>
+      <TextInput
+        style={styles.input}
+        value={profileData.name}
+        onChangeText={(name) => setProfileData((prev) => ({ ...prev, name }))}
+        placeholder="Ad Soyad"
+        placeholderTextColor="#64748b"
+      />
+      <TextInput
+        style={[styles.input, styles.textArea]}
+        value={profileData.bio}
+        onChangeText={(bio) => setProfileData((prev) => ({ ...prev, bio }))}
+        placeholder="Ozun haqqinda qisa melumat"
+        placeholderTextColor="#64748b"
+        multiline
+        numberOfLines={4}
+      />
+      <TextInput
+        style={styles.input}
+        value={profileData.website}
+        onChangeText={(website) => setProfileData((prev) => ({ ...prev, website }))}
+        placeholder="https://example.com"
+        placeholderTextColor="#64748b"
+        autoCapitalize="none"
+      />
+    </>
+  );
+
+  return (
+    <View style={styles.container}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.progressRow}>
+          {[0, 1, 2, 3].map((item) => (
+            <View key={item} style={[styles.progressDot, item <= step && styles.progressDotActive]} />
+          ))}
         </View>
 
-        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-          <View style={styles.section}>
-            <Text style={styles.label}>Ad (Tələb olunur)</Text>
-            <View style={styles.inputWrapper}>
-              <TextInput
-                style={styles.input}
-                placeholder="Adınız"
-                placeholderTextColor="#64748b"
-                value={profileData.name}
-                onChangeText={(text) =>
-                  setProfileData((prev) => ({ ...prev, name: text }))
-                }
-              />
-            </View>
+        {step === 0 && renderRoleStep()}
+        {step === 1 && renderSubRoleStep()}
+        {step === 2 && renderSkillsStep()}
+        {step === 3 && renderProfileStep()}
+      </ScrollView>
 
-            <Text style={styles.label}>Bio (Tələb olunur)</Text>
-            <View style={styles.inputWrapper}>
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                placeholder="Haqqınızda qısa məlumat (meslek, ixtisaslaşma)"
-                placeholderTextColor="#64748b"
-                value={profileData.bio}
-                onChangeText={(text) =>
-                  setProfileData((prev) => ({ ...prev, bio: text }))
-                }
-                multiline
-                numberOfLines={3}
-              />
-            </View>
-
-            <Text style={styles.label}>Web saytı (isteğe bağlı)</Text>
-            <View style={styles.inputWrapper}>
-              <TextInput
-                style={styles.input}
-                placeholder="https://example.com"
-                placeholderTextColor="#64748b"
-                value={profileData.website}
-                onChangeText={(text) =>
-                  setProfileData((prev) => ({ ...prev, website: text }))
-                }
-              />
-            </View>
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Seçim xülasəsi</Text>
-            <View style={styles.summaryBox}>
-              <Text style={styles.summaryItem}>
-                <Text style={{ fontWeight: 'bold' }}>Rol:</Text> {ROLES.find((r) => r.id === selectedRole)?.label}
-              </Text>
-              <Text style={styles.summaryItem}>
-                <Text style={{ fontWeight: 'bold' }}>Sahə:</Text>{' '}
-                {SUB_ROLES[selectedRole]?.find((s) => s.id === selectedSubRole)?.label}
-              </Text>
-              <Text style={styles.summaryItem}>
-                <Text style={{ fontWeight: 'bold' }}>Texnologiyalar:</Text> {selectedSkills.join(', ')}
-              </Text>
-              {selectedLanguages.length > 0 && (
-                <Text style={styles.summaryItem}>
-                  <Text style={{ fontWeight: 'bold' }}>Dillər:</Text> {selectedLanguages.join(', ')}
-                </Text>
-              )}
-            </View>
-          </View>
-        </ScrollView>
-
-        <View style={styles.footer}>
-          <TouchableOpacity style={styles.backButton} onPress={handleBackStep}>
-            <Text style={styles.backButtonText}>← Geri</Text>
+      <View style={styles.footer}>
+        {step === 0 ? (
+          <TouchableOpacity style={styles.secondaryButton} onPress={signOut}>
+            <Text style={styles.secondaryButtonText}>Cixis</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.completeButton}
-            onPress={handleCompleteProfile}
-            disabled={loading}
-          >
+        ) : (
+          <TouchableOpacity style={styles.secondaryButton} onPress={() => setStep((current) => current - 1)}>
+            <Text style={styles.secondaryButtonText}>Geri</Text>
+          </TouchableOpacity>
+        )}
+
+        {step < 3 ? (
+          <TouchableOpacity style={styles.primaryButton} onPress={handleContinue}>
+            <Text style={styles.primaryButtonText}>Davam et</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity style={styles.primaryButton} onPress={handleComplete} disabled={loading}>
             {loading ? (
               <ActivityIndicator color="#ffffff" />
             ) : (
-              <Text style={styles.completeButtonText}>Profilı tamamla ✓</Text>
+              <Text style={styles.primaryButtonText}>Tamamla</Text>
             )}
           </TouchableOpacity>
-        </View>
+        )}
       </View>
-    );
-  }
-}
-
-const TextInput = ({ style, ...props }) => {
-  const [focused, setFocused] = React.useState(false);
-  const React = require('react');
-  
-  return (
-    <TextInput
-      {...props}
-      style={[
-        style,
-        focused && { borderColor: '#7c3aed', borderWidth: 2 },
-      ]}
-      onFocus={() => setFocused(true)}
-      onBlur={() => setFocused(false)}
-    />
+    </View>
   );
-};
-
-// TextInput component for React Native
-import { TextInput as RNTextInput } from 'react-native';
-const TextInput_Component = (props) => (
-  <RNTextInput
-    {...props}
-    placeholderTextColor="#64748b"
-  />
-);
+}
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#020617',
   },
-  header: {
-    paddingHorizontal: 24,
-    paddingTop: 40,
-    paddingBottom: 24,
+  content: {
+    padding: 24,
+    paddingBottom: 120,
+  },
+  progressRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginBottom: 28,
+    marginTop: 16,
+  },
+  progressDot: {
+    width: 28,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#1e293b',
+    marginHorizontal: 4,
+  },
+  progressDotActive: {
+    backgroundColor: '#7c3aed',
   },
   title: {
+    color: '#e2e8f0',
     fontSize: 28,
     fontWeight: '900',
-    color: '#e2e8f0',
     marginBottom: 8,
   },
   subtitle: {
-    fontSize: 14,
     color: '#94a3b8',
+    fontSize: 14,
     lineHeight: 20,
-  },
-  scrollView: {
-    flex: 1,
-    paddingHorizontal: 24,
+    marginBottom: 22,
   },
   grid: {
-    display: 'flex',
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    marginBottom: 40,
   },
-  roleCard: {
+  list: {
+    marginTop: 2,
+  },
+  card: {
     width: '48%',
     backgroundColor: '#0b1120',
     borderRadius: 16,
@@ -495,152 +315,113 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderColor: '#1e293b',
     borderWidth: 1,
-    alignItems: 'center',
+    minHeight: 112,
   },
-  roleIcon: {
-    fontSize: 32,
-    marginBottom: 8,
-  },
-  roleLabel: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#e2e8f0',
-    textAlign: 'center',
-    marginBottom: 6,
-  },
-  roleDesc: {
-    fontSize: 12,
-    color: '#94a3b8',
-    textAlign: 'center',
-    lineHeight: 16,
-  },
-  section: {
-    marginVertical: 16,
-  },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#e2e8f0',
-    marginBottom: 12,
-  },
-  tagGrid: {
-    display: 'flex',
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  tag: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+  rowCard: {
     backgroundColor: '#0b1120',
-    borderRadius: 8,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
     borderColor: '#1e293b',
     borderWidth: 1,
   },
-  tagSelected: {
+  cardActive: {
+    backgroundColor: '#1f1445',
+    borderColor: '#7c3aed',
+  },
+  cardTitle: {
+    color: '#e2e8f0',
+    fontSize: 14,
+    fontWeight: '800',
+    marginBottom: 8,
+  },
+  cardDesc: {
+    color: '#94a3b8',
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  sectionTitle: {
+    color: '#e2e8f0',
+    fontSize: 14,
+    fontWeight: '800',
+    marginTop: 16,
+    marginBottom: 12,
+  },
+  chipWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  chip: {
+    backgroundColor: '#0b1120',
+    borderColor: '#1e293b',
+    borderWidth: 1,
+    borderRadius: 18,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  chipActive: {
     backgroundColor: '#7c3aed',
     borderColor: '#7c3aed',
   },
-  tagText: {
-    fontSize: 13,
+  chipText: {
     color: '#94a3b8',
-    fontWeight: '500',
-  },
-  tagTextSelected: {
-    color: '#ffffff',
-  },
-  label: {
-    fontSize: 13,
     fontWeight: '600',
-    color: '#e2e8f0',
-    marginBottom: 8,
+    fontSize: 13,
   },
-  inputWrapper: {
-    marginBottom: 16,
+  chipTextActive: {
+    color: '#ffffff',
   },
   input: {
     backgroundColor: '#0b1120',
     borderColor: '#1e293b',
     borderWidth: 1,
-    borderRadius: 10,
+    borderRadius: 14,
     paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingVertical: 13,
     color: '#e2e8f0',
     fontSize: 14,
+    marginBottom: 14,
   },
   textArea: {
-    height: 80,
+    minHeight: 104,
     textAlignVertical: 'top',
   },
-  summaryBox: {
-    backgroundColor: '#0b1120',
-    borderColor: '#1e293b',
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 16,
-  },
-  summaryItem: {
-    fontSize: 13,
-    color: '#cbd5e1',
-    marginBottom: 8,
-    lineHeight: 18,
-  },
   footer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
     flexDirection: 'row',
-    paddingHorizontal: 24,
-    paddingBottom: 32,
-    paddingTop: 16,
-    gap: 12,
-    justifyContent: 'space-between',
+    padding: 16,
+    paddingBottom: 28,
+    backgroundColor: '#020617',
+    borderTopColor: '#111827',
+    borderTopWidth: 1,
   },
-  backButton: {
-    flex: 0.45,
-    paddingVertical: 14,
-    borderRadius: 10,
+  secondaryButton: {
+    flex: 1,
     borderColor: '#1e293b',
     borderWidth: 1,
+    borderRadius: 14,
+    paddingVertical: 14,
     alignItems: 'center',
+    marginRight: 10,
   },
-  backButtonText: {
+  secondaryButtonText: {
     color: '#cbd5e1',
-    fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '700',
   },
-  logoutButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#dc2626',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  logoutButtonText: {
-    color: '#ffffff',
-    fontSize: 24,
-    fontWeight: '300',
-  },
-  continueButton: {
-    flex: 0.45,
-    paddingVertical: 14,
-    borderRadius: 10,
+  primaryButton: {
+    flex: 2,
     backgroundColor: '#7c3aed',
-    alignItems: 'center',
-  },
-  continueButtonText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  completeButton: {
-    flex: 1,
+    borderRadius: 14,
     paddingVertical: 14,
-    borderRadius: 10,
-    backgroundColor: '#10b981',
     alignItems: 'center',
   },
-  completeButtonText: {
+  primaryButtonText: {
     color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '800',
   },
 });

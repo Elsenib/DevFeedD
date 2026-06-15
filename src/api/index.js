@@ -24,13 +24,49 @@ export async function register(name, email, password) {
   return response.data;
 }
 
+export async function socialLogin({ provider, providerId, email, name, avatarUrl }) {
+  const response = await api.post('/auth/social-login', {
+    provider,
+    providerId,
+    email,
+    name,
+    avatarUrl,
+  });
+  return response.data;
+}
+
+export async function updateProfile(profile) {
+  const response = await api.patch('/profile', profile);
+  return response.data;
+}
+
 export async function fetchPosts() {
   const response = await api.get('/posts');
   return response.data;
 }
 
+export async function createPost(post) {
+  const response = await api.post('/posts', post);
+  return response.data;
+}
+
+export async function updatePost(postId, post) {
+  const response = await api.put(`/posts/${postId}`, post);
+  return response.data;
+}
+
+export async function deletePost(postId) {
+  const response = await api.delete(`/posts/${postId}`);
+  return response.data;
+}
+
 export async function fetchPostById(postId) {
   const response = await api.get(`/posts/${postId}`);
+  return response.data;
+}
+
+export async function fetchComments(postId) {
+  const response = await api.get(`/posts/${postId}/comments`);
   return response.data;
 }
 
@@ -44,6 +80,24 @@ export async function toggleLike(postId) {
   return response.data;
 }
 
+export async function bookmarkPost(postId) {
+  const response = await api.post(`/posts/${postId}/bookmark`);
+  return response.data;
+}
+
+export async function removeBookmark(postId) {
+  const response = await api.delete(`/posts/${postId}/bookmark`);
+  return response.data;
+}
+
+export async function applyToJob(postId, { coverLetter = '', resumeUrl = '' } = {}) {
+  const response = await api.post(`/posts/${postId}/apply`, {
+    cover_letter: coverLetter,
+    resume_url: resumeUrl,
+  });
+  return response.data;
+}
+
 export async function fetchProfile() {
   const response = await api.get('/profile');
   return response.data;
@@ -54,14 +108,77 @@ export async function fetchConversations() {
   return response.data;
 }
 
+export async function fetchConversation(conversationId) {
+  const response = await api.get(`/conversations/${conversationId}`);
+  return response.data;
+}
+
+export async function createConversation({ email, userId }) {
+  const response = await api.post('/conversations', { email, userId });
+  return response.data;
+}
+
+export async function sendMessage(conversationId, text) {
+  const response = await api.post(`/conversations/${conversationId}/messages`, { text });
+  return response.data;
+}
+
+export async function fetchChatRooms() {
+  const response = await api.get('/chat/rooms');
+  return response.data;
+}
+
+export async function createChatRoom({ name, description }) {
+  const response = await api.post('/chat/rooms', { name, description });
+  return response.data;
+}
+
+export async function joinChatRoom(roomId) {
+  const response = await api.post(`/chat/rooms/${roomId}/join`);
+  return response.data;
+}
+
+export async function leaveChatRoom(roomId) {
+  const response = await api.post(`/chat/rooms/${roomId}/leave`);
+  return response.data;
+}
+
+export async function fetchChatMessages(roomId) {
+  const response = await api.get(`/chat/rooms/${roomId}/messages`);
+  return response.data;
+}
+
+export async function sendChatMessage(roomId, text) {
+  const response = await api.post(`/chat/rooms/${roomId}/messages`, { text });
+  return response.data;
+}
+
 export default {
   setToken,
   login,
   register,
+  socialLogin,
+  updateProfile,
   fetchPosts,
+  createPost,
+  updatePost,
+  deletePost,
   fetchPostById,
+  fetchComments,
   addComment,
   toggleLike,
+  bookmarkPost,
+  removeBookmark,
+  applyToJob,
   fetchProfile,
   fetchConversations,
+  fetchConversation,
+  createConversation,
+  sendMessage,
+  fetchChatRooms,
+  createChatRoom,
+  joinChatRoom,
+  leaveChatRoom,
+  fetchChatMessages,
+  sendChatMessage,
 };

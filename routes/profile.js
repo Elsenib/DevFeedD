@@ -34,7 +34,7 @@ const upload = multer({
 
 router.get('/', auth, async (req, res) => {
   try {
-    const result = await db.query('SELECT id, name, email, bio, role, skills, languages, website, avatar_url FROM users WHERE id = $1', [req.user.id]);
+    const result = await db.query('SELECT id, name, email, bio, role, role_sub, skills, languages, website, avatar_url FROM users WHERE id = $1', [req.user.id]);
     const user = result.rows[0];
     if (!user) return res.status(404).json({ message: 'User not found' });
 
@@ -84,7 +84,7 @@ router.get('/:id', auth, async (req, res) => {
       return res.status(400).json({ message: 'Invalid user id' });
     }
 
-    const result = await db.query('SELECT id, name, email, bio, role, skills, languages, website, avatar_url FROM users WHERE id = $1', [userId]);
+    const result = await db.query('SELECT id, name, email, bio, role, role_sub, skills, languages, website, avatar_url FROM users WHERE id = $1', [userId]);
     const user = result.rows[0];
     if (!user) return res.status(404).json({ message: 'User not found' });
 
@@ -101,9 +101,10 @@ router.get('/:id', auth, async (req, res) => {
   }
 });
 
-// Update profile (role, skills, languages, bio, website, avatar_url)
+// Update profile (role, sub-role, skills, languages, bio, website, avatar_url)
 router.patch('/', auth, async (req, res) => {
-  const { role, skills, languages, bio, website, name, avatar_url } = req.body;
+  const { role, roleSub, subRole, skills, languages, bio, website, name, avatar_url } = req.body;
+  const roleSubValue = roleSub || subRole || null;
   try {
     if (name && containsIllegalWords(name)) {
       return res.status(400).json({ message: 'Ad qadağan edilmiş sözlər ehtiva edir' });
@@ -125,14 +126,25 @@ router.patch('/', auth, async (req, res) => {
       `UPDATE users SET
          name = COALESCE($1, name),
          role = COALESCE($2, role),
-         skills = COALESCE($3::jsonb, skills),
-         languages = COALESCE($4::jsonb, languages),
-         bio = COALESCE($5, bio),
-         website = COALESCE($6, website),
-         avatar_url = COALESCE($7, avatar_url)
-       WHERE id = $8
-       RETURNING id, name, email, role, skills, languages, bio, website, avatar_url`,
-      [name || null, role || null, skillsJson.length ? JSON.stringify(skillsJson) : null, langsJson.length ? JSON.stringify(langsJson) : null, bio || null, website || null, avatar_url || null, req.user.id]
+         role_sub = COALESCE($3, role_sub),
+         skills = COALESCE($4::jsonb, skills),
+         languages = COALESCE($5::jsonb, languages),
+         bio = COALESCE($6, bio),
+         website = COALESCE($7, website),
+         avatar_url = COALESCE($8, avatar_url)
+       WHERE id = $9
+       RETURNING id, name, email, role, role_sub, skills, languages, bio, website, avatar_url`,
+      [
+        name || null,
+        role || null,
+        roleSubValue,
+        skillsJson.length ? JSON.stringify(skillsJson) : null,
+        langsJson.length ? JSON.stringify(langsJson) : null,
+        bio || null,
+        website || null,
+        avatar_url || null,
+        req.user.id,
+      ]
     );
 
     const user = result.rows[0];

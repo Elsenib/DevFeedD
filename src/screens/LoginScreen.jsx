@@ -7,38 +7,55 @@ export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [socialLoading, setSocialLoading] = useState(false);
+  const [socialLoading, setSocialLoading] = useState(null);
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert('Xəta', 'E-mail və şifrəni daxil edin');
+      Alert.alert('Xeta', 'E-mail ve sifreni daxil edin');
       return;
     }
     setLoading(true);
     try {
       await signIn({ email, password });
     } catch (error) {
-      Alert.alert('Daxil olma xətası', error.response?.data?.message || error.message);
+      Alert.alert('Daxil olma xetasi', error.response?.data?.message || error.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleGoogleSignIn = async () => {
-    setSocialLoading(true);
+  const handleSocialSignIn = async (provider) => {
+    setSocialLoading(provider);
     try {
-      await socialSignIn('google');
+      await socialSignIn(provider);
     } catch (error) {
-      Alert.alert('Google daxil olma xətası', error.message);
+      Alert.alert(`${provider} ile davam et`, error.message);
     } finally {
-      setSocialLoading(false);
+      setSocialLoading(null);
     }
   };
+
+  const renderSocialButton = (provider, label, icon) => (
+    <TouchableOpacity
+      style={styles.socialButton}
+      onPress={() => handleSocialSignIn(provider)}
+      disabled={!!socialLoading}
+    >
+      {socialLoading === provider ? (
+        <ActivityIndicator color="#ffffff" />
+      ) : (
+        <>
+          <Text style={styles.socialIcon}>{icon}</Text>
+          <Text style={styles.socialButtonText}>{label}</Text>
+        </>
+      )}
+    </TouchableOpacity>
+  );
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>DevFeed Mobile</Text>
-      <Text style={styles.subtitle}>Sənin developer şəbəkən mobil tətbiqdə.</Text>
+      <Text style={styles.subtitle}>Developerler ucun sosial platforma.</Text>
       <View style={styles.formCard}>
         <TextInput
           value={email}
@@ -52,7 +69,7 @@ export default function LoginScreen({ navigation }) {
         <TextInput
           value={password}
           onChangeText={setPassword}
-          placeholder="Şifrə"
+          placeholder="Sifre"
           placeholderTextColor="#94a3b8"
           secureTextEntry
           style={styles.input}
@@ -63,23 +80,15 @@ export default function LoginScreen({ navigation }) {
 
         <View style={styles.dividerContainer}>
           <View style={styles.divider} />
-          <Text style={styles.dividerText}>və ya</Text>
+          <Text style={styles.dividerText}>ve ya</Text>
           <View style={styles.divider} />
         </View>
 
-        <TouchableOpacity style={styles.googleButton} onPress={handleGoogleSignIn} disabled={socialLoading}>
-          {socialLoading ? (
-            <ActivityIndicator color="#ffffff" />
-          ) : (
-            <>
-              <Text style={styles.googleIcon}>🔵</Text>
-              <Text style={styles.googleButtonText}>Google ilə daxil ol</Text>
-            </>
-          )}
-        </TouchableOpacity>
+        {renderSocialButton('github', 'GitHub ile davam et', 'GH')}
+        {renderSocialButton('google', 'Google ile davam et', 'G')}
 
         <TouchableOpacity onPress={() => navigation.navigate('Register')}>
-          <Text style={styles.switchText}>Hesabın yoxdursa, qeydiyyatdan keç</Text>
+          <Text style={styles.switchText}>Hesabin yoxdursa, qeydiyyatdan kec</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -147,7 +156,7 @@ const styles = StyleSheet.create({
     color: '#64748b',
     fontSize: 13,
   },
-  googleButton: {
+  socialButton: {
     backgroundColor: '#1e293b',
     borderRadius: 14,
     paddingVertical: 14,
@@ -156,11 +165,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginBottom: 12,
   },
-  googleIcon: {
-    fontSize: 18,
+  socialIcon: {
+    color: '#e2e8f0',
+    fontSize: 13,
+    fontWeight: '800',
     marginRight: 8,
   },
-  googleButtonText: {
+  socialButtonText: {
     color: '#e2e8f0',
     fontWeight: '600',
     fontSize: 14,

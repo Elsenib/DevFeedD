@@ -3,31 +3,60 @@ import { ActivityIndicator, Alert, StyleSheet, Text, TextInput, TouchableOpacity
 import { AuthContext } from '../context/AuthContext';
 
 export default function RegisterScreen({ navigation }) {
-  const { signUp } = useContext(AuthContext);
+  const { signUp, socialSignIn } = useContext(AuthContext);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [socialLoading, setSocialLoading] = useState(null);
 
   const handleRegister = async () => {
     if (!name || !email || !password) {
-      Alert.alert('Xəta', 'Bütün sahələri doldurun');
+      Alert.alert('Xeta', 'Butun saheleri doldurun');
       return;
     }
     setLoading(true);
     try {
       await signUp({ name, email, password });
     } catch (error) {
-      Alert.alert('Qeydiyyat xətası', error.response?.data?.message || error.message);
+      Alert.alert('Qeydiyyat xetasi', error.response?.data?.message || error.message);
     } finally {
       setLoading(false);
     }
   };
 
+  const handleSocialRegister = async (provider) => {
+    setSocialLoading(provider);
+    try {
+      await socialSignIn(provider);
+    } catch (error) {
+      Alert.alert(`${provider} ile davam et`, error.message);
+    } finally {
+      setSocialLoading(null);
+    }
+  };
+
+  const renderSocialButton = (provider, label, icon) => (
+    <TouchableOpacity
+      style={styles.socialButton}
+      onPress={() => handleSocialRegister(provider)}
+      disabled={!!socialLoading}
+    >
+      {socialLoading === provider ? (
+        <ActivityIndicator color="#ffffff" />
+      ) : (
+        <>
+          <Text style={styles.socialIcon}>{icon}</Text>
+          <Text style={styles.socialButtonText}>{label}</Text>
+        </>
+      )}
+    </TouchableOpacity>
+  );
+
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Yeni hesab aç</Text>
-      <Text style={styles.subtitle}>Bir neçə saniyədə qeydiyyatdan keç və feed-ə başla.</Text>
+      <Text style={styles.title}>Yeni hesab ac</Text>
+      <Text style={styles.subtitle}>Bir nece saniyede qeydiyyatdan kec ve feed-e basla.</Text>
       <View style={styles.formCard}>
         <TextInput
           value={name}
@@ -48,7 +77,7 @@ export default function RegisterScreen({ navigation }) {
         <TextInput
           value={password}
           onChangeText={setPassword}
-          placeholder="Şifrə"
+          placeholder="Sifre"
           placeholderTextColor="#94a3b8"
           secureTextEntry
           style={styles.input}
@@ -56,8 +85,18 @@ export default function RegisterScreen({ navigation }) {
         <TouchableOpacity style={styles.button} onPress={handleRegister} disabled={loading}>
           {loading ? <ActivityIndicator color="#ffffff" /> : <Text style={styles.buttonText}>Qeydiyyat</Text>}
         </TouchableOpacity>
+
+        <View style={styles.dividerContainer}>
+          <View style={styles.divider} />
+          <Text style={styles.dividerText}>ve ya</Text>
+          <View style={styles.divider} />
+        </View>
+
+        {renderSocialButton('github', 'GitHub ile davam et', 'GH')}
+        {renderSocialButton('google', 'Google ile davam et', 'G')}
+
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.switchText}>Artıq hesabın varsa, daxil ol</Text>
+          <Text style={styles.switchText}>Artiq hesabin varsa, daxil ol</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -109,6 +148,41 @@ const styles = StyleSheet.create({
   buttonText: {
     color: '#ffffff',
     fontWeight: '700',
+  },
+  dividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 16,
+  },
+  divider: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#1e293b',
+  },
+  dividerText: {
+    marginHorizontal: 12,
+    color: '#64748b',
+    fontSize: 13,
+  },
+  socialButton: {
+    backgroundColor: '#1e293b',
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    marginBottom: 12,
+  },
+  socialIcon: {
+    color: '#e2e8f0',
+    fontSize: 13,
+    fontWeight: '800',
+    marginRight: 8,
+  },
+  socialButtonText: {
+    color: '#e2e8f0',
+    fontWeight: '600',
+    fontSize: 14,
   },
   switchText: {
     color: '#94a3b8',

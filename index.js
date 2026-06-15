@@ -8,6 +8,7 @@ const authRoutes = require('./routes/auth');
 const postsRoutes = require('./routes/posts');
 const profileRoutes = require('./routes/profile');
 const conversationsRoutes = require('./routes/conversations');
+const chatRoutes = require('./routes/chat');
 
 dotenv.config();
 const app = express();
@@ -27,6 +28,7 @@ app.use('/auth', authRoutes);
 app.use('/posts', postsRoutes);
 app.use('/profile', profileRoutes);
 app.use('/conversations', conversationsRoutes);
+app.use('/chat', chatRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -54,6 +56,7 @@ const createSchema = async () => {
         avatar_url TEXT,
         bio TEXT,
         role TEXT,
+        role_sub TEXT,
         skills JSONB DEFAULT '[]'::jsonb,
         languages JSONB DEFAULT '[]'::jsonb,
         website TEXT,
@@ -68,6 +71,7 @@ const createSchema = async () => {
       ADD COLUMN IF NOT EXISTS provider_id TEXT,
       ADD COLUMN IF NOT EXISTS avatar_url TEXT,
       ADD COLUMN IF NOT EXISTS role TEXT,
+      ADD COLUMN IF NOT EXISTS role_sub TEXT,
       ADD COLUMN IF NOT EXISTS skills JSONB DEFAULT '[]'::jsonb,
       ADD COLUMN IF NOT EXISTS languages JSONB DEFAULT '[]'::jsonb,
       ADD COLUMN IF NOT EXISTS website TEXT;
@@ -154,6 +158,46 @@ const createSchema = async () => {
       ALTER TABLE job_applications
       ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'APPLIED',
       ADD COLUMN IF NOT EXISTS resume_url TEXT;
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS chat_rooms (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL UNIQUE,
+        description TEXT,
+        created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        is_public BOOLEAN DEFAULT true,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS room_members (
+        id SERIAL PRIMARY KEY,
+        room_id INTEGER REFERENCES chat_rooms(id) ON DELETE CASCADE,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        joined_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(room_id, user_id)
+      );
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS chat_messages (
+        id SERIAL PRIMARY KEY,
+        room_id INTEGER REFERENCES chat_rooms(id) ON DELETE CASCADE,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        text TEXT NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+
+    await client.query(`
+      INSERT INTO chat_rooms (name, description, created_by, is_public)
+      VALUES
+        ('Umumi', 'DevFeed umumi sohbet otaqi', NULL, true),
+        ('Kod Paylasimi', 'Kod, snippet ve texniki fikirler', NULL, true),
+        ('Is ve Karyera', 'Vakansiya, freelance ve karyera movzulari', NULL, true)
+      ON CONFLICT (name) DO NOTHING;
     `);
 
     await client.query('COMMIT');
