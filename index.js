@@ -9,6 +9,7 @@ const postsRoutes = require('./routes/posts');
 const profileRoutes = require('./routes/profile');
 const conversationsRoutes = require('./routes/conversations');
 const chatRoutes = require('./routes/chat');
+const supportRoutes = require('./routes/support');
 
 dotenv.config();
 const app = express();
@@ -29,6 +30,7 @@ app.use('/posts', postsRoutes);
 app.use('/profile', profileRoutes);
 app.use('/conversations', conversationsRoutes);
 app.use('/chat', chatRoutes);
+app.use('/support', supportRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -198,6 +200,20 @@ const createSchema = async () => {
         ('Kod Paylasimi', 'Kod, snippet ve texniki fikirler', NULL, true),
         ('Is ve Karyera', 'Vakansiya, freelance ve karyera movzulari', NULL, true)
       ON CONFLICT (name) DO NOTHING;
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS support_payments (
+        id SERIAL PRIMARY KEY,
+        supporter_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        receiver_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        amount NUMERIC(10, 2) NOT NULL CHECK (amount >= 1),
+        currency VARCHAR(8) NOT NULL DEFAULT 'AZN',
+        status TEXT NOT NULL DEFAULT 'PENDING_MANUAL_CONFIRMATION',
+        note TEXT,
+        reference TEXT UNIQUE NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
     `);
 
     await client.query('COMMIT');

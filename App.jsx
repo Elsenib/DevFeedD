@@ -4,6 +4,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import { AuthContext } from './src/context/AuthContext';
+import { PreferencesProvider } from './src/context/PreferencesContext';
 import * as api from './src/api';
 import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
@@ -135,6 +136,17 @@ export default function App() {
         persistAuth(token, nextUser);
         return data;
       },
+      updateCurrentUser: async (profile) => {
+        const data = await api.updateProfile(profile);
+        const nextUser = normalizeUser({
+          ...(user || {}),
+          ...(data.user || {}),
+          onboardingPending: false,
+        });
+        setUser(nextUser);
+        persistAuth(token, nextUser);
+        return data;
+      },
     }),
     [token, user]
   );
@@ -150,27 +162,29 @@ export default function App() {
   const needsOnboarding = !!user?.onboardingPending;
 
   return (
-    <AuthContext.Provider value={authContext}>
-      <NavigationContainer>
-        <StatusBar style="light" />
-        <Stack.Navigator screenOptions={{ headerShown: false }}>
-          {!user ? (
-            <>
-              <Stack.Screen name="Login" component={LoginScreen} />
-              <Stack.Screen name="Register" component={RegisterScreen} />
-            </>
-          ) : needsOnboarding ? (
-            <Stack.Screen name="RegisterOnboarding" component={RegisterOnboardingScreen} />
-          ) : (
-            <>
-              <Stack.Screen name="Main" component={TabNavigator} />
-              <Stack.Screen name="PostDetail" component={PostDetailScreen} />
-              <Stack.Screen name="Chat" component={ChatScreen} />
-            </>
-          )}
-        </Stack.Navigator>
-      </NavigationContainer>
-    </AuthContext.Provider>
+    <PreferencesProvider>
+      <AuthContext.Provider value={authContext}>
+        <NavigationContainer>
+          <StatusBar style="light" />
+          <Stack.Navigator screenOptions={{ headerShown: false }}>
+            {!user ? (
+              <>
+                <Stack.Screen name="Login" component={LoginScreen} />
+                <Stack.Screen name="Register" component={RegisterScreen} />
+              </>
+            ) : needsOnboarding ? (
+              <Stack.Screen name="RegisterOnboarding" component={RegisterOnboardingScreen} />
+            ) : (
+              <>
+                <Stack.Screen name="Main" component={TabNavigator} />
+                <Stack.Screen name="PostDetail" component={PostDetailScreen} />
+                <Stack.Screen name="Chat" component={ChatScreen} />
+              </>
+            )}
+          </Stack.Navigator>
+        </NavigationContainer>
+      </AuthContext.Provider>
+    </PreferencesProvider>
   );
 }
 

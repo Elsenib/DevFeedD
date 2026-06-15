@@ -1,5 +1,7 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useContext } from 'react';
+import { PreferencesContext } from '../context/PreferencesContext';
 import FeedScreen from '../screens/FeedScreen';
 import MessagesScreen from '../screens/MessagesScreen';
 import PublicChatScreen from '../screens/PublicChatScreen';
@@ -9,14 +11,17 @@ import SettingsScreen from '../screens/SettingsScreen';
 const Tab = createBottomTabNavigator();
 
 export default function TabNavigator() {
+  const { theme } = useContext(PreferencesContext);
+  const colors = theme.colors;
+
   return (
     <Tab.Navigator
       initialRouteName="Feed"
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarStyle: { backgroundColor: '#0d1117', borderTopColor: '#21262d' },
-        tabBarActiveTintColor: '#6366f1',
-        tabBarInactiveTintColor: '#8b949e',
+        tabBarStyle: { backgroundColor: colors.background, borderTopColor: colors.border },
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.muted,
         tabBarIcon: ({ color, size }) => {
           let iconName;
           if (route.name === 'Feed') iconName = 'dynamic-feed';

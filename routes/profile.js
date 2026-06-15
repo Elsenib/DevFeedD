@@ -77,6 +77,28 @@ router.post('/avatar', auth, upload.single('avatar'), async (req, res) => {
   }
 });
 
+router.get('/posts', auth, async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT
+        p.id, p.user_id, p.title, p.caption, p.body, p.post_type, p.metadata, p.tags, p.views, p.likes, p.created_at,
+        u.name, u.role, u.avatar_url,
+        (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id) as like_count,
+        (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comment_count,
+        COALESCE((SELECT COUNT(*) FROM post_bookmarks WHERE post_id = p.id), 0) as bookmark_count
+       FROM posts p
+       JOIN users u ON p.user_id = u.id
+       WHERE p.user_id = $1
+       ORDER BY p.created_at DESC`,
+      [req.user.id]
+    );
+    res.json(result.rows);
+  } catch (error) {
+    console.error('GET /profile/posts error:', error);
+    res.status(500).json({ message: 'Profil paylaşımları yüklənmədi' });
+  }
+});
+
 router.get('/:id', auth, async (req, res) => {
   try {
     const userId = parseInt(req.params.id, 10);

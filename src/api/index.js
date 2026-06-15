@@ -40,6 +40,15 @@ export async function updateProfile(profile) {
   return response.data;
 }
 
+export async function uploadAvatar({ uri, name = 'avatar.jpg', type = 'image/jpeg' }) {
+  const formData = new FormData();
+  formData.append('avatar', { uri, name, type });
+  const response = await api.post('/profile/avatar', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return response.data;
+}
+
 export async function fetchPosts() {
   const response = await api.get('/posts');
   return response.data;
@@ -103,6 +112,11 @@ export async function fetchProfile() {
   return response.data;
 }
 
+export async function fetchMyPosts() {
+  const response = await api.get('/profile/posts');
+  return response.data;
+}
+
 export async function fetchConversations() {
   const response = await api.get('/conversations');
   return response.data;
@@ -153,12 +167,23 @@ export async function sendChatMessage(roomId, text) {
   return response.data;
 }
 
+export async function fetchSupportConfig() {
+  const response = await api.get('/support/config');
+  return response.data;
+}
+
+export async function createSupportPayment({ receiverId, amount, note }) {
+  const response = await api.post('/support/payments', { receiverId, amount, note });
+  return response.data;
+}
+
 export default {
   setToken,
   login,
   register,
   socialLogin,
   updateProfile,
+  uploadAvatar,
   fetchPosts,
   createPost,
   updatePost,
@@ -181,4 +206,7 @@ export default {
   leaveChatRoom,
   fetchChatMessages,
   sendChatMessage,
+  fetchSupportConfig,
+  createSupportPayment,
+  fetchMyPosts,
 };
