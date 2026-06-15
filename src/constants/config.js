@@ -1,1 +1,1 @@
-export const API_BASE_URL = 'https://devfeed-production.up.railway.app';
+export const API_BASE_URL = 'https://devfeedd-backend-production.up.railway.app';
