@@ -1,0 +1,10 @@
+node_modules
+.git
+.expo
+.vscode
+android
+eas-inspect
+scripts
+server
+uploads
+npm-debug.log
