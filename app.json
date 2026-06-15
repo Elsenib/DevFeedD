@@ -2,6 +2,7 @@
   "expo": {
     "name": "DevFeed Mobile",
     "slug": "devfeed-mobile",
+    "owner": "dasdanstudio",
     "scheme": "devfeed",
     "platforms": ["ios", "android", "web"],
     "version": "1.0.0",
@@ -36,6 +37,11 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "5d888528-e8a4-4861-af23-77fc915e35e7"
+      }
     }
   }
 }
