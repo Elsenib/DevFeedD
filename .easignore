@@ -1,0 +1,15 @@
+.git
+.expo
+.vscode
+node_modules
+android
+dist
+build
+eas-inspect
+uploads
+server/.env
+.env
+.env.local
+.env.*.local
+*.log
+marketing/video/frames
