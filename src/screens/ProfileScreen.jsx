@@ -424,18 +424,20 @@ export default function ProfileScreen({ route, navigation }) {
           {!isOwnProfile && (
             <TouchableOpacity style={styles.actionButton} onPress={handleToggleFollow}>
               <MaterialIcons name={profile?.following_by_me ? 'person-remove' : 'person-add'} size={18} color="#ffffff" />
-              <Text style={styles.actionButtonText}>{profile?.following_by_me ? 'İzləmədən çıx' : 'İzlə'}</Text>
+              <Text style={styles.actionButtonText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.78}>
+                {profile?.following_by_me ? 'İzləmədən çıx' : 'İzlə'}
+              </Text>
             </TouchableOpacity>
           )}
           {!isOwnProfile && (
             <TouchableOpacity style={[styles.actionButton, styles.messageButton]} onPress={handleMessage}>
               <MaterialIcons name="send" size={18} color="#ffffff" />
-              <Text style={styles.actionButtonText}>Mesaj</Text>
+              <Text style={styles.actionButtonText} numberOfLines={1}>Mesaj</Text>
             </TouchableOpacity>
           )}
           <TouchableOpacity style={[styles.actionButton, styles.supportButton]} onPress={() => setSupportOpen(true)}>
             <MaterialIcons name="local-cafe" size={18} color="#111827" />
-            <Text style={styles.supportButtonText}>Dəstək ol</Text>
+            <Text style={styles.supportButtonText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82}>Dəstək ol</Text>
           </TouchableOpacity>
         </View>
 
@@ -640,17 +642,23 @@ function createStyles(colors) {
     },
     actionRow: {
       flexDirection: 'row',
+      flexWrap: 'wrap',
       marginBottom: 12,
+      marginHorizontal: -4,
     },
     actionButton: {
-      flex: 1,
+      flexGrow: 1,
+      flexBasis: '31%',
       backgroundColor: colors.primary,
       borderRadius: 10,
       paddingVertical: 12,
+      paddingHorizontal: 8,
       alignItems: 'center',
       justifyContent: 'center',
       flexDirection: 'row',
-      marginRight: 8,
+      marginHorizontal: 4,
+      marginBottom: 8,
+      minHeight: 44,
     },
     hiddenAction: {
       display: 'none',
@@ -662,16 +670,18 @@ function createStyles(colors) {
       color: '#ffffff',
       fontWeight: '900',
       marginLeft: 7,
+      fontSize: 12,
+      flexShrink: 1,
     },
     supportButton: {
       backgroundColor: colors.warning,
-      marginRight: 0,
-      marginLeft: 8,
     },
     supportButtonText: {
       color: '#111827',
       fontWeight: '900',
       marginLeft: 7,
+      fontSize: 12,
+      flexShrink: 1,
     },
     card: {
       backgroundColor: colors.surface,

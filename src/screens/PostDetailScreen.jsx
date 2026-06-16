@@ -4,6 +4,7 @@ import {
   Alert,
   FlatList,
   Image,
+  Linking,
   Modal,
   StyleSheet,
   Text,
@@ -13,7 +14,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
+import { ResizeMode, Video } from 'expo-av';
 import { AuthContext } from '../context/AuthContext';
+import { PreferencesContext } from '../context/PreferencesContext';
 import JobApplicationModal from '../components/JobApplicationModal';
 import * as api from '../api';
 
@@ -75,6 +78,21 @@ function AuthorAvatar({ name, avatarUrl }) {
   );
 }
 
+async function openExternalUrl(url) {
+  const value = String(url || '').trim();
+  if (!/^https?:\/\//i.test(value)) return;
+  try {
+    const supported = await Linking.canOpenURL(value);
+    if (!supported) {
+      Alert.alert('Link açılmadı', 'Bu linki açmaq mümkün olmadı.');
+      return;
+    }
+    await Linking.openURL(value);
+  } catch (error) {
+    Alert.alert('Link xətası', error.message);
+  }
+}
+
 function PayloadPreview({ post }) {
   const metadata = post.metadata || {};
   if (post.type === 'GIT') {
@@ -108,12 +126,37 @@ function PayloadPreview({ post }) {
     );
   }
   if (post.type === 'MEDIA') {
+    const mediaUrl = metadata.mediaUrl || metadata.url;
+    const mediaType = metadata.mediaType || (String(metadata.mimeType || '').startsWith('image/') ? 'image' : 'video');
     return (
-      <View style={styles.mediaBox}>
-        <MaterialIcons name="play-circle-outline" size={42} color="#818cf8" />
-        <Text style={styles.mediaTitle}>{metadata.title || 'Media paylasim'}</Text>
-        <Text style={styles.mediaLink}>{metadata.url || 'Demo/link elave edilmeyib'}</Text>
-      </View>
+      <TouchableOpacity
+        style={styles.mediaBox}
+        activeOpacity={mediaUrl ? 0.85 : 1}
+        onPress={() => {
+          if (mediaType !== 'video') openExternalUrl(mediaUrl);
+        }}
+        disabled={!mediaUrl || mediaType === 'video'}
+      >
+        {mediaType === 'image' && mediaUrl ? (
+          <Image source={{ uri: mediaUrl }} style={styles.mediaPreviewImage} />
+        ) : mediaType === 'video' && mediaUrl ? (
+          <Video
+            source={{ uri: mediaUrl }}
+            style={styles.mediaPreviewVideo}
+            resizeMode={ResizeMode.COVER}
+            useNativeControls
+            shouldPlay={false}
+          />
+        ) : (
+          <View style={styles.mediaPreviewIcon}>
+            <MaterialIcons name="play-circle-outline" size={42} color="#818cf8" />
+          </View>
+        )}
+        <View style={styles.mediaOverlay}>
+          <Text style={styles.mediaTitle}>{metadata.title || 'Media paylaşım'}</Text>
+          <Text style={styles.mediaLink}>{mediaType === 'video' && mediaUrl ? 'Video player' : mediaUrl || 'Media əlavə edilməyib'}</Text>
+        </View>
+      </TouchableOpacity>
     );
   }
   if (post.type === 'JOB') {
@@ -204,17 +247,76 @@ function EditPostModal({ visible, post, saving, onClose, onSave }) {
   );
 }
 
+function CommentComposer({ saving, replyTarget, colors, onCancelReply, onSubmit }) {
+  const [draft, setDraft] = useState('');
+  const themed = useMemo(() => ({
+    commentBox: { backgroundColor: colors.surface, borderColor: colors.border },
+    commentInput: { color: colors.text },
+    replyBar: { borderBottomColor: colors.border },
+  }), [colors]);
+
+  const handleSend = async () => {
+    const value = draft.trim();
+    if (!value || saving) return;
+    const submitted = await onSubmit(value);
+    if (submitted !== false) setDraft('');
+  };
+
+  return (
+    <View style={[styles.commentBox, themed.commentBox]}>
+      <View style={styles.commentComposerBody}>
+        {!!replyTarget && (
+          <View style={[styles.replyingBar, themed.replyBar]}>
+            <MaterialIcons name="reply" size={15} color="#58a6ff" />
+            <Text style={styles.replyingText} numberOfLines={1}>
+              {replyTarget.name || 'İstifadəçi'} şərhinə cavab
+            </Text>
+            <TouchableOpacity onPress={onCancelReply}>
+              <MaterialIcons name="close" size={16} color="#8b949e" />
+            </TouchableOpacity>
+          </View>
+        )}
+        <TextInput
+          value={draft}
+          onChangeText={setDraft}
+          placeholder={replyTarget ? '@tag ilə cavab yaz...' : 'Şərh yaz...'}
+          placeholderTextColor={colors.muted}
+          style={[styles.commentInput, themed.commentInput]}
+          multiline
+        />
+      </View>
+      <TouchableOpacity style={styles.commentButton} onPress={handleSend} disabled={saving || !draft.trim()}>
+        {saving ? <ActivityIndicator color="#ffffff" /> : <MaterialIcons name="send" size={18} color="#ffffff" />}
+      </TouchableOpacity>
+    </View>
+  );
+}
+
 export default function PostDetailScreen({ route, navigation }) {
   const { user } = useContext(AuthContext);
+  const { theme, t } = useContext(PreferencesContext);
+  const colors = theme.colors;
+  const themed = useMemo(() => ({
+    container: { backgroundColor: colors.background },
+    header: { backgroundColor: colors.background, borderBottomColor: colors.border },
+    iconButton: { backgroundColor: colors.surface, borderColor: colors.border },
+    title: { color: colors.text },
+    muted: { color: colors.muted },
+    card: { backgroundColor: colors.surface, borderColor: colors.border },
+    commentBox: { backgroundColor: colors.surface, borderColor: colors.border },
+    commentInput: { color: colors.text },
+    commentCard: { backgroundColor: colors.surface, borderColor: colors.border },
+    emptyText: { color: colors.muted },
+  }), [colors]);
   const initialPost = useMemo(() => normalizePost(route.params?.post || {}), [route.params?.post]);
   const [post, setPost] = useState(initialPost);
   const [comments, setComments] = useState([]);
-  const [commentText, setCommentText] = useState('');
   const [loading, setLoading] = useState(true);
   const [savingComment, setSavingComment] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [applyOpen, setApplyOpen] = useState(false);
+  const [replyTarget, setReplyTarget] = useState(null);
   const [applyingJob, setApplyingJob] = useState(false);
   const [boostingJob, setBoostingJob] = useState(false);
   const [applications, setApplications] = useState([]);
@@ -249,23 +351,29 @@ export default function PostDetailScreen({ route, navigation }) {
       .catch(() => setApplications([]));
   }, [isOwner, isJobPost, post.id]);
 
-  const handleAddComment = async () => {
-    const text = commentText.trim();
+  const handleAddComment = async (text) => {
     if (!text) return;
     setSavingComment(true);
     try {
-      const newComment = await api.addComment(post.id, text);
+      const newComment = await api.addComment(post.id, {
+        text,
+        parentId: replyTarget?.id,
+        replyToUserId: replyTarget?.user_id || replyTarget?.userId,
+      });
       setComments((prev) => [
         {
           ...newComment,
           name: user?.name || user?.email || 'Sen',
+          reply_to_name: replyTarget?.name || replyTarget?.user?.name || null,
         },
         ...prev,
       ]);
       setPost((prev) => ({ ...prev, commentCount: prev.commentCount + 1, comment_count: prev.commentCount + 1 }));
-      setCommentText('');
+      setReplyTarget(null);
+      return true;
     } catch (error) {
       Alert.alert('Serh xetasi', error.response?.data?.message || error.response?.data?.error || error.message);
+      return false;
     } finally {
       setSavingComment(false);
     }
@@ -421,17 +529,17 @@ export default function PostDetailScreen({ route, navigation }) {
 
   const renderHeader = () => (
     <View>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.iconButton} onPress={() => navigation.goBack()}>
-          <MaterialIcons name="arrow-back" size={22} color="#e6edf3" />
+      <View style={[styles.header, themed.header]}>
+        <TouchableOpacity style={[styles.iconButton, themed.iconButton]} onPress={() => navigation.goBack()}>
+          <MaterialIcons name="arrow-back" size={22} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.screenTitle}>Paylasim</Text>
+        <Text style={[styles.screenTitle, themed.title]}>{t.post}</Text>
         {isOwner ? (
           <View style={styles.ownerActions}>
-            <TouchableOpacity style={styles.iconButton} onPress={() => setEditOpen(true)}>
+            <TouchableOpacity style={[styles.iconButton, themed.iconButton]} onPress={() => setEditOpen(true)}>
               <MaterialIcons name="edit" size={20} color="#58a6ff" />
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.iconButton, styles.deleteButton]} onPress={handleDelete}>
+            <TouchableOpacity style={[styles.iconButton, themed.iconButton, styles.deleteButton]} onPress={handleDelete}>
               <MaterialIcons name="delete-outline" size={21} color="#f85149" />
             </TouchableOpacity>
           </View>
@@ -440,13 +548,13 @@ export default function PostDetailScreen({ route, navigation }) {
         )}
       </View>
 
-      <View style={styles.card}>
+      <View style={[styles.card, themed.card]}>
         <View style={styles.postHeader}>
           <TouchableOpacity style={styles.authorTap} onPress={handleAuthorPress}>
             <AuthorAvatar name={post.authorName} avatarUrl={post.authorAvatar} />
             <View style={styles.authorBlock}>
-              <Text style={styles.postUser}>{post.authorName}</Text>
-              <Text style={styles.postTime}>{post.authorRole} - {formatDate(post.created_at || post.createdAt)}</Text>
+              <Text style={[styles.postUser, themed.title]}>{post.authorName}</Text>
+              <Text style={[styles.postTime, themed.muted]}>{post.authorRole} - {formatDate(post.created_at || post.createdAt)}</Text>
             </View>
           </TouchableOpacity>
           <View style={[styles.typeBadge, { borderColor: kind.color, backgroundColor: `${kind.color}18` }]}>
@@ -455,8 +563,8 @@ export default function PostDetailScreen({ route, navigation }) {
           </View>
         </View>
 
-        <Text style={styles.postTitle}>{post.title}</Text>
-        {!!post.body && <Text style={styles.postBody}>{post.body}</Text>}
+        <Text style={[styles.postTitle, themed.title]}>{post.title}</Text>
+        {!!post.body && <Text style={[styles.postBody, themed.title]}>{post.body}</Text>}
         {post.tags.length > 0 && (
           <View style={styles.tagsRow}>
             {post.tags.map((tag) => (
@@ -527,49 +635,57 @@ export default function PostDetailScreen({ route, navigation }) {
         </View>
       </View>
 
-      <View style={styles.commentBox}>
-        <TextInput
-          value={commentText}
-          onChangeText={setCommentText}
-          placeholder="Serh yaz..."
-          placeholderTextColor="#4b5563"
-          style={styles.commentInput}
-          multiline
-        />
-        <TouchableOpacity style={styles.commentButton} onPress={handleAddComment} disabled={savingComment || !commentText.trim()}>
-          {savingComment ? <ActivityIndicator color="#ffffff" /> : <MaterialIcons name="send" size={18} color="#ffffff" />}
-        </TouchableOpacity>
-      </View>
+      <CommentComposer
+        saving={savingComment}
+        replyTarget={replyTarget}
+        colors={colors}
+        onCancelReply={() => setReplyTarget(null)}
+        onSubmit={handleAddComment}
+      />
 
-      <Text style={styles.sectionTitle}>Serhler</Text>
+      <Text style={[styles.sectionTitle, themed.title]}>{t.comments}</Text>
     </View>
   );
 
   if (loading) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color="#6366f1" />
+      <View style={[styles.center, themed.container]}>
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, themed.container]} edges={['top']}>
       <FlatList
         data={comments}
         keyExtractor={(item) => item.id?.toString() ?? Math.random().toString()}
         ListHeaderComponent={renderHeader()}
         contentContainerStyle={styles.listContent}
         renderItem={({ item }) => (
-          <View style={styles.commentCard}>
+          <View style={[styles.commentCard, themed.commentCard]}>
             <AuthorAvatar name={item.name || item.user?.name || item.sender?.name} avatarUrl={item.avatar_url || item.user?.avatar_url || item.sender?.avatar_url} />
             <View style={styles.commentBody}>
-              <Text style={styles.commentAuthor}>{item.name || item.user?.name || item.userEmail || 'Istifadeci'}</Text>
-              <Text style={styles.commentText}>{item.text}</Text>
+              <Text style={[styles.commentAuthor, themed.title]}>{item.name || item.user?.name || item.userEmail || 'Istifadeci'}</Text>
+              {!!item.reply_to_name && (
+                <Text style={styles.replyMeta}>@{item.reply_to_name} cavab</Text>
+              )}
+              <Text style={[styles.commentText, themed.title]}>{item.text}</Text>
+              <TouchableOpacity
+                style={styles.replyButton}
+                onPress={() => setReplyTarget({
+                  id: item.id,
+                  user_id: item.user_id,
+                  name: item.name || item.user?.name || item.userEmail || 'İstifadəçi',
+                })}
+              >
+                <MaterialIcons name="reply" size={14} color="#58a6ff" />
+                <Text style={styles.replyButtonText}>Cavab ver</Text>
+              </TouchableOpacity>
             </View>
           </View>
         )}
-        ListEmptyComponent={<Text style={styles.emptyText}>Hele serh yoxdur. Ilk fikri sen yaz.</Text>}
+        ListEmptyComponent={<Text style={[styles.emptyText, themed.emptyText]}>Hələ şərh yoxdur. İlk fikri sən yaz.</Text>}
       />
       <EditPostModal
         visible={editOpen}
@@ -801,14 +917,32 @@ const styles = StyleSheet.create({
     minHeight: 145,
     borderColor: '#30215a',
     borderWidth: 1,
+    overflow: 'hidden',
+  },
+  mediaPreviewImage: {
+    width: '100%',
+    height: 190,
+    backgroundColor: '#0d1117',
+  },
+  mediaPreviewVideo: {
+    width: '100%',
+    height: 230,
+    backgroundColor: '#0d1117',
+  },
+  mediaPreviewIcon: {
+    height: 145,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 16,
+  },
+  mediaOverlay: {
+    borderTopColor: '#30215a',
+    borderTopWidth: 1,
+    padding: 12,
+    backgroundColor: 'rgba(21,17,38,0.95)',
   },
   mediaTitle: {
     color: '#818cf8',
     fontWeight: '800',
-    marginTop: 8,
   },
   mediaLink: {
     color: '#a5b4fc',
@@ -960,6 +1094,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-end',
   },
+  commentComposerBody: {
+    flex: 1,
+  },
+  replyingBar: {
+    borderBottomColor: '#21262d',
+    borderBottomWidth: 1,
+    paddingHorizontal: 8,
+    paddingBottom: 8,
+    marginBottom: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  replyingText: {
+    flex: 1,
+    color: '#58a6ff',
+    fontSize: 12,
+    fontWeight: '800',
+    marginLeft: 6,
+  },
   commentInput: {
     flex: 1,
     color: '#e6edf3',
@@ -1005,6 +1158,24 @@ const styles = StyleSheet.create({
   commentText: {
     color: '#c9d1d9',
     lineHeight: 20,
+  },
+  replyMeta: {
+    color: '#58a6ff',
+    fontSize: 11,
+    fontWeight: '800',
+    marginBottom: 3,
+  },
+  replyButton: {
+    marginTop: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+  },
+  replyButtonText: {
+    color: '#58a6ff',
+    fontSize: 12,
+    fontWeight: '800',
+    marginLeft: 4,
   },
   emptyText: {
     color: '#8b949e',

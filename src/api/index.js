@@ -75,6 +75,16 @@ export async function uploadJobResume({ uri, name = 'cv.pdf', type = 'applicatio
   return response.data;
 }
 
+export async function uploadPostMedia({ uri, name = 'media', type = 'application/octet-stream', mediaType = 'media' }) {
+  const formData = new FormData();
+  formData.append('media', { uri, name, type });
+  formData.append('mediaType', mediaType);
+  const response = await api.post('/posts/media', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return response.data;
+}
+
 export async function fetchPosts() {
   const response = await api.get('/posts');
   return response.data;
@@ -105,8 +115,9 @@ export async function fetchComments(postId) {
   return response.data;
 }
 
-export async function addComment(postId, text) {
-  const response = await api.post(`/posts/${postId}/comments`, { text });
+export async function addComment(postId, comment) {
+  const payload = typeof comment === 'string' ? { text: comment } : comment;
+  const response = await api.post(`/posts/${postId}/comments`, payload);
   return response.data;
 }
 
@@ -230,6 +241,16 @@ export async function leaveChatRoom(roomId) {
   return response.data;
 }
 
+export async function fetchChatRoomMembers(roomId) {
+  const response = await api.get(`/chat/rooms/${roomId}/members`);
+  return response.data;
+}
+
+export async function inviteToChatRoom(roomId, { email, userId }) {
+  const response = await api.post(`/chat/rooms/${roomId}/invite`, { email, userId });
+  return response.data;
+}
+
 export async function fetchChatMessages(roomId) {
   const response = await api.get(`/chat/rooms/${roomId}/messages`);
   return response.data;
@@ -281,6 +302,7 @@ export default {
   updateProfile,
   uploadAvatar,
   uploadJobResume,
+  uploadPostMedia,
   fetchPosts,
   createPost,
   updatePost,
@@ -310,6 +332,8 @@ export default {
   createChatRoom,
   joinChatRoom,
   leaveChatRoom,
+  fetchChatRoomMembers,
+  inviteToChatRoom,
   fetchChatMessages,
   sendChatMessage,
   fetchSupportConfig,

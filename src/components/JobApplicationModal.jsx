@@ -2,7 +2,10 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -64,57 +67,63 @@ export default function JobApplicationModal({ visible, post, submitting, onClose
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={styles.overlay}>
+      <KeyboardAvoidingView
+        style={styles.overlay}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 18 : 0}
+      >
         <View style={styles.sheet}>
-          <View style={styles.header}>
-            <View style={styles.headerText}>
-              <Text style={styles.title}>Müraciət et</Text>
-              <Text style={styles.subtitle} numberOfLines={2}>{title}</Text>
+          <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+            <View style={styles.header}>
+              <View style={styles.headerText}>
+                <Text style={styles.title}>Müraciət et</Text>
+                <Text style={styles.subtitle} numberOfLines={2}>{title}</Text>
+              </View>
+              <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+                <MaterialIcons name="close" size={22} color="#8b949e" />
+              </TouchableOpacity>
             </View>
-            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-              <MaterialIcons name="close" size={22} color="#8b949e" />
+
+            <Text style={styles.label}>QISA MƏKTUB</Text>
+            <TextInput
+              value={coverLetter}
+              onChangeText={setCoverLetter}
+              placeholder="Özünü qısa təqdim et, uyğun təcrübəni yaz..."
+              placeholderTextColor="#6b7280"
+              style={[styles.input, styles.textarea]}
+              multiline
+              textAlignVertical="top"
+            />
+
+            <Text style={styles.label}>ƏLAQƏ NÖMRƏSİ *</Text>
+            <TextInput
+              value={phone}
+              onChangeText={setPhone}
+              placeholder="+994..."
+              placeholderTextColor="#6b7280"
+              style={styles.input}
+              keyboardType="phone-pad"
+            />
+
+            <Text style={styles.label}>CV PDF *</Text>
+            <TouchableOpacity style={styles.resumeButton} onPress={handlePickResume}>
+              <MaterialIcons name={resume ? 'picture-as-pdf' : 'upload-file'} size={20} color={resume ? '#f87171' : '#58a6ff'} />
+              <View style={styles.resumeTextBlock}>
+                <Text style={styles.resumeTitle}>{resume?.name || 'PDF CV seç'}</Text>
+                <Text style={styles.resumeMeta}>Maksimum 8 MB, yalnız PDF</Text>
+              </View>
             </TouchableOpacity>
-          </View>
 
-          <Text style={styles.label}>QISA MƏKTUB</Text>
-          <TextInput
-            value={coverLetter}
-            onChangeText={setCoverLetter}
-            placeholder="Özünü qısa təqdim et, uyğun təcrübəni yaz..."
-            placeholderTextColor="#6b7280"
-            style={[styles.input, styles.textarea]}
-            multiline
-            textAlignVertical="top"
-          />
-
-          <Text style={styles.label}>ƏLAQƏ NÖMRƏSİ *</Text>
-          <TextInput
-            value={phone}
-            onChangeText={setPhone}
-            placeholder="+994..."
-            placeholderTextColor="#6b7280"
-            style={styles.input}
-            keyboardType="phone-pad"
-          />
-
-          <Text style={styles.label}>CV PDF *</Text>
-          <TouchableOpacity style={styles.resumeButton} onPress={handlePickResume}>
-            <MaterialIcons name={resume ? 'picture-as-pdf' : 'upload-file'} size={20} color={resume ? '#f87171' : '#58a6ff'} />
-            <View style={styles.resumeTextBlock}>
-              <Text style={styles.resumeTitle}>{resume?.name || 'PDF CV seç'}</Text>
-              <Text style={styles.resumeMeta}>Maksimum 8 MB, yalnız PDF</Text>
-            </View>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.submitButton, submitting && styles.disabledButton]}
-            onPress={handleSubmit}
-            disabled={submitting}
-          >
-            {submitting ? <ActivityIndicator color="#ffffff" /> : <Text style={styles.submitText}>Müraciəti göndər</Text>}
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.submitButton, submitting && styles.disabledButton]}
+              onPress={handleSubmit}
+              disabled={submitting}
+            >
+              {submitting ? <ActivityIndicator color="#ffffff" /> : <Text style={styles.submitText}>Müraciəti göndər</Text>}
+            </TouchableOpacity>
+          </ScrollView>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -132,6 +141,7 @@ const styles = StyleSheet.create({
     borderColor: '#21262d',
     borderWidth: 1,
     padding: 18,
+    maxHeight: '92%',
   },
   header: {
     flexDirection: 'row',

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
+import { PreferencesContext } from '../context/PreferencesContext';
 import * as api from '../api';
 
 function formatTime(value) {
@@ -78,6 +79,22 @@ function NewConversationModal({ visible, creating, onClose, onCreate }) {
 }
 
 export default function MessagesScreen({ navigation }) {
+  const { theme, t } = useContext(PreferencesContext);
+  const colors = theme.colors;
+  const themed = useMemo(() => ({
+    container: { backgroundColor: colors.background },
+    header: { backgroundColor: colors.background, borderBottomColor: colors.border },
+    title: { color: colors.text },
+    subtitle: { color: colors.muted },
+    tabButton: { backgroundColor: colors.surface, borderColor: colors.border },
+    tabButtonActive: { backgroundColor: colors.primarySoft, borderColor: colors.primary },
+    tabText: { color: colors.muted },
+    tabTextActive: { color: colors.text },
+    card: { backgroundColor: colors.surface, borderColor: colors.border },
+    text: { color: colors.text },
+    muted: { color: colors.muted },
+    emptyText: { color: colors.muted },
+  }), [colors]);
   const [conversations, setConversations] = useState([]);
   const [applications, setApplications] = useState([]);
   const [activeTab, setActiveTab] = useState('chats');
@@ -151,32 +168,32 @@ export default function MessagesScreen({ navigation }) {
 
   const renderConversation = ({ item }) => (
     <TouchableOpacity
-      style={styles.chatCard}
+      style={[styles.chatCard, themed.card]}
       onPress={() => navigation.navigate('Chat', { conversationId: item.id, title: item.title })}
     >
       <ConversationAvatar title={item.title} avatarUrl={item.avatar_url || item.otherUser?.avatar_url} />
       <View style={styles.chatBody}>
         <View style={styles.chatTopRow}>
-          <Text style={styles.chatTitle}>{item.title || 'Söhbət'}</Text>
-          <Text style={styles.chatTime}>{formatTime(item.updatedAt || item.time)}</Text>
+          <Text style={[styles.chatTitle, themed.text]}>{item.title || 'Söhbət'}</Text>
+          <Text style={[styles.chatTime, themed.muted]}>{formatTime(item.updatedAt || item.time)}</Text>
         </View>
-        <Text style={styles.chatLast} numberOfLines={1}>{item.lastMessage || 'Hələ mesaj yoxdur'}</Text>
+        <Text style={[styles.chatLast, themed.muted]} numberOfLines={1}>{item.lastMessage || 'Hələ mesaj yoxdur'}</Text>
       </View>
-      <MaterialIcons name="chevron-right" size={24} color="#8b949e" />
+      <MaterialIcons name="chevron-right" size={24} color={colors.muted} />
     </TouchableOpacity>
   );
 
   const renderApplication = ({ item }) => (
-    <View style={styles.applicationCard}>
+    <View style={[styles.applicationCard, themed.card]}>
       <View style={styles.applicationTop}>
         <ConversationAvatar title={item.applicant_name || item.name} avatarUrl={item.applicant_avatar_url || item.avatar_url} />
         <View style={styles.chatBody}>
-          <Text style={styles.chatTitle}>{item.applicant_name || item.name || 'Namizəd'}</Text>
-          <Text style={styles.chatLast}>{item.post_caption || item.post_title || 'İş elanı'}</Text>
+          <Text style={[styles.chatTitle, themed.text]}>{item.applicant_name || item.name || 'Namizəd'}</Text>
+          <Text style={[styles.chatLast, themed.muted]}>{item.post_caption || item.post_title || 'İş elanı'}</Text>
           <Text style={styles.applicationPhone}>{item.applicant_phone || 'Telefon qeyd edilməyib'}</Text>
         </View>
       </View>
-      {!!item.cover_letter && <Text style={styles.applicationLetter} numberOfLines={3}>{item.cover_letter}</Text>}
+      {!!item.cover_letter && <Text style={[styles.applicationLetter, themed.text]} numberOfLines={3}>{item.cover_letter}</Text>}
       <View style={styles.applicationActions}>
         <TouchableOpacity style={styles.resumeButton} onPress={() => handleOpenResume(item.resume_url)} disabled={!item.resume_url}>
           <MaterialIcons name="picture-as-pdf" size={16} color="#f87171" />
@@ -199,11 +216,11 @@ export default function MessagesScreen({ navigation }) {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.container, themed.container]} edges={['top']}>
+      <View style={[styles.header, themed.header]}>
         <View>
-          <Text style={styles.title}>Mesajlar</Text>
-          <Text style={styles.subtitle}>DM söhbətləri və iş müraciətləri</Text>
+          <Text style={[styles.title, themed.title]}>{t.messages}</Text>
+          <Text style={[styles.subtitle, themed.subtitle]}>{t.messagesSubtitle}</Text>
         </View>
         <TouchableOpacity style={styles.plusButton} onPress={() => setModalOpen(true)}>
           <MaterialIcons name="add" size={24} color="#ffffff" />
@@ -212,16 +229,16 @@ export default function MessagesScreen({ navigation }) {
 
       <View style={styles.tabs}>
         <TouchableOpacity
-          style={[styles.tabButton, activeTab === 'chats' && styles.tabButtonActive]}
+          style={[styles.tabButton, themed.tabButton, activeTab === 'chats' && styles.tabButtonActive, activeTab === 'chats' && themed.tabButtonActive]}
           onPress={() => setActiveTab('chats')}
         >
-          <Text style={[styles.tabText, activeTab === 'chats' && styles.tabTextActive]}>Söhbətlər</Text>
+          <Text style={[styles.tabText, themed.tabText, activeTab === 'chats' && styles.tabTextActive, activeTab === 'chats' && themed.tabTextActive]}>{t.chats}</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.tabButton, activeTab === 'applications' && styles.tabButtonActive]}
+          style={[styles.tabButton, themed.tabButton, activeTab === 'applications' && styles.tabButtonActive, activeTab === 'applications' && themed.tabButtonActive]}
           onPress={() => setActiveTab('applications')}
         >
-          <Text style={[styles.tabText, activeTab === 'applications' && styles.tabTextActive]}>Müraciətlər</Text>
+          <Text style={[styles.tabText, themed.tabText, activeTab === 'applications' && styles.tabTextActive, activeTab === 'applications' && themed.tabTextActive]}>{t.applications}</Text>
         </TouchableOpacity>
       </View>
 
@@ -229,10 +246,10 @@ export default function MessagesScreen({ navigation }) {
         data={activeTab === 'chats' ? conversations : applications}
         keyExtractor={(item) => item.id?.toString() ?? `${activeTab}-${Math.random()}`}
         contentContainerStyle={styles.listContent}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#6366f1" />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />}
         renderItem={activeTab === 'chats' ? renderConversation : renderApplication}
         ListEmptyComponent={
-          <Text style={styles.emptyText}>
+          <Text style={[styles.emptyText, themed.emptyText]}>
             {activeTab === 'chats' ? 'Hələ söhbət yoxdur. Email ilə ilk söhbəti aç.' : 'Hələ iş müraciəti yoxdur.'}
           </Text>
         }

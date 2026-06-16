@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, SafeAreaView, StyleSheet } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
@@ -31,24 +32,13 @@ function normalizeUser(user) {
   };
 }
 
-function getWebStorage() {
-  try {
-    return globalThis?.localStorage || null;
-  } catch (error) {
-    return null;
-  }
-}
-
-function persistAuth(nextToken, nextUser) {
-  const storage = getWebStorage();
-  if (!storage) return;
-
+async function persistAuth(nextToken, nextUser) {
   if (!nextToken || !nextUser) {
-    storage.removeItem(AUTH_STORAGE_KEY);
+    await AsyncStorage.removeItem(AUTH_STORAGE_KEY);
     return;
   }
 
-  storage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ token: nextToken, user: nextUser }));
+  await AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ token: nextToken, user: nextUser }));
 }
 
 function getOAuthParam(url, key) {
@@ -64,20 +54,17 @@ export default function App() {
 
   useEffect(() => {
     const restore = async () => {
-      const storage = getWebStorage();
-      if (storage) {
-        try {
-          const saved = storage.getItem(AUTH_STORAGE_KEY);
-          if (saved) {
-            const parsed = JSON.parse(saved);
-            if (parsed?.token && parsed?.user) {
-              setToken(parsed.token);
-              setUser(normalizeUser(parsed.user));
-            }
+      try {
+        const saved = await AsyncStorage.getItem(AUTH_STORAGE_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed?.token && parsed?.user) {
+            setToken(parsed.token);
+            setUser(normalizeUser(parsed.user));
           }
-        } catch (error) {
-          storage.removeItem(AUTH_STORAGE_KEY);
         }
+      } catch (error) {
+        await AsyncStorage.removeItem(AUTH_STORAGE_KEY).catch(() => {});
       }
       setLoading(false);
     };
@@ -97,13 +84,13 @@ export default function App() {
         const nextUser = normalizeUser(data.user || { email });
         setToken(data.token);
         setUser(nextUser);
-        persistAuth(data.token, nextUser);
+        await persistAuth(data.token, nextUser);
         return data;
       },
-      signOut: () => {
+      signOut: async () => {
         setToken(null);
         setUser(null);
-        persistAuth(null, null);
+        await persistAuth(null, null);
       },
       signUp: async ({ name, email, password }) => {
         const data = await api.register(name, email, password);
@@ -113,7 +100,7 @@ export default function App() {
         const nextUser = normalizeUser(data.user || { name, email });
         setToken(data.token);
         setUser(nextUser);
-        persistAuth(data.token, nextUser);
+        await persistAuth(data.token, nextUser);
         return data;
       },
       verifyEmailRegistration: async ({ email, code }) => {
@@ -121,7 +108,7 @@ export default function App() {
         const nextUser = normalizeUser(data.user || { email });
         setToken(data.token);
         setUser(nextUser);
-        persistAuth(data.token, nextUser);
+        await persistAuth(data.token, nextUser);
         return data;
       },
       socialSignIn: async (provider, profile) => {
@@ -130,7 +117,7 @@ export default function App() {
         if (profile?.providerId && profile?.email && profile?.name) {
           data = await api.socialLogin({ provider, ...profile });
         } else {
-          const redirectUri = Linking.createURL('oauth');
+          const redirectUri = Linking.createURL('oauth', { scheme: 'devfeed' });
           const started = await api.startOAuth(provider, redirectUri);
           const result = await WebBrowser.openAuthSessionAsync(started.authUrl, redirectUri);
 
@@ -154,7 +141,7 @@ export default function App() {
         const nextUser = normalizeUser(data.user || (profile ? { email: profile.email, name: profile.name } : null));
         setToken(data.token);
         setUser(nextUser);
-        persistAuth(data.token, nextUser);
+        await persistAuth(data.token, nextUser);
         return data;
       },
       completeOnboarding: async (profile) => {
@@ -176,7 +163,7 @@ export default function App() {
           onboardingPending: false,
         });
         setUser(nextUser);
-        persistAuth(token, nextUser);
+        await persistAuth(token, nextUser);
         return data;
       },
       updateCurrentUser: async (profile) => {
@@ -187,7 +174,7 @@ export default function App() {
           onboardingPending: false,
         });
         setUser(nextUser);
-        persistAuth(token, nextUser);
+        await persistAuth(token, nextUser);
         return data;
       },
     }),

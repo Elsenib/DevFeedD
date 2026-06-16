@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Image,
   KeyboardAvoidingView,
   Platform,
   RefreshControl,
@@ -15,6 +16,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { AuthContext } from '../context/AuthContext';
+import { PreferencesContext } from '../context/PreferencesContext';
 import * as api from '../api';
 
 function formatTime(value) {
@@ -24,8 +26,33 @@ function formatTime(value) {
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
+function MessageAvatar({ name, uri }) {
+  const letter = String(name || 'U').slice(0, 1).toUpperCase();
+  if (uri) return <Image source={{ uri }} style={styles.messageAvatarImage} />;
+  return (
+    <View style={styles.messageAvatar}>
+      <Text style={styles.messageAvatarText}>{letter}</Text>
+    </View>
+  );
+}
+
 export default function ChatScreen({ route, navigation }) {
   const { user } = useContext(AuthContext);
+  const { theme } = useContext(PreferencesContext);
+  const colors = theme.colors;
+  const themed = useMemo(() => ({
+    container: { backgroundColor: colors.background },
+    header: { backgroundColor: colors.background, borderBottomColor: colors.border },
+    iconButton: { backgroundColor: colors.surface, borderColor: colors.border },
+    title: { color: colors.text },
+    subtitle: { color: colors.muted },
+    bubble: { backgroundColor: colors.surface, borderColor: colors.border },
+    mineBubble: { backgroundColor: colors.primary, borderColor: colors.primary },
+    text: { color: colors.text },
+    composer: { backgroundColor: colors.background, borderTopColor: colors.border },
+    input: { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text },
+    emptyText: { color: colors.muted },
+  }), [colors]);
   const { conversationId, title } = route.params || {};
   const [conversation, setConversation] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -78,11 +105,12 @@ export default function ChatScreen({ route, navigation }) {
     const mine = String(item.sender?.id || item.sender_id || '') === String(user?.id || '');
     return (
       <View style={[styles.messageRow, mine && styles.messageRowMine]}>
-        <View style={[styles.messageBubble, mine && styles.messageBubbleMine]}>
+        {!mine && <MessageAvatar name={item.sender?.name || item.sender_name || screenTitle} uri={item.sender?.avatar_url || item.sender_avatar_url} />}
+        <View style={[styles.messageBubble, themed.bubble, mine && styles.messageBubbleMine, mine && themed.mineBubble]}>
           <Text style={[styles.senderName, mine && styles.senderNameMine]}>
             {mine ? 'Sən' : item.sender?.name || item.sender_name || screenTitle}
           </Text>
-          <Text style={[styles.messageText, mine && styles.messageTextMine]}>{item.text}</Text>
+          <Text style={[styles.messageText, themed.text, mine && styles.messageTextMine]}>{item.text}</Text>
           <Text style={[styles.messageTime, mine && styles.messageTimeMine]}>{formatTime(item.createdAt || item.created_at)}</Text>
         </View>
       </View>
@@ -91,29 +119,29 @@ export default function ChatScreen({ route, navigation }) {
 
   if (loading) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color="#6366f1" />
+      <View style={[styles.center, themed.container]}>
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, themed.container]} edges={['top']}>
       <KeyboardAvoidingView
         style={styles.keyboard}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 72 : 0}
       >
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.iconButton} onPress={() => navigation.goBack()}>
-          <MaterialIcons name="arrow-back" size={22} color="#e6edf3" />
+      <View style={[styles.header, themed.header]}>
+        <TouchableOpacity style={[styles.iconButton, themed.iconButton]} onPress={() => navigation.goBack()}>
+          <MaterialIcons name="arrow-back" size={22} color={colors.text} />
         </TouchableOpacity>
         <View style={styles.headerText}>
-          <Text style={styles.title}>{screenTitle}</Text>
-          <Text style={styles.subtitle}>Direct message</Text>
+          <Text style={[styles.title, themed.title]}>{screenTitle}</Text>
+          <Text style={[styles.subtitle, themed.subtitle]}>Direct message</Text>
         </View>
-        <TouchableOpacity style={styles.iconButton} onPress={loadConversation}>
-          <MaterialIcons name="refresh" size={20} color="#8b949e" />
+        <TouchableOpacity style={[styles.iconButton, themed.iconButton]} onPress={loadConversation}>
+          <MaterialIcons name="refresh" size={20} color={colors.muted} />
         </TouchableOpacity>
       </View>
 
@@ -122,17 +150,17 @@ export default function ChatScreen({ route, navigation }) {
         keyExtractor={(item) => item.id?.toString() ?? Math.random().toString()}
         renderItem={renderMessage}
         contentContainerStyle={styles.messagesContent}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#6366f1" />}
-        ListEmptyComponent={<Text style={styles.emptyText}>Hələ mesaj yoxdur. İlk mesajı yaz.</Text>}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />}
+        ListEmptyComponent={<Text style={[styles.emptyText, themed.emptyText]}>Hələ mesaj yoxdur. İlk mesajı yaz.</Text>}
       />
 
-      <View style={styles.composer}>
+      <View style={[styles.composer, themed.composer]}>
         <TextInput
           value={text}
           onChangeText={setText}
           placeholder="Mesaj yaz..."
-          placeholderTextColor="#4b5563"
-          style={styles.input}
+          placeholderTextColor={colors.muted}
+          style={[styles.input, themed.input]}
           multiline
         />
         <TouchableOpacity
@@ -203,6 +231,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-start',
     marginBottom: 10,
+    alignItems: 'flex-end',
   },
   messageRowMine: {
     justifyContent: 'flex-end',
@@ -218,6 +247,28 @@ const styles = StyleSheet.create({
   messageBubbleMine: {
     backgroundColor: '#312e81',
     borderColor: '#4f46e5',
+    borderBottomRightRadius: 4,
+  },
+  messageAvatar: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#6366f1',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+  },
+  messageAvatarImage: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#21262d',
+    marginRight: 8,
+  },
+  messageAvatarText: {
+    color: '#ffffff',
+    fontSize: 11,
+    fontWeight: '900',
   },
   senderName: {
     color: '#8b949e',

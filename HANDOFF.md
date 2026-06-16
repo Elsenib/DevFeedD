@@ -4,7 +4,7 @@
 
 ## Where We Are
 
-The project has a richer web-style prototype in `DevFeed.jsx`. P1 feed/post work is backend-backed, P2 DM/public chat has REST flows, the social graph pass is implemented locally, and Google/GitHub OAuth now has a backend-driven start/callback/complete flow. The next big step is deploying this update to Railway, configuring OAuth callback URLs, and testing on a physical phone.
+The project has a richer web-style prototype in `DevFeed.jsx`. P1 feed/post work is backend-backed, P2 DM/public chat has REST flows, the social graph pass is implemented locally, and Google/GitHub OAuth now has a backend-driven start/callback/complete flow. APK testing found several UX/runtime issues; the current passes fixed native auth persistence, long job/media composer scrolling, media upload/video playback, safe link validation, comment input focus, profile button overflow, chat invites, comment replies/@mentions, and main-screen theme/language propagation.
 
 ## Important Files
 
@@ -39,10 +39,15 @@ The project has a richer web-style prototype in `DevFeed.jsx`. P1 feed/post work
 - Google callback URL: `https://devfeedd-backend-production.up.railway.app/auth/oauth/callback/google`.
 - GitHub callback URL: `https://devfeedd-backend-production.up.railway.app/auth/oauth/callback/github`.
 - Password registration now requires email verification in production. `RESEND_API_KEY` and `EMAIL_FROM` are configured, but emails may still land in spam until domain reputation improves.
-- Token persistence still needs a real mobile storage dependency such as `expo-secure-store` or AsyncStorage. `App.jsx` currently has only a web `localStorage` fallback.
+- Token persistence now uses AsyncStorage in `App.jsx`; retest APK cold start after reinstall/update.
 - `API_BASE_URL` currently points to `https://devfeedd-backend-production.up.railway.app`; routes in this repo are mounted without `/api`.
 - `npm.cmd run web -- --offline` compiled successfully, but full browser/user-flow testing still needs to be done.
-- Media posts currently store title/link metadata only; real file upload is still pending.
+- Media posts now support gallery image/video selection, backend upload to `/posts/media`, and `expo-av` playback in feed/post detail.
+- Feed/post metadata links are validated server-side, but full link reputation scanning/warning screen is still pending.
+- Job composer and job application modals now scroll on small screens.
+- Comment input draft is local to avoid keyboard closing while typing; reply and @mention notifications are implemented.
+- Theme/language changes now affect the main app screens: Feed, Explore, Messages, Chat, Public Chat, Notifications, and Post Detail.
+- Public/group chat invites are implemented for chat rooms; invited users are added to room members and receive notifications.
 - Public chat is REST/manual-refresh now; realtime transport is still pending.
 - Updated OAuth backend code is not deployed until Railway receives this repo update.
 - `middleware/contentFilter.js`, deleted uploaded avatar files, `server`, `android/`, `eas-inspect/`, and `scripts/` are dirty/untracked in the working tree; do not stage them blindly.
@@ -84,6 +89,22 @@ The project has a richer web-style prototype in `DevFeed.jsx`. P1 feed/post work
 - Added `/auth/oauth/start/:provider`, `/auth/oauth/callback/:provider`, and `/auth/oauth/complete`.
 - Wired `socialSignIn` to open the provider login page and complete login via the backend session.
 - Added OAuth account linking by provider ID or matching email.
+- Replaced web-only auth persistence with `AsyncStorage` so APK restarts keep the login session.
+- Made OAuth app redirect explicit with `devfeed://oauth` and improved social login error display.
+- Added `/posts/media` upload endpoint for images/videos and frontend media picker in Feed composer.
+- Added backend safe URL validation for media/deploy metadata links.
+- Made Deploy links visible/clickable in feed cards.
+- Added vertical scroll and keyboard avoiding behavior to Feed composer and Job application modal.
+- Fixed comment composer keyboard/focus behavior by moving the draft state into a local component.
+- Fixed profile action button overflow for `İzləmədən çıx` on narrow phones.
+- Updated promo generator and marketing images/video from `Elşən İbrahimli` to `Elşən İbrahimov`.
+- Added `expo-av` for native video playback.
+- Added `comments.parent_id` and `comments.reply_to_user_id` schema support.
+- Added room member metadata (`invited_by`, `role`) and `/chat/rooms/:id/members`, `/chat/rooms/:id/invite`.
+- Added comment reply UI, @mention parsing, and mention/reply notifications.
+- Added Public Chat invite UI and member count display.
+- Added DM/public chat avatar polish and DM message notifications.
+- Added main-screen theme/language propagation to Feed, Explore, Messages, Chat, Public Chat, Notifications, and Post Detail.
 
 ## If Continuing In A New Session
 
@@ -102,4 +123,6 @@ Continue in this order:
 2. Add/check Railway OAuth variables and provider callback URLs.
 3. Verify `/health`, `/auth/oauth/start/google`, and `/auth/oauth/start/github`.
 4. Test Expo on phone with Google/GitHub login against the live Railway API.
-5. Add token persistence for native mobile, then continue realtime chat, media upload, and job boost.
+5. Deploy backend so new schema/routes exist live.
+6. Rebuild/reinstall APK because `expo-av` and new JS/native changes are included.
+7. Retest APK restart/session, job composer scroll, media upload/video playback, comment typing/reply/@mention, profile follow button, chat invites, theme/language, and Google/GitHub OAuth.

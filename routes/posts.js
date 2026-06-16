@@ -9,7 +9,9 @@ const { createNotification } = require('../services/notifications');
 
 const router = express.Router();
 const resumesDir = path.join(__dirname, '../uploads/resumes');
+const mediaDir = path.join(__dirname, '../uploads/media');
 fs.mkdirSync(resumesDir, { recursive: true });
+fs.mkdirSync(mediaDir, { recursive: true });
 
 const resumeUpload = multer({
   storage: multer.diskStorage({
@@ -28,9 +30,141 @@ const resumeUpload = multer({
   },
 });
 
+const mediaUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, mediaDir),
+    filename: (req, file, cb) => {
+      const safeName = path.basename(file.originalname || 'media').replace(/[^a-zA-Z0-9._-]/g, '-');
+      cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}-${safeName}`);
+    },
+  }),
+  limits: { fileSize: 60 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = [
+      'image/jpeg',
+      'image/png',
+      'image/webp',
+      'image/gif',
+      'video/mp4',
+      'video/quicktime',
+      'video/webm',
+    ];
+    if (!allowed.includes(file.mimetype)) {
+      return cb(new Error('Media yalnız JPG, PNG, WebP, GIF, MP4, MOV və WebM ola bilər.'));
+    }
+    cb(null, true);
+  },
+});
+
+function getUploadedMediaType(file) {
+  if (String(file?.mimetype || '').startsWith('image/')) return 'image';
+  if (String(file?.mimetype || '').startsWith('video/')) return 'video';
+  return 'media';
+}
+
 function getPublicUploadUrl(req, folder, filename) {
   const base = (process.env.PUBLIC_BACKEND_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
   return `${base}/uploads/${folder}/${filename}`;
+}
+
+function isPrivateHost(hostname) {
+  const host = String(hostname || '').toLowerCase();
+  if (!host) return true;
+  if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local')) return true;
+  if (host === '0.0.0.0' || host === '127.0.0.1' || host === '::1') return true;
+  if (/^127\./.test(host) || /^10\./.test(host) || /^192\.168\./.test(host)) return true;
+  const private172 = host.match(/^172\.(\d{1,2})\./);
+  if (private172 && Number(private172[1]) >= 16 && Number(private172[1]) <= 31) return true;
+  if (host.startsWith('169.254.') || host.startsWith('fc') || host.startsWith('fd') || host.startsWith('fe80')) return true;
+  return false;
+}
+
+function validateSafeUrl(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return { valid: true };
+
+  let parsed;
+  try {
+    parsed = new URL(raw);
+  } catch (error) {
+    return { valid: false, message: 'Link düzgün URL formatında deyil.' };
+  }
+
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    return { valid: false, message: 'Yalnız http/https linklər qəbul olunur.' };
+  }
+
+  if (isPrivateHost(parsed.hostname)) {
+    return { valid: false, message: 'Private, local və daxili şəbəkə linkləri paylaşmaq olmaz.' };
+  }
+
+  const searchable = `${parsed.hostname} ${parsed.pathname} ${parsed.search}`;
+  if (containsIllegalWords(searchable) || checkBadWords(searchable)) {
+    return { valid: false, message: 'Link qaydalara uyğun deyil.' };
+  }
+
+  if (/\.(exe|msi|bat|cmd|ps1|scr|jar|apk|ipa)(\?|#|$)/i.test(parsed.pathname)) {
+    return { valid: false, message: 'İcra edilən və install faylı linkləri paylaşmaq olmaz.' };
+  }
+
+  return { valid: true, url: parsed.toString() };
+}
+
+function collectMetadataLinks(value, key = '') {
+  if (!value) return [];
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (/^https?:\/\//i.test(trimmed) || /(?:url|link|href)$/i.test(key)) return [trimmed];
+    return [];
+  }
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => collectMetadataLinks(item, key));
+  }
+  if (typeof value === 'object') {
+    return Object.entries(value).flatMap(([nextKey, nextValue]) => collectMetadataLinks(nextValue, nextKey));
+  }
+  return [];
+}
+
+function validatePostLinks(metadata = {}) {
+  const links = collectMetadataLinks(metadata);
+  for (const link of links) {
+    const validation = validateSafeUrl(link);
+    if (!validation.valid) return validation;
+  }
+  return { valid: true };
+}
+
+function extractMentionTokens(text) {
+  const matches = String(text || '').match(/@([a-zA-Z0-9_.-]{2,40})/g) || [];
+  return [...new Set(matches.map((item) => item.slice(1).toLowerCase()))];
+}
+
+async function notifyMentionedUsers({ text, actorId, actorName, entityType, entityId }) {
+  const tokens = extractMentionTokens(text);
+  if (tokens.length === 0) return;
+
+  const emailTokens = tokens.map((token) => `${token}@%`);
+  const result = await pool.query(
+    `SELECT id, name
+     FROM users
+     WHERE LOWER(REPLACE(name, ' ', '')) = ANY($1)
+        OR LOWER(split_part(email, '@', 1)) = ANY($1)
+        OR LOWER(email) LIKE ANY($2)
+     LIMIT 20`,
+    [tokens, emailTokens]
+  );
+
+  await Promise.all(result.rows.map((mentioned) =>
+    createNotification({
+      userId: mentioned.id,
+      actorId,
+      type: 'mention',
+      entityType,
+      entityId,
+      text: `${actorName || 'Bir istifadəçi'} səni şərhdə tag etdi.`,
+    })
+  ));
 }
 
 // GET /posts?limit=20&offset=0
@@ -114,6 +248,29 @@ router.post('/applications/resume', auth, resumeUpload.single('resume'), async (
   }
 });
 
+router.post('/media', auth, mediaUpload.single('media'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'Media faylı lazımdır.' });
+    }
+
+    const mediaType = getUploadedMediaType(req.file);
+    res.status(201).json({
+      mediaUrl: getPublicUploadUrl(req, 'media', req.file.filename),
+      mediaFileName: req.file.originalname || req.file.filename,
+      mediaType,
+      mimeType: req.file.mimetype,
+      size: req.file.size,
+    });
+  } catch (error) {
+    if (req.file?.path) {
+      try { fs.unlinkSync(req.file.path); } catch (unlinkError) {}
+    }
+    console.error('POST /posts/media error:', error);
+    res.status(500).json({ message: error.message || 'Media yüklənmədi.' });
+  }
+});
+
 router.get('/applications/inbox', auth, async (req, res) => {
   try {
     const result = await pool.query(
@@ -188,6 +345,10 @@ router.post('/', auth, async (req, res) => {
     if (containsIllegalWords(body) || checkBadWords(body)) {
       return res.status(400).json({ error: 'Post metni kurallara uygun değil' });
     }
+    const linkValidation = validatePostLinks(metadata);
+    if (!linkValidation.valid) {
+      return res.status(400).json({ error: linkValidation.message });
+    }
 
     const result = await pool.query(
       `INSERT INTO posts (user_id, title, caption, body, post_type, metadata, tags)
@@ -219,6 +380,10 @@ router.put('/:id', auth, async (req, res) => {
     }
     if (containsIllegalWords(title) || containsIllegalWords(caption) || containsIllegalWords(body)) {
       return res.status(400).json({ error: 'İçerik kurallara uyğun deyil.' });
+    }
+    const linkValidation = validatePostLinks(metadata);
+    if (!linkValidation.valid) {
+      return res.status(400).json({ error: linkValidation.message });
     }
 
     const result = await pool.query(
@@ -365,8 +530,16 @@ router.delete('/:id/bookmark', auth, async (req, res) => {
 router.post('/:id/comments', auth, async (req, res) => {
   try {
     const { id } = req.params;
-    const { text } = req.body;
+    const {
+      text,
+      parent_id,
+      parentId,
+      reply_to_user_id,
+      replyToUserId: replyToUserIdBody,
+    } = req.body;
     const user_id = req.user.id;
+    const parentCommentId = parent_id || parentId || null;
+    let replyToUserId = reply_to_user_id || replyToUserIdBody || null;
 
     if (!text) {
       return res.status(400).json({ error: 'text is required' });
@@ -380,11 +553,25 @@ router.post('/:id/comments', auth, async (req, res) => {
       return res.status(404).json({ error: 'Post tapılmadı.' });
     }
 
+    if (parentCommentId) {
+      const parentResult = await pool.query(
+        'SELECT id, user_id FROM comments WHERE id = $1 AND post_id = $2',
+        [parentCommentId, id]
+      );
+      const parentComment = parentResult.rows[0];
+      if (!parentComment) {
+        return res.status(404).json({ error: 'Cavab verilən şərh tapılmadı.' });
+      }
+      replyToUserId = replyToUserId || parentComment.user_id;
+    }
+
     const result = await pool.query(
-      `INSERT INTO comments (post_id, user_id, text) VALUES ($1, $2, $3)
+      `INSERT INTO comments (post_id, user_id, parent_id, reply_to_user_id, text)
+       VALUES ($1, $2, $3, $4, $5)
        RETURNING *`,
-      [id, user_id, text]
+      [id, user_id, parentCommentId, replyToUserId, text]
     );
+    const comment = result.rows[0];
 
     await createNotification({
       userId: postResult.rows[0].user_id,
@@ -395,7 +582,26 @@ router.post('/:id/comments', auth, async (req, res) => {
       text: `${req.user.name || 'Bir istifadəçi'} paylaşımına şərh yazdı.`,
     });
 
-    res.status(201).json(result.rows[0]);
+    if (replyToUserId) {
+      await createNotification({
+        userId: replyToUserId,
+        actorId: user_id,
+        type: 'comment_reply',
+        entityType: 'post',
+        entityId: id,
+        text: `${req.user.name || 'Bir istifadəçi'} şərhinə cavab yazdı.`,
+      });
+    }
+
+    await notifyMentionedUsers({
+      text,
+      actorId: user_id,
+      actorName: req.user.name,
+      entityType: 'post',
+      entityId: id,
+    });
+
+    res.status(201).json(comment);
   } catch (error) {
     console.error('POST /posts/:id/comments error:', error);
     res.status(500).json({ error: error.message });
@@ -407,9 +613,12 @@ router.get('/:id/comments', async (req, res) => {
   try {
     const { id } = req.params;
     const result = await pool.query(
-      `SELECT c.id, c.post_id, c.user_id, c.text, c.created_at, u.name, u.avatar_url
+      `SELECT c.id, c.post_id, c.user_id, c.parent_id, c.reply_to_user_id, c.text, c.created_at,
+              u.name, u.avatar_url,
+              reply_user.name AS reply_to_name
        FROM comments c
        JOIN users u ON c.user_id = u.id
+       LEFT JOIN users reply_user ON reply_user.id = c.reply_to_user_id
        WHERE c.post_id = $1
        ORDER BY c.created_at DESC`,
       [id]

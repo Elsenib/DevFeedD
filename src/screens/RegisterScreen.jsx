@@ -57,7 +57,7 @@ export default function RegisterScreen({ navigation }) {
     try {
       await socialSignIn(provider);
     } catch (error) {
-      Alert.alert(`${provider} ile davam et`, error.message);
+      Alert.alert(`${provider} ilə davam et`, error.response?.data?.message || error.message);
     } finally {
       setSocialLoading(null);
     }

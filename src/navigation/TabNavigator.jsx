@@ -12,7 +12,7 @@ import ProfileScreen from '../screens/ProfileScreen';
 const Tab = createBottomTabNavigator();
 
 export default function TabNavigator() {
-  const { theme } = useContext(PreferencesContext);
+  const { theme, t } = useContext(PreferencesContext);
   const colors = theme.colors;
 
   return (
@@ -35,12 +35,12 @@ export default function TabNavigator() {
         },
       })}
     >
-      <Tab.Screen name="Feed" component={FeedScreen} />
-      <Tab.Screen name="Explore" component={ExploreScreen} options={{ title: 'Kəşf' }} />
-      <Tab.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Bildirişlər' }} />
-      <Tab.Screen name="Messages" component={MessagesScreen} />
+      <Tab.Screen name="Feed" component={FeedScreen} options={{ title: t.feed }} />
+      <Tab.Screen name="Explore" component={ExploreScreen} options={{ title: t.explore }} />
+      <Tab.Screen name="Notifications" component={NotificationsScreen} options={{ title: t.notifications }} />
+      <Tab.Screen name="Messages" component={MessagesScreen} options={{ title: t.messages }} />
       <Tab.Screen name="PublicChat" component={PublicChatScreen} options={{ title: 'Chat' }} />
-      <Tab.Screen name="Profile" component={ProfileScreen} />
+      <Tab.Screen name="Profile" component={ProfileScreen} options={{ title: t.profile }} />
     </Tab.Navigator>
   );
 }

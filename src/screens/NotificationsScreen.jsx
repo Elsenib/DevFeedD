@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -12,14 +12,19 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
+import { PreferencesContext } from '../context/PreferencesContext';
 import * as api from '../api';
 
 function iconFor(type) {
   if (type === 'post_like') return { name: 'favorite', color: '#f85149' };
   if (type === 'post_comment') return { name: 'chat-bubble', color: '#58a6ff' };
+  if (type === 'comment_reply') return { name: 'reply', color: '#38bdf8' };
+  if (type === 'mention') return { name: 'alternate-email', color: '#a78bfa' };
   if (type === 'post_bookmark') return { name: 'bookmark', color: '#fbbf24' };
   if (type === 'follow') return { name: 'person-add', color: '#3fb950' };
   if (type === 'message') return { name: 'mail', color: '#818cf8' };
+  if (type === 'chat_invite') return { name: 'group-add', color: '#22c55e' };
+  if (type === 'chat_mention') return { name: 'alternate-email', color: '#22d3ee' };
   if (type === 'job_application') return { name: 'work', color: '#f59e0b' };
   return { name: 'notifications', color: '#6366f1' };
 }
@@ -42,6 +47,20 @@ function ActorAvatar({ name, uri }) {
 }
 
 export default function NotificationsScreen({ navigation }) {
+  const { theme, t } = useContext(PreferencesContext);
+  const colors = theme.colors;
+  const themed = useMemo(() => ({
+    container: { backgroundColor: colors.background },
+    header: { backgroundColor: colors.background, borderBottomColor: colors.border },
+    title: { color: colors.text },
+    subtitle: { color: colors.muted },
+    iconButton: { backgroundColor: colors.surface, borderColor: colors.border },
+    card: { backgroundColor: colors.surface, borderColor: colors.border },
+    cardUnread: { backgroundColor: colors.surfaceStrong, borderColor: colors.primary },
+    text: { color: colors.text },
+    time: { color: colors.muted },
+    emptyText: { color: colors.muted },
+  }), [colors]);
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -96,6 +115,10 @@ export default function NotificationsScreen({ navigation }) {
     }
     if (item.entity_type === 'conversation' && item.entity_id) {
       navigation.navigate('Chat', { conversationId: item.entity_id, title: item.actor_name || 'Söhbət' });
+      return;
+    }
+    if (item.entity_type === 'chat_room' && item.entity_id) {
+      navigation.navigate('PublicChat', { roomId: item.entity_id });
     }
   };
 
@@ -103,36 +126,36 @@ export default function NotificationsScreen({ navigation }) {
     const icon = iconFor(item.type);
     const unread = !item.read_at;
     return (
-      <TouchableOpacity style={[styles.card, unread && styles.cardUnread]} onPress={() => handleOpen(item)}>
+      <TouchableOpacity style={[styles.card, themed.card, unread && styles.cardUnread, unread && themed.cardUnread]} onPress={() => handleOpen(item)}>
         <ActorAvatar name={item.actor_name} uri={item.actor_avatar_url} />
         <View style={styles.body}>
           <View style={styles.topRow}>
-            <Text style={styles.text} numberOfLines={2}>{item.text}</Text>
+            <Text style={[styles.text, themed.text]} numberOfLines={2}>{item.text}</Text>
             <View style={[styles.iconBadge, { backgroundColor: `${icon.color}22` }]}>
               <MaterialIcons name={icon.name} size={16} color={icon.color} />
             </View>
           </View>
-          <Text style={styles.time}>{formatTime(item.created_at)}</Text>
+          <Text style={[styles.time, themed.time]}>{formatTime(item.created_at)}</Text>
         </View>
       </TouchableOpacity>
     );
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.container, themed.container]} edges={['top']}>
+      <View style={[styles.header, themed.header]}>
         <View>
-          <Text style={styles.title}>Bildirişlər</Text>
-          <Text style={styles.subtitle}>Paylaşım, follow və mesaj xəbərləri</Text>
+          <Text style={[styles.title, themed.title]}>{t.notifications}</Text>
+          <Text style={[styles.subtitle, themed.subtitle]}>{t.notificationsSubtitle}</Text>
         </View>
-        <TouchableOpacity style={styles.iconButton} onPress={handleReadAll}>
-          <MaterialIcons name="done-all" size={20} color="#e6edf3" />
+        <TouchableOpacity style={[styles.iconButton, themed.iconButton]} onPress={handleReadAll}>
+          <MaterialIcons name="done-all" size={20} color={colors.text} />
         </TouchableOpacity>
       </View>
 
       {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color="#6366f1" />
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : (
         <FlatList
@@ -140,8 +163,8 @@ export default function NotificationsScreen({ navigation }) {
           keyExtractor={(item) => item.id?.toString() ?? Math.random().toString()}
           renderItem={renderItem}
           contentContainerStyle={styles.listContent}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#6366f1" />}
-          ListEmptyComponent={<Text style={styles.emptyText}>Hələ bildiriş yoxdur.</Text>}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />}
+          ListEmptyComponent={<Text style={[styles.emptyText, themed.emptyText]}>Hələ bildiriş yoxdur.</Text>}
         />
       )}
     </SafeAreaView>

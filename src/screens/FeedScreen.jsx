@@ -4,7 +4,10 @@ import {
   Alert,
   FlatList,
   Image,
+  KeyboardAvoidingView,
+  Linking,
   Modal,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -16,7 +19,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
+import { ResizeMode, Video } from 'expo-av';
 import { AuthContext } from '../context/AuthContext';
+import { PreferencesContext } from '../context/PreferencesContext';
 import JobApplicationModal from '../components/JobApplicationModal';
 import * as api from '../api';
 
@@ -25,7 +31,7 @@ const POST_TYPES = [
   { id: 'GIT', label: 'Git', icon: 'code', color: '#58a6ff' },
   { id: 'DEPLOY', label: 'Deploy', icon: 'cloud-upload', color: '#3fb950' },
   { id: 'MEDIA', label: 'Media', icon: 'videocam', color: '#818cf8' },
-  { id: 'JOB', label: 'Is', icon: 'work', color: '#fbbf24' },
+  { id: 'JOB', label: 'İş', icon: 'work', color: '#fbbf24' },
 ];
 
 const TRENDING = ['#reactnative', '#golang', '#kubernetes', '#ai'];
@@ -73,6 +79,21 @@ function typeStyle(type) {
   return POST_TYPES.find((item) => item.id === type) || POST_TYPES[0];
 }
 
+async function openExternalUrl(url) {
+  const value = String(url || '').trim();
+  if (!/^https?:\/\//i.test(value)) return;
+  try {
+    const supported = await Linking.canOpenURL(value);
+    if (!supported) {
+      Alert.alert('Link açılmadı', 'Bu linki açmaq mümkün olmadı.');
+      return;
+    }
+    await Linking.openURL(value);
+  } catch (error) {
+    Alert.alert('Link xətası', error.message);
+  }
+}
+
 function AuthorAvatar({ name, avatarUrl }) {
   const letter = String(name || 'U').slice(0, 1).toUpperCase();
   if (avatarUrl) {
@@ -116,13 +137,19 @@ function GitPayload({ post }) {
 
 function DeployPayload({ post }) {
   const { metadata } = post;
+  const deployUrl = metadata.url || metadata.link || metadata.deployUrl;
   return (
     <View style={styles.deployBox}>
       <View style={styles.payloadHeader}>
         <MaterialIcons name="cloud-upload" size={18} color="#3fb950" />
         <View style={styles.payloadBody}>
           <Text style={styles.payloadTitle}>{metadata.service || 'Deploy'} -> {metadata.env || 'Production'}</Text>
-          <Text style={styles.deployText}>Deploy ugurlu - {metadata.duration || '2m 30s'}</Text>
+          <Text style={styles.deployText}>Deploy uğurlu - {metadata.duration || '2m 30s'}</Text>
+          {!!deployUrl && (
+            <TouchableOpacity onPress={() => openExternalUrl(deployUrl)}>
+              <Text style={styles.payloadLink} numberOfLines={1}>{deployUrl}</Text>
+            </TouchableOpacity>
+          )}
         </View>
         <Text style={styles.liveBadge}>LIVE</Text>
       </View>
@@ -132,12 +159,40 @@ function DeployPayload({ post }) {
 
 function MediaPayload({ post }) {
   const { metadata } = post;
+  const mediaUrl = metadata.mediaUrl || metadata.url;
+  const mediaType = metadata.mediaType || (String(metadata.mimeType || '').startsWith('image/') ? 'image' : 'video');
   return (
-    <View style={styles.mediaBox}>
-      <MaterialIcons name="play-circle-outline" size={42} color="#818cf8" />
-      <Text style={styles.mediaTitle}>{metadata.title || 'Media paylasim'}</Text>
-      <Text style={styles.mediaLink}>{metadata.url || 'Demo/link elave edilmeyib'}</Text>
-    </View>
+    <TouchableOpacity
+      style={styles.mediaBox}
+      activeOpacity={mediaUrl ? 0.82 : 1}
+      onPress={() => {
+        if (mediaType !== 'video') openExternalUrl(mediaUrl);
+      }}
+      disabled={!mediaUrl || mediaType === 'video'}
+    >
+      {mediaType === 'image' && mediaUrl ? (
+        <Image source={{ uri: mediaUrl }} style={styles.mediaPreviewImage} />
+      ) : mediaType === 'video' && mediaUrl ? (
+        <Video
+          source={{ uri: mediaUrl }}
+          style={styles.mediaPreviewVideo}
+          resizeMode={ResizeMode.COVER}
+          useNativeControls
+          shouldPlay={false}
+          isLooping={false}
+        />
+      ) : (
+        <View style={styles.mediaPreviewIcon}>
+          <MaterialIcons name="play-circle-outline" size={46} color="#c4b5fd" />
+        </View>
+      )}
+      <View style={styles.mediaOverlay}>
+        <Text style={styles.mediaTitle}>{metadata.title || 'Media paylaşım'}</Text>
+        <Text style={styles.mediaLink} numberOfLines={1}>
+          {mediaType === 'video' && mediaUrl ? 'Video player' : mediaUrl ? 'Açmaq üçün toxun' : 'Media əlavə edilməyib'}
+        </Text>
+      </View>
+    </TouchableOpacity>
   );
 }
 
@@ -180,9 +235,16 @@ function PostPayload({ post, onApplyJob }) {
 }
 
 function PostCard({ post, onPress, onAuthorPress, onLike, onBookmark, onApplyJob }) {
+  const { theme } = useContext(PreferencesContext);
+  const colors = theme.colors;
+  const themed = useMemo(() => ({
+    card: { backgroundColor: colors.surface, borderColor: colors.border },
+    text: { color: colors.text },
+    muted: { color: colors.muted },
+  }), [colors]);
   const kind = typeStyle(post.type);
   return (
-    <Pressable style={styles.postCard} onPress={() => onPress(post)}>
+    <Pressable style={[styles.postCard, themed.card]} onPress={() => onPress(post)}>
       <View style={styles.postHeader}>
         <TouchableOpacity
           style={styles.authorTap}
@@ -193,8 +255,8 @@ function PostCard({ post, onPress, onAuthorPress, onLike, onBookmark, onApplyJob
         >
           <AuthorAvatar name={post.authorName} avatarUrl={post.authorAvatar} />
           <View style={styles.authorBlock}>
-            <Text style={styles.postUser}>{post.authorName}</Text>
-            <Text style={styles.postTime}>{post.authorRole} - {formatTime(post.createdAt)}</Text>
+            <Text style={[styles.postUser, themed.text]}>{post.authorName}</Text>
+            <Text style={[styles.postTime, themed.muted]}>{post.authorRole} - {formatTime(post.createdAt)}</Text>
           </View>
         </TouchableOpacity>
         <View style={[styles.typeBadge, { borderColor: kind.color, backgroundColor: `${kind.color}18` }]}>
@@ -202,7 +264,7 @@ function PostCard({ post, onPress, onAuthorPress, onLike, onBookmark, onApplyJob
         </View>
       </View>
 
-      <Text style={styles.postCaption}>{post.caption}</Text>
+      <Text style={[styles.postCaption, themed.text]}>{post.caption}</Text>
       {post.tags.length > 0 && (
         <View style={styles.tagsRow}>
           {post.tags.map((tag) => (
@@ -222,11 +284,11 @@ function PostCard({ post, onPress, onAuthorPress, onLike, onBookmark, onApplyJob
           }}
         >
           <MaterialIcons name={post.likedByMe ? 'favorite' : 'favorite-border'} size={18} color={post.likedByMe ? '#f85149' : '#8b949e'} />
-          <Text style={[styles.metaText, post.likedByMe && styles.likeTextActive]}>{post.likeCount}</Text>
+          <Text style={[styles.metaText, themed.muted, post.likedByMe && styles.likeTextActive]}>{post.likeCount}</Text>
         </TouchableOpacity>
         <View style={styles.actionButton}>
           <MaterialIcons name="chat-bubble-outline" size={18} color="#8b949e" />
-          <Text style={styles.metaText}>{post.commentCount}</Text>
+          <Text style={[styles.metaText, themed.muted]}>{post.commentCount}</Text>
         </View>
         <TouchableOpacity
           style={styles.actionButton}
@@ -236,7 +298,7 @@ function PostCard({ post, onPress, onAuthorPress, onLike, onBookmark, onApplyJob
           }}
         >
           <MaterialIcons name={post.bookmarkedByMe ? 'bookmark' : 'bookmark-border'} size={18} color={post.bookmarkedByMe ? '#fbbf24' : '#8b949e'} />
-          <Text style={[styles.metaText, post.bookmarkedByMe && styles.bookmarkTextActive]}>{post.bookmarkCount}</Text>
+          <Text style={[styles.metaText, themed.muted, post.bookmarkedByMe && styles.bookmarkTextActive]}>{post.bookmarkCount}</Text>
         </TouchableOpacity>
       </View>
     </Pressable>
@@ -244,6 +306,17 @@ function PostCard({ post, onPress, onAuthorPress, onLike, onBookmark, onApplyJob
 }
 
 function ComposeModal({ visible, onClose, onSubmit, submitting }) {
+  const { theme } = useContext(PreferencesContext);
+  const colors = theme.colors;
+  const themed = useMemo(() => ({
+    sheet: { backgroundColor: colors.surface, borderColor: colors.border },
+    title: { color: colors.text },
+    captionInput: { backgroundColor: colors.input, borderColor: colors.border, color: colors.text },
+    extraBox: { backgroundColor: colors.background, borderColor: colors.border },
+    input: { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text },
+    footer: { borderTopColor: colors.border },
+    muted: { color: colors.muted },
+  }), [colors]);
   const [type, setType] = useState('TEXT');
   const [caption, setCaption] = useState('');
   const [repo, setRepo] = useState('');
@@ -251,8 +324,10 @@ function ComposeModal({ visible, onClose, onSubmit, submitting }) {
   const [commitMsg, setCommitMsg] = useState('');
   const [service, setService] = useState('Railway');
   const [env, setEnv] = useState('Production');
+  const [deployUrl, setDeployUrl] = useState('');
   const [mediaTitle, setMediaTitle] = useState('');
   const [mediaUrl, setMediaUrl] = useState('');
+  const [selectedMedia, setSelectedMedia] = useState(null);
   const [tagInput, setTagInput] = useState('');
   const [tags, setTags] = useState([]);
   const [requirementInput, setRequirementInput] = useState('');
@@ -262,11 +337,19 @@ function ComposeModal({ visible, onClose, onSubmit, submitting }) {
   const [salary, setSalary] = useState('');
   const [employmentType, setEmploymentType] = useState('Full-time');
   const [deadline, setDeadline] = useState('');
+  const [uploadingMedia, setUploadingMedia] = useState(false);
 
   const activeType = typeStyle(type);
+  const hasMedia = !!mediaUrl.trim() || !!selectedMedia;
+  const working = submitting || uploadingMedia;
+  const modalInputStyle = [styles.modalInput, themed.input];
+  const inlineInputStyle = [styles.inlineInput, themed.input];
+  const extraBoxStyle = [styles.extraBox, themed.extraBox];
+  const labelStyle = [styles.fieldLabel, themed.muted];
   const canSubmit = caption.trim().length > 0
     && (type !== 'GIT' || repo.trim())
-    && (type !== 'JOB' || (company.trim() && requirements.length > 0));
+    && (type !== 'JOB' || (company.trim() && requirements.length > 0))
+    && (type !== 'MEDIA' || hasMedia);
 
   const addTag = () => {
     const value = tagInput.trim().replace(/^#/, '');
@@ -280,6 +363,24 @@ function ComposeModal({ visible, onClose, onSubmit, submitting }) {
     setRequirementInput('');
   };
 
+  const pickMedia = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('İcazə lazımdır', 'Media paylaşmaq üçün qalereya icazəsi ver.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.All,
+      allowsEditing: false,
+      quality: 0.82,
+      videoMaxDuration: 90,
+    });
+
+    if (result.canceled || !result.assets?.[0]) return;
+    setSelectedMedia(result.assets[0]);
+  };
+
   const reset = () => {
     setCaption('');
     setRepo('');
@@ -287,8 +388,10 @@ function ComposeModal({ visible, onClose, onSubmit, submitting }) {
     setCommitMsg('');
     setService('Railway');
     setEnv('Production');
+    setDeployUrl('');
     setMediaTitle('');
     setMediaUrl('');
+    setSelectedMedia(null);
     setTagInput('');
     setTags([]);
     setRequirementInput('');
@@ -302,85 +405,108 @@ function ComposeModal({ visible, onClose, onSubmit, submitting }) {
   };
 
   const handleSubmit = async () => {
-    if (!canSubmit) return;
+    if (!canSubmit || working) return;
     const metadata = {};
-    if (type === 'GIT') {
-      metadata.repo = repo.trim();
-      metadata.branch = branch.trim() || 'main';
-      metadata.commits = [
-        {
-          hash: Math.random().toString(16).slice(2, 9),
-          msg: commitMsg.trim() || caption.trim(),
-        },
-      ];
-      metadata.stats = { additions: 0, deletions: 0, files: 1 };
-    }
-    if (type === 'DEPLOY') {
-      metadata.service = service.trim() || 'Deploy';
-      metadata.env = env.trim() || 'Production';
-      metadata.duration = '2m 30s';
-    }
-    if (type === 'MEDIA') {
-      metadata.title = mediaTitle.trim() || 'Media paylasim';
-      metadata.url = mediaUrl.trim();
-    }
-    if (type === 'JOB') {
-      metadata.company = company.trim();
-      metadata.location = location.trim() || 'Remote';
-      metadata.salary = salary.trim();
-      metadata.employmentType = employmentType.trim() || 'Full-time';
-      metadata.deadline = deadline.trim();
-      metadata.requirements = requirements;
-    }
+    setUploadingMedia(true);
+    try {
+      if (type === 'GIT') {
+        metadata.repo = repo.trim();
+        metadata.branch = branch.trim() || 'main';
+        metadata.commits = [
+          {
+            hash: Math.random().toString(16).slice(2, 9),
+            msg: commitMsg.trim() || caption.trim(),
+          },
+        ];
+        metadata.stats = { additions: 0, deletions: 0, files: 1 };
+      }
+      if (type === 'DEPLOY') {
+        metadata.service = service.trim() || 'Deploy';
+        metadata.env = env.trim() || 'Production';
+        metadata.duration = '2m 30s';
+        metadata.url = deployUrl.trim();
+      }
+      if (type === 'MEDIA') {
+        let uploadedMedia = null;
+        if (selectedMedia) {
+          uploadedMedia = await api.uploadPostMedia({
+            uri: selectedMedia.uri,
+            name: selectedMedia.fileName || selectedMedia.name || (selectedMedia.type === 'video' ? 'video.mp4' : 'image.jpg'),
+            type: selectedMedia.mimeType || (selectedMedia.type === 'video' ? 'video/mp4' : 'image/jpeg'),
+            mediaType: selectedMedia.type || 'media',
+          });
+        }
+        metadata.title = mediaTitle.trim() || 'Media paylaşım';
+        metadata.url = mediaUrl.trim() || uploadedMedia?.mediaUrl || '';
+        metadata.mediaUrl = uploadedMedia?.mediaUrl || '';
+        metadata.mediaType = uploadedMedia?.mediaType || selectedMedia?.type || 'link';
+        metadata.mimeType = uploadedMedia?.mimeType || selectedMedia?.mimeType || '';
+        metadata.fileName = uploadedMedia?.mediaFileName || selectedMedia?.fileName || selectedMedia?.name || '';
+      }
+      if (type === 'JOB') {
+        metadata.company = company.trim();
+        metadata.location = location.trim() || 'Remote';
+        metadata.salary = salary.trim();
+        metadata.employmentType = employmentType.trim() || 'Full-time';
+        metadata.deadline = deadline.trim();
+        metadata.requirements = requirements;
+      }
 
-    await onSubmit({
-      title: caption.trim().slice(0, 80),
-      caption: caption.trim(),
-      body: caption.trim(),
-      post_type: type,
-      metadata,
-      tags,
-    });
-    reset();
+      await onSubmit({
+        title: caption.trim().slice(0, 80),
+        caption: caption.trim(),
+        body: caption.trim(),
+        post_type: type,
+        metadata,
+        tags,
+      });
+      reset();
+    } catch (error) {
+      Alert.alert('Paylaşım xətası', error.response?.data?.error || error.response?.data?.message || error.message);
+    } finally {
+      setUploadingMedia(false);
+    }
   };
 
   const renderExtraFields = () => {
     if (type === 'GIT') {
       return (
-        <View style={styles.extraBox}>
-          <Text style={styles.fieldLabel}>REPO ADI *</Text>
-          <TextInput value={repo} onChangeText={setRepo} placeholder="username/my-project" placeholderTextColor="#4b5563" style={styles.modalInput} autoCapitalize="none" />
-          <Text style={styles.fieldLabel}>BRANCH</Text>
-          <TextInput value={branch} onChangeText={setBranch} placeholder="feat/new-feature" placeholderTextColor="#4b5563" style={styles.modalInput} autoCapitalize="none" />
-          <Text style={styles.fieldLabel}>COMMIT MESAJI</Text>
-          <TextInput value={commitMsg} onChangeText={setCommitMsg} placeholder="Fix: login validation" placeholderTextColor="#4b5563" style={styles.modalInput} />
+        <View style={extraBoxStyle}>
+          <Text style={labelStyle}>REPO ADI *</Text>
+          <TextInput value={repo} onChangeText={setRepo} placeholder="username/my-project" placeholderTextColor={colors.muted} style={modalInputStyle} autoCapitalize="none" />
+          <Text style={labelStyle}>BRANCH</Text>
+          <TextInput value={branch} onChangeText={setBranch} placeholder="feat/new-feature" placeholderTextColor={colors.muted} style={modalInputStyle} autoCapitalize="none" />
+          <Text style={labelStyle}>COMMIT MESAJI</Text>
+          <TextInput value={commitMsg} onChangeText={setCommitMsg} placeholder="Fix: login validation" placeholderTextColor={colors.muted} style={modalInputStyle} />
         </View>
       );
     }
     if (type === 'DEPLOY') {
       return (
-        <View style={styles.extraBox}>
-          <Text style={styles.fieldLabel}>SERVIS</Text>
-          <TextInput value={service} onChangeText={setService} placeholder="Railway, Vercel, Kubernetes" placeholderTextColor="#4b5563" style={styles.modalInput} />
-          <Text style={styles.fieldLabel}>MUHIT</Text>
-          <TextInput value={env} onChangeText={setEnv} placeholder="Production" placeholderTextColor="#4b5563" style={styles.modalInput} />
+        <View style={extraBoxStyle}>
+          <Text style={labelStyle}>SERVIS</Text>
+          <TextInput value={service} onChangeText={setService} placeholder="Railway, Vercel, Kubernetes" placeholderTextColor={colors.muted} style={modalInputStyle} />
+          <Text style={labelStyle}>MUHIT</Text>
+          <TextInput value={env} onChangeText={setEnv} placeholder="Production" placeholderTextColor={colors.muted} style={modalInputStyle} />
+          <Text style={labelStyle}>DEPLOY LINKI</Text>
+          <TextInput value={deployUrl} onChangeText={setDeployUrl} placeholder="https://my-app.railway.app" placeholderTextColor={colors.muted} style={modalInputStyle} autoCapitalize="none" keyboardType="url" />
         </View>
       );
     }
     if (type === 'JOB') {
       return (
-        <View style={styles.extraBox}>
-          <Text style={styles.fieldLabel}>ŞİRKƏT *</Text>
-          <TextInput value={company} onChangeText={setCompany} placeholder="DevFeed MMC" placeholderTextColor="#4b5563" style={styles.modalInput} />
-          <Text style={styles.fieldLabel}>LOKASİYA</Text>
-          <TextInput value={location} onChangeText={setLocation} placeholder="Bakı, Remote, Hybrid..." placeholderTextColor="#4b5563" style={styles.modalInput} />
-          <Text style={styles.fieldLabel}>İŞ TİPİ</Text>
-          <TextInput value={employmentType} onChangeText={setEmploymentType} placeholder="Full-time, Part-time, Freelance" placeholderTextColor="#4b5563" style={styles.modalInput} />
-          <Text style={styles.fieldLabel}>MAAŞ ARALIĞI</Text>
-          <TextInput value={salary} onChangeText={setSalary} placeholder="1500-2500 AZN" placeholderTextColor="#4b5563" style={styles.modalInput} />
-          <Text style={styles.fieldLabel}>SON TARİX</Text>
-          <TextInput value={deadline} onChangeText={setDeadline} placeholder="30.06.2026" placeholderTextColor="#4b5563" style={styles.modalInput} />
-          <Text style={styles.fieldLabel}>TELEBLER *</Text>
+        <View style={extraBoxStyle}>
+          <Text style={labelStyle}>ŞİRKƏT *</Text>
+          <TextInput value={company} onChangeText={setCompany} placeholder="DevFeed MMC" placeholderTextColor={colors.muted} style={modalInputStyle} />
+          <Text style={labelStyle}>LOKASİYA</Text>
+          <TextInput value={location} onChangeText={setLocation} placeholder="Bakı, Remote, Hybrid..." placeholderTextColor={colors.muted} style={modalInputStyle} />
+          <Text style={labelStyle}>İŞ TİPİ</Text>
+          <TextInput value={employmentType} onChangeText={setEmploymentType} placeholder="Full-time, Part-time, Freelance" placeholderTextColor={colors.muted} style={modalInputStyle} />
+          <Text style={labelStyle}>MAAŞ ARALIĞI</Text>
+          <TextInput value={salary} onChangeText={setSalary} placeholder="1500-2500 AZN" placeholderTextColor={colors.muted} style={modalInputStyle} />
+          <Text style={labelStyle}>SON TARİX</Text>
+          <TextInput value={deadline} onChangeText={setDeadline} placeholder="30.06.2026" placeholderTextColor={colors.muted} style={modalInputStyle} />
+          <Text style={labelStyle}>TƏLƏBLƏR *</Text>
           <View style={styles.chipWrap}>
             {requirements.map((item) => (
               <TouchableOpacity key={item} style={styles.removeChip} onPress={() => setRequirements((prev) => prev.filter((entry) => entry !== item))}>
@@ -389,7 +515,7 @@ function ComposeModal({ visible, onClose, onSubmit, submitting }) {
             ))}
           </View>
           <View style={styles.inlineInputRow}>
-            <TextInput value={requirementInput} onChangeText={setRequirementInput} placeholder="Node.js, Docker..." placeholderTextColor="#4b5563" style={styles.inlineInput} />
+            <TextInput value={requirementInput} onChangeText={setRequirementInput} placeholder="Node.js, Docker..." placeholderTextColor={colors.muted} style={inlineInputStyle} />
             <TouchableOpacity style={styles.addSmallButton} onPress={addRequirement}>
               <Text style={styles.addSmallButtonText}>+</Text>
             </TouchableOpacity>
@@ -399,11 +525,18 @@ function ComposeModal({ visible, onClose, onSubmit, submitting }) {
     }
     if (type === 'MEDIA') {
       return (
-        <View style={styles.extraBox}>
-          <Text style={styles.fieldLabel}>MEDIA BASLIGI</Text>
-          <TextInput value={mediaTitle} onChangeText={setMediaTitle} placeholder="Demo video, UI preview..." placeholderTextColor="#4b5563" style={styles.modalInput} />
-          <Text style={styles.fieldLabel}>DEMO / MEDIA LINKI</Text>
-          <TextInput value={mediaUrl} onChangeText={setMediaUrl} placeholder="https://..." placeholderTextColor="#4b5563" style={styles.modalInput} autoCapitalize="none" />
+        <View style={extraBoxStyle}>
+          <Text style={labelStyle}>MEDIA BAŞLIĞI</Text>
+          <TextInput value={mediaTitle} onChangeText={setMediaTitle} placeholder="Demo video, UI preview..." placeholderTextColor={colors.muted} style={modalInputStyle} />
+          <TouchableOpacity style={styles.mediaPickerButton} onPress={pickMedia}>
+            <MaterialIcons name={selectedMedia ? 'perm-media' : 'add-photo-alternate'} size={19} color="#c4b5fd" />
+            <View style={styles.mediaPickerTextBlock}>
+              <Text style={styles.mediaPickerTitle}>{selectedMedia?.fileName || selectedMedia?.name || 'Şəkil və ya video seç'}</Text>
+              <Text style={styles.mediaPickerMeta}>{selectedMedia ? 'Posta yüklənəcək' : 'Instagram/TikTok kimi qalereyadan paylaş'}</Text>
+            </View>
+          </TouchableOpacity>
+          <Text style={labelStyle}>İSTƏYƏ BAĞLI LİNK</Text>
+          <TextInput value={mediaUrl} onChangeText={setMediaUrl} placeholder="https://demo-link.com" placeholderTextColor={colors.muted} style={modalInputStyle} autoCapitalize="none" keyboardType="url" />
         </View>
       );
     }
@@ -412,8 +545,8 @@ function ComposeModal({ visible, onClose, onSubmit, submitting }) {
 
   const renderTagFields = () => {
     return (
-      <View style={styles.extraBox}>
-        <Text style={styles.fieldLabel}>HASHTAG</Text>
+      <View style={extraBoxStyle}>
+        <Text style={labelStyle}>HASHTAG</Text>
         <View style={styles.chipWrap}>
           {tags.map((tag) => (
             <TouchableOpacity key={tag} style={styles.removeChip} onPress={() => setTags((prev) => prev.filter((entry) => entry !== tag))}>
@@ -422,7 +555,7 @@ function ComposeModal({ visible, onClose, onSubmit, submitting }) {
           ))}
         </View>
         <View style={styles.inlineInputRow}>
-          <TextInput value={tagInput} onChangeText={setTagInput} placeholder="#reactnative" placeholderTextColor="#4b5563" style={styles.inlineInput} autoCapitalize="none" />
+          <TextInput value={tagInput} onChangeText={setTagInput} placeholder="#reactnative" placeholderTextColor={colors.muted} style={inlineInputStyle} autoCapitalize="none" />
           <TouchableOpacity style={styles.addSmallButton} onPress={addTag}>
             <Text style={styles.addSmallButtonText}>+</Text>
           </TouchableOpacity>
@@ -433,63 +566,74 @@ function ComposeModal({ visible, onClose, onSubmit, submitting }) {
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={styles.modalOverlay}>
-        <View style={styles.composeSheet}>
+      <KeyboardAvoidingView
+        style={styles.modalOverlay}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 18 : 0}
+      >
+        <View style={[styles.composeSheet, themed.sheet]}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Yeni Paylasim</Text>
+            <Text style={[styles.modalTitle, themed.title]}>Yeni Paylaşım</Text>
             <TouchableOpacity onPress={onClose}>
-              <MaterialIcons name="close" size={24} color="#8b949e" />
+              <MaterialIcons name="close" size={24} color={colors.muted} />
             </TouchableOpacity>
           </View>
 
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.typeTabs}>
-            {POST_TYPES.map((item) => {
-              const active = item.id === type;
-              return (
-                <TouchableOpacity
-                  key={item.id}
-                  style={[styles.typeTab, active && { borderColor: item.color, backgroundColor: `${item.color}18` }]}
-                  onPress={() => setType(item.id)}
-                >
-                  <MaterialIcons name={item.icon} size={15} color={active ? item.color : '#8b949e'} />
-                  <Text style={[styles.typeTabText, active && { color: item.color }]}>{item.label}</Text>
-                </TouchableOpacity>
-              );
-            })}
+          <ScrollView
+            style={styles.composeScroll}
+            contentContainerStyle={styles.composeScrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.typeTabs}>
+              {POST_TYPES.map((item) => {
+                const active = item.id === type;
+                return (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={[styles.typeTab, active && { borderColor: item.color, backgroundColor: `${item.color}18` }]}
+                    onPress={() => setType(item.id)}
+                  >
+                    <MaterialIcons name={item.icon} size={15} color={active ? item.color : '#8b949e'} />
+                    <Text style={[styles.typeTabText, active && { color: item.color }]}>{item.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            <TextInput
+              value={caption}
+              onChangeText={setCaption}
+              placeholder={
+                type === 'GIT'
+                  ? 'Commit haqqında nə bildirmək istəyirsən?'
+                  : type === 'DEPLOY'
+                    ? 'Deploy haqqında qeyd...'
+                    : type === 'JOB'
+                      ? 'Vakansiya haqqında ətraflı izah...'
+                      : 'Nə düşünürsən?'
+              }
+              placeholderTextColor={colors.muted}
+              style={[styles.captionInput, themed.captionInput]}
+              multiline
+              numberOfLines={4}
+            />
+
+            {renderExtraFields()}
+            {renderTagFields()}
           </ScrollView>
 
-          <TextInput
-            value={caption}
-            onChangeText={setCaption}
-            placeholder={
-              type === 'GIT'
-                ? 'Commit haqqinda ne bildirmek isteyirsen?'
-                : type === 'DEPLOY'
-                  ? 'Deploy haqqinda qeyd...'
-                  : type === 'JOB'
-                    ? 'Vakansiya haqqinda etrafli izah...'
-                    : 'Ne dusunursen?'
-            }
-            placeholderTextColor="#4b5563"
-            style={styles.captionInput}
-            multiline
-            numberOfLines={4}
-          />
-
-          {renderExtraFields()}
-          {renderTagFields()}
-
-          <View style={styles.modalFooter}>
+          <View style={[styles.modalFooter, themed.footer]}>
             <View style={styles.publicInfo}>
-              <MaterialIcons name="public" size={15} color="#8b949e" />
-              <Text style={styles.publicInfoText}>Hamiya aciq</Text>
+              <MaterialIcons name="public" size={15} color={colors.muted} />
+              <Text style={[styles.publicInfoText, themed.muted]}>Hamıya açıq</Text>
             </View>
             <TouchableOpacity
               style={[styles.submitButton, { backgroundColor: canSubmit ? activeType.color : '#21262d' }]}
               onPress={handleSubmit}
-              disabled={!canSubmit || submitting}
+              disabled={!canSubmit || working}
             >
-              {submitting ? (
+              {working ? (
                 <ActivityIndicator color="#ffffff" />
               ) : (
                 <Text style={styles.submitButtonText}>Paylas</Text>
@@ -497,13 +641,24 @@ function ComposeModal({ visible, onClose, onSubmit, submitting }) {
             </TouchableOpacity>
           </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
 
 export default function FeedScreen({ navigation }) {
   const { user } = useContext(AuthContext);
+  const { theme, t } = useContext(PreferencesContext);
+  const colors = theme.colors;
+  const themed = useMemo(() => ({
+    container: { backgroundColor: colors.background },
+    header: { backgroundColor: colors.background, borderBottomColor: colors.border },
+    title: { color: colors.text },
+    subtitle: { color: colors.muted },
+    quickComposer: { backgroundColor: colors.surface, borderColor: colors.border },
+    quickComposerText: { color: colors.muted },
+    emptyText: { color: colors.muted },
+  }), [colors]);
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -663,14 +818,14 @@ export default function FeedScreen({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.container, themed.container]} edges={['top']}>
+      <View style={[styles.header, themed.header]}>
         <View>
           <View style={styles.brandRow}>
             <MaterialIcons name="terminal" size={22} color="#6366f1" />
-            <Text style={styles.brandText}>dev<Text style={styles.brandAccent}>feed</Text></Text>
+            <Text style={[styles.brandText, themed.title]}>dev<Text style={styles.brandAccent}>feed</Text></Text>
           </View>
-          <Text style={styles.headerSubtitle}>Kod, deploy, media ve is elanlari</Text>
+          <Text style={[styles.headerSubtitle, themed.subtitle]}>{t.feedSubtitle}</Text>
         </View>
         <TouchableOpacity style={styles.plusButton} onPress={() => setComposeOpen(true)}>
           <MaterialIcons name="add" size={24} color="#ffffff" />
@@ -679,7 +834,7 @@ export default function FeedScreen({ navigation }) {
 
       {loading ? (
         <View style={styles.loaderContainer}>
-          <ActivityIndicator size="large" color="#7c3aed" />
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : (
         <FlatList
@@ -696,12 +851,12 @@ export default function FeedScreen({ navigation }) {
             />
           )}
           contentContainerStyle={styles.listContent}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#7c3aed" />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
           ListHeaderComponent={
             <View>
-              <TouchableOpacity style={styles.quickComposer} onPress={() => setComposeOpen(true)}>
+              <TouchableOpacity style={[styles.quickComposer, themed.quickComposer]} onPress={() => setComposeOpen(true)}>
                 <AuthorAvatar name={user?.name || user?.email || 'U'} avatarUrl={user?.avatar_url || user?.avatarUrl} />
-                <Text style={styles.quickComposerText}>Ne paylasmaq isteyirsen?</Text>
+                <Text style={[styles.quickComposerText, themed.quickComposerText]}>Nə paylaşmaq istəyirsən?</Text>
                 <MaterialIcons name="send" size={18} color="#6366f1" />
               </TouchableOpacity>
 
@@ -714,7 +869,7 @@ export default function FeedScreen({ navigation }) {
               </ScrollView>
             </View>
           }
-          ListEmptyComponent={<Text style={styles.emptyText}>Hele paylasim yoxdur. Ilk postu sen yaz.</Text>}
+          ListEmptyComponent={<Text style={[styles.emptyText, themed.emptyText]}>Hələ paylaşım yoxdur. İlk postu sən yaz.</Text>}
         />
       )}
 
@@ -925,10 +1080,29 @@ const styles = StyleSheet.create({
     minHeight: 150,
     borderColor: '#30215a',
     borderWidth: 1,
+    overflow: 'hidden',
+    marginTop: 4,
+  },
+  mediaPreviewImage: {
+    width: '100%',
+    height: 180,
+    backgroundColor: '#0d1117',
+  },
+  mediaPreviewVideo: {
+    width: '100%',
+    height: 220,
+    backgroundColor: '#0d1117',
+  },
+  mediaPreviewIcon: {
+    height: 150,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 16,
-    marginTop: 4,
+  },
+  mediaOverlay: {
+    borderTopColor: '#30215a',
+    borderTopWidth: 1,
+    padding: 12,
+    backgroundColor: 'rgba(21,17,38,0.95)',
   },
   jobBox: {
     backgroundColor: '#1c1200',
@@ -1043,6 +1217,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
   },
+  payloadLink: {
+    color: '#93c5fd',
+    fontSize: 12,
+    marginTop: 6,
+    textDecorationLine: 'underline',
+  },
   chipWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1117,6 +1297,12 @@ const styles = StyleSheet.create({
   typeTabs: {
     marginBottom: 14,
   },
+  composeScroll: {
+    flexGrow: 0,
+  },
+  composeScrollContent: {
+    paddingBottom: 8,
+  },
   typeTab: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1169,6 +1355,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: 11,
     paddingVertical: 10,
     marginBottom: 8,
+  },
+  mediaPickerButton: {
+    backgroundColor: '#161b22',
+    borderColor: '#312e81',
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  mediaPickerTextBlock: {
+    flex: 1,
+    marginLeft: 10,
+  },
+  mediaPickerTitle: {
+    color: '#e6edf3',
+    fontWeight: '900',
+  },
+  mediaPickerMeta: {
+    color: '#8b949e',
+    fontSize: 11,
+    marginTop: 3,
   },
   inlineInputRow: {
     flexDirection: 'row',

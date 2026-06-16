@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
+import { PreferencesContext } from '../context/PreferencesContext';
 import * as api from '../api';
 
 function parseMetadata(metadata) {
@@ -51,6 +52,23 @@ function Avatar({ name, uri, size = 42 }) {
 }
 
 export default function ExploreScreen({ navigation }) {
+  const { theme, t } = useContext(PreferencesContext);
+  const colors = theme.colors;
+  const themed = useMemo(() => ({
+    container: { backgroundColor: colors.background },
+    header: { backgroundColor: colors.background, borderBottomColor: colors.border },
+    title: { color: colors.text },
+    subtitle: { color: colors.muted },
+    searchRow: { backgroundColor: colors.surface, borderColor: colors.border },
+    searchInput: { color: colors.text },
+    tab: { backgroundColor: colors.surface, borderColor: colors.border },
+    tabActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+    resultCard: { backgroundColor: colors.surface, borderColor: colors.border },
+    resultTitle: { color: colors.text },
+    resultSubtitle: { color: colors.muted },
+    resultMeta: { color: colors.muted },
+    emptyText: { color: colors.muted },
+  }), [colors]);
   const [query, setQuery] = useState('');
   const [activeTab, setActiveTab] = useState('users');
   const [users, setUsers] = useState([]);
@@ -118,12 +136,12 @@ export default function ExploreScreen({ navigation }) {
   };
 
   const renderUser = ({ item }) => (
-    <TouchableOpacity style={styles.resultCard} onPress={() => navigation.navigate('UserProfile', { userId: item.id })}>
+    <TouchableOpacity style={[styles.resultCard, themed.resultCard]} onPress={() => navigation.navigate('UserProfile', { userId: item.id })}>
       <Avatar name={item.name} uri={item.avatar_url} />
       <View style={styles.resultBody}>
-        <Text style={styles.resultTitle}>{item.name || item.email}</Text>
-        <Text style={styles.resultSubtitle}>{item.role_sub || item.role || item.bio || 'DevFeed member'}</Text>
-        <Text style={styles.resultMeta}>{Number(item.followers_count || 0)} izləyici</Text>
+        <Text style={[styles.resultTitle, themed.resultTitle]}>{item.name || item.email}</Text>
+        <Text style={[styles.resultSubtitle, themed.resultSubtitle]}>{item.role_sub || item.role || item.bio || 'DevFeed member'}</Text>
+        <Text style={[styles.resultMeta, themed.resultMeta]}>{Number(item.followers_count || 0)} izləyici</Text>
       </View>
       <TouchableOpacity
         style={[styles.followButton, item.following_by_me && styles.followButtonActive]}
@@ -138,16 +156,16 @@ export default function ExploreScreen({ navigation }) {
   );
 
   const renderPost = ({ item }) => (
-    <TouchableOpacity style={styles.resultCard} onPress={() => navigation.navigate('PostDetail', { post: item })}>
+    <TouchableOpacity style={[styles.resultCard, themed.resultCard]} onPress={() => navigation.navigate('PostDetail', { post: item })}>
       <Avatar name={item.authorName} uri={item.authorAvatar} />
       <View style={styles.resultBody}>
         <View style={styles.postTop}>
           <Text style={styles.typeBadge}>{item.type}</Text>
-          <Text style={styles.resultMeta}>{item.authorName}</Text>
+          <Text style={[styles.resultMeta, themed.resultMeta]}>{item.authorName}</Text>
         </View>
-        <Text style={styles.resultTitle} numberOfLines={2}>{item.title}</Text>
-        <Text style={styles.resultSubtitle} numberOfLines={2}>{item.body || item.caption}</Text>
-        <Text style={styles.resultMeta}>{item.likeCount} bəyənmə · {item.commentCount} şərh</Text>
+        <Text style={[styles.resultTitle, themed.resultTitle]} numberOfLines={2}>{item.title}</Text>
+        <Text style={[styles.resultSubtitle, themed.resultSubtitle]} numberOfLines={2}>{item.body || item.caption}</Text>
+        <Text style={[styles.resultMeta, themed.resultMeta]}>{item.likeCount} bəyənmə · {item.commentCount} şərh</Text>
       </View>
     </TouchableOpacity>
   );
@@ -155,20 +173,20 @@ export default function ExploreScreen({ navigation }) {
   const data = activeTab === 'users' ? users : normalizedPosts;
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Kəşf</Text>
-        <Text style={styles.subtitle}>İstifadəçiləri və paylaşımları tap</Text>
+    <SafeAreaView style={[styles.container, themed.container]} edges={['top']}>
+      <View style={[styles.header, themed.header]}>
+        <Text style={[styles.title, themed.title]}>{t.explore}</Text>
+        <Text style={[styles.subtitle, themed.subtitle]}>{t.exploreSubtitle}</Text>
       </View>
 
-      <View style={styles.searchRow}>
-        <MaterialIcons name="search" size={20} color="#8b949e" />
+      <View style={[styles.searchRow, themed.searchRow]}>
+        <MaterialIcons name="search" size={20} color={colors.muted} />
         <TextInput
           value={query}
           onChangeText={setQuery}
-          placeholder="Ad, email, texnologiya və ya hashtag"
-          placeholderTextColor="#4b5563"
-          style={styles.searchInput}
+          placeholder={t.searchPlaceholder}
+          placeholderTextColor={colors.muted}
+          style={[styles.searchInput, themed.searchInput]}
           autoCapitalize="none"
           returnKeyType="search"
           onSubmitEditing={loadResults}
@@ -176,11 +194,11 @@ export default function ExploreScreen({ navigation }) {
       </View>
 
       <View style={styles.tabs}>
-        <TouchableOpacity style={[styles.tab, activeTab === 'users' && styles.tabActive]} onPress={() => setActiveTab('users')}>
+        <TouchableOpacity style={[styles.tab, themed.tab, activeTab === 'users' && styles.tabActive, activeTab === 'users' && themed.tabActive]} onPress={() => setActiveTab('users')}>
           <MaterialIcons name="people" size={18} color={activeTab === 'users' ? '#ffffff' : '#8b949e'} />
           <Text style={[styles.tabText, activeTab === 'users' && styles.tabTextActive]}>İstifadəçilər</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.tab, activeTab === 'posts' && styles.tabActive]} onPress={() => setActiveTab('posts')}>
+        <TouchableOpacity style={[styles.tab, themed.tab, activeTab === 'posts' && styles.tabActive, activeTab === 'posts' && themed.tabActive]} onPress={() => setActiveTab('posts')}>
           <MaterialIcons name="dynamic-feed" size={18} color={activeTab === 'posts' ? '#ffffff' : '#8b949e'} />
           <Text style={[styles.tabText, activeTab === 'posts' && styles.tabTextActive]}>Postlar</Text>
         </TouchableOpacity>
@@ -188,7 +206,7 @@ export default function ExploreScreen({ navigation }) {
 
       {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator color="#6366f1" size="large" />
+          <ActivityIndicator color={colors.primary} size="large" />
         </View>
       ) : (
         <FlatList
@@ -196,8 +214,8 @@ export default function ExploreScreen({ navigation }) {
           keyExtractor={(item) => item.id?.toString() ?? Math.random().toString()}
           renderItem={activeTab === 'users' ? renderUser : renderPost}
           contentContainerStyle={styles.listContent}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#6366f1" />}
-          ListEmptyComponent={<Text style={styles.emptyText}>Nəticə tapılmadı.</Text>}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />}
+          ListEmptyComponent={<Text style={[styles.emptyText, themed.emptyText]}>{t.noResults}</Text>}
         />
       )}
     </SafeAreaView>

@@ -111,9 +111,16 @@ const createSchema = async () => {
         id SERIAL PRIMARY KEY,
         post_id INTEGER REFERENCES posts(id) ON DELETE CASCADE,
         user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        parent_id INTEGER REFERENCES comments(id) ON DELETE CASCADE,
+        reply_to_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
         text TEXT NOT NULL,
         created_at TIMESTAMPTZ DEFAULT NOW()
       );
+    `);
+    await client.query(`
+      ALTER TABLE comments
+      ADD COLUMN IF NOT EXISTS parent_id INTEGER REFERENCES comments(id) ON DELETE CASCADE,
+      ADD COLUMN IF NOT EXISTS reply_to_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
     `);
     await client.query(`
       CREATE TABLE IF NOT EXISTS post_likes (
@@ -262,9 +269,16 @@ const createSchema = async () => {
         id SERIAL PRIMARY KEY,
         room_id INTEGER REFERENCES chat_rooms(id) ON DELETE CASCADE,
         user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        invited_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        role TEXT NOT NULL DEFAULT 'member',
         joined_at TIMESTAMPTZ DEFAULT NOW(),
         UNIQUE(room_id, user_id)
       );
+    `);
+    await client.query(`
+      ALTER TABLE room_members
+      ADD COLUMN IF NOT EXISTS invited_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'member';
     `);
 
     await client.query(`

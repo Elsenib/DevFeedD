@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -17,6 +18,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { AuthContext } from '../context/AuthContext';
+import { PreferencesContext } from '../context/PreferencesContext';
 import * as api from '../api';
 
 function formatTime(value) {
@@ -77,10 +79,86 @@ function RoomModal({ visible, creating, onClose, onCreate }) {
   );
 }
 
-export default function PublicChatScreen() {
+function InviteModal({ visible, inviting, roomName, onClose, onInvite }) {
+  const [email, setEmail] = useState('');
+
+  const handleInvite = async () => {
+    const value = email.trim().toLowerCase();
+    if (!value) return;
+    await onInvite(value);
+    setEmail('');
+  };
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={styles.modalOverlay}>
+        <View style={styles.roomSheet}>
+          <View style={styles.modalHeader}>
+            <View>
+              <Text style={styles.modalTitle}>İstifadəçi dəvət et</Text>
+              <Text style={styles.modalSubtitle}>{roomName || 'Chat otağı'}</Text>
+            </View>
+            <TouchableOpacity onPress={onClose}>
+              <MaterialIcons name="close" size={24} color="#8b949e" />
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.fieldLabel}>EMAIL</Text>
+          <TextInput
+            value={email}
+            onChangeText={setEmail}
+            placeholder="user@example.com"
+            placeholderTextColor="#4b5563"
+            style={styles.modalInput}
+            autoCapitalize="none"
+            keyboardType="email-address"
+          />
+          <TouchableOpacity
+            style={[styles.createButton, !email.trim() && styles.disabledButton]}
+            onPress={handleInvite}
+            disabled={inviting || !email.trim()}
+          >
+            {inviting ? <ActivityIndicator color="#ffffff" /> : <Text style={styles.createButtonText}>Dəvət göndər</Text>}
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function MessageAvatar({ name, uri }) {
+  const letter = String(name || 'U').slice(0, 1).toUpperCase();
+  if (uri) return <Image source={{ uri }} style={styles.messageAvatarImage} />;
+  return (
+    <View style={styles.messageAvatar}>
+      <Text style={styles.messageAvatarText}>{letter}</Text>
+    </View>
+  );
+}
+
+export default function PublicChatScreen({ route }) {
   const { user } = useContext(AuthContext);
+  const { theme, t } = useContext(PreferencesContext);
+  const colors = theme.colors;
+  const themed = useMemo(() => ({
+    container: { backgroundColor: colors.background },
+    header: { backgroundColor: colors.background, borderBottomColor: colors.border },
+    title: { color: colors.text },
+    subtitle: { color: colors.muted },
+    roomsBar: { borderBottomColor: colors.border },
+    roomChip: { backgroundColor: colors.surface, borderColor: colors.border },
+    roomChipActive: { backgroundColor: colors.primarySoft, borderColor: colors.primary },
+    roomName: { color: colors.muted },
+    roomNameActive: { color: colors.text },
+    bubble: { backgroundColor: colors.surface, borderColor: colors.border },
+    mineBubble: { backgroundColor: colors.primary, borderColor: colors.primary },
+    text: { color: colors.text },
+    composer: { backgroundColor: colors.background, borderTopColor: colors.border },
+    input: { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text },
+    emptyText: { color: colors.muted },
+  }), [colors]);
   const [rooms, setRooms] = useState([]);
   const [selectedRoom, setSelectedRoom] = useState(null);
+  const [members, setMembers] = useState([]);
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState('');
   const [loadingRooms, setLoadingRooms] = useState(true);
@@ -89,6 +167,8 @@ export default function PublicChatScreen() {
   const [sending, setSending] = useState(false);
   const [roomModalOpen, setRoomModalOpen] = useState(false);
   const [creatingRoom, setCreatingRoom] = useState(false);
+  const [inviteModalOpen, setInviteModalOpen] = useState(false);
+  const [inviting, setInviting] = useState(false);
 
   const selectedRoomId = selectedRoom?.id;
   const selectedRoomTitle = useMemo(() => selectedRoom?.name || 'Public chat', [selectedRoom?.name]);
@@ -125,8 +205,29 @@ export default function PublicChatScreen() {
   }, [loadRooms]);
 
   useEffect(() => {
+    const targetRoomId = route?.params?.roomId;
+    if (!targetRoomId || rooms.length === 0) return;
+    const targetRoom = rooms.find((room) => String(room.id) === String(targetRoomId));
+    if (targetRoom) setSelectedRoom(targetRoom);
+  }, [rooms, route?.params?.roomId]);
+
+  useEffect(() => {
     loadMessages();
   }, [loadMessages]);
+
+  const loadMembers = useCallback(async () => {
+    if (!selectedRoomId) return;
+    try {
+      const data = await api.fetchChatRoomMembers(selectedRoomId);
+      setMembers(Array.isArray(data) ? data : []);
+    } catch (error) {
+      setMembers([]);
+    }
+  }, [selectedRoomId]);
+
+  useEffect(() => {
+    loadMembers();
+  }, [loadMembers]);
 
   const handleSelectRoom = async (room) => {
     setSelectedRoom(room);
@@ -160,6 +261,22 @@ export default function PublicChatScreen() {
     }
   };
 
+  const handleInvite = async (email) => {
+    if (!selectedRoomId) return;
+    setInviting(true);
+    try {
+      await api.inviteToChatRoom(selectedRoomId, { email });
+      setInviteModalOpen(false);
+      Alert.alert('Dəvət göndərildi', `${email} otağa əlavə edildi və bildiriş aldı.`);
+      loadMembers();
+      loadRooms();
+    } catch (error) {
+      Alert.alert('Dəvət xətası', error.response?.data?.message || error.message);
+    } finally {
+      setInviting(false);
+    }
+  };
+
   const handleSend = async () => {
     const value = text.trim();
     if (!selectedRoomId || !value || sending) return;
@@ -186,11 +303,15 @@ export default function PublicChatScreen() {
     const mine = String(item.user_id || item.userId || '') === String(user?.id || '');
     return (
       <View style={[styles.messageRow, mine && styles.messageRowMine]}>
-        <View style={[styles.messageBubble, mine && styles.messageBubbleMine]}>
+        {!mine && <MessageAvatar name={item.name} uri={item.avatar_url} />}
+        <View style={[styles.messageBubble, themed.bubble, mine && styles.messageBubbleMine, mine && themed.mineBubble]}>
           <Text style={[styles.senderName, mine && styles.senderNameMine]}>
             {mine ? 'Sən' : item.name || 'İstifadəçi'}
           </Text>
-          <Text style={[styles.messageText, mine && styles.messageTextMine]}>{item.text}</Text>
+          {!mine && !!(item.role_sub || item.role) && (
+            <Text style={styles.senderRole}>{item.role_sub || item.role}</Text>
+          )}
+          <Text style={[styles.messageText, themed.text, mine && styles.messageTextMine]}>{item.text}</Text>
           <Text style={[styles.messageTime, mine && styles.messageTimeMine]}>{formatTime(item.created_at || item.createdAt)}</Text>
         </View>
       </View>
@@ -199,40 +320,45 @@ export default function PublicChatScreen() {
 
   if (loadingRooms) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color="#6366f1" />
+      <View style={[styles.center, themed.container]}>
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, themed.container]} edges={['top']}>
       <KeyboardAvoidingView
         style={styles.keyboard}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 72 : 0}
       >
-      <View style={styles.header}>
+      <View style={[styles.header, themed.header]}>
         <View>
-          <Text style={styles.title}>Public Chat</Text>
-          <Text style={styles.subtitle}>{selectedRoomTitle}</Text>
+          <Text style={[styles.title, themed.title]}>{t.publicChat}</Text>
+          <Text style={[styles.subtitle, themed.subtitle]}>{selectedRoomTitle} · {members.length || selectedRoom?.member_count || 0} üzv</Text>
         </View>
-        <TouchableOpacity style={styles.plusButton} onPress={() => setRoomModalOpen(true)}>
-          <MaterialIcons name="add" size={24} color="#ffffff" />
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity style={styles.plusButton} onPress={() => setInviteModalOpen(true)} disabled={!selectedRoomId}>
+            <MaterialIcons name="group-add" size={22} color="#ffffff" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.plusButton} onPress={() => setRoomModalOpen(true)}>
+            <MaterialIcons name="add" size={24} color="#ffffff" />
+          </TouchableOpacity>
+        </View>
       </View>
 
-      <View style={styles.roomsBar}>
+      <View style={[styles.roomsBar, themed.roomsBar]}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           {rooms.map((room) => {
             const active = room.id === selectedRoomId;
             return (
               <TouchableOpacity
                 key={room.id}
-                style={[styles.roomChip, active && styles.roomChipActive]}
+                style={[styles.roomChip, themed.roomChip, active && styles.roomChipActive, active && themed.roomChipActive]}
                 onPress={() => handleSelectRoom(room)}
               >
-                <Text style={[styles.roomName, active && styles.roomNameActive]}>{room.name}</Text>
+                <Text style={[styles.roomName, themed.roomName, active && styles.roomNameActive, active && themed.roomNameActive]}>{room.name}</Text>
                 <Text style={[styles.roomMeta, active && styles.roomMetaActive]}>{room.member_count || 0}</Text>
               </TouchableOpacity>
             );
@@ -242,7 +368,7 @@ export default function PublicChatScreen() {
 
       {loadingMessages ? (
         <View style={styles.messageLoader}>
-          <ActivityIndicator color="#6366f1" />
+          <ActivityIndicator color={colors.primary} />
         </View>
       ) : (
         <FlatList
@@ -250,18 +376,18 @@ export default function PublicChatScreen() {
           keyExtractor={(item) => item.id?.toString() ?? Math.random().toString()}
           renderItem={renderMessage}
           contentContainerStyle={styles.messagesContent}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#6366f1" />}
-          ListEmptyComponent={<Text style={styles.emptyText}>Bu otaqda hələ mesaj yoxdur.</Text>}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />}
+          ListEmptyComponent={<Text style={[styles.emptyText, themed.emptyText]}>Bu otaqda hələ mesaj yoxdur.</Text>}
         />
       )}
 
-      <View style={styles.composer}>
+      <View style={[styles.composer, themed.composer]}>
         <TextInput
           value={text}
           onChangeText={setText}
           placeholder="Mesaj, kod və ya link yaz..."
-          placeholderTextColor="#4b5563"
-          style={styles.input}
+          placeholderTextColor={colors.muted}
+          style={[styles.input, themed.input]}
           multiline
         />
         <TouchableOpacity
@@ -278,6 +404,13 @@ export default function PublicChatScreen() {
         creating={creatingRoom}
         onClose={() => setRoomModalOpen(false)}
         onCreate={handleCreateRoom}
+      />
+      <InviteModal
+        visible={inviteModalOpen}
+        inviting={inviting}
+        roomName={selectedRoomTitle}
+        onClose={() => setInviteModalOpen(false)}
+        onInvite={handleInvite}
       />
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -325,6 +458,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#6366f1',
     alignItems: 'center',
     justifyContent: 'center',
+    marginLeft: 8,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   roomsBar: {
     borderBottomColor: '#21262d',
@@ -375,6 +513,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-start',
     marginBottom: 10,
+    alignItems: 'flex-end',
   },
   messageRowMine: {
     justifyContent: 'flex-end',
@@ -397,6 +536,12 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     marginBottom: 4,
   },
+  senderRole: {
+    color: '#58a6ff',
+    fontSize: 10,
+    fontWeight: '800',
+    marginBottom: 5,
+  },
   senderNameMine: {
     color: '#c7d2fe',
   },
@@ -415,6 +560,27 @@ const styles = StyleSheet.create({
   },
   messageTimeMine: {
     color: '#c7d2fe',
+  },
+  messageAvatar: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#6366f1',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+  },
+  messageAvatarImage: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#21262d',
+    marginRight: 8,
+  },
+  messageAvatarText: {
+    color: '#ffffff',
+    fontSize: 11,
+    fontWeight: '900',
   },
   emptyText: {
     color: '#8b949e',
@@ -476,6 +642,11 @@ const styles = StyleSheet.create({
     color: '#e6edf3',
     fontSize: 17,
     fontWeight: '900',
+  },
+  modalSubtitle: {
+    color: '#8b949e',
+    fontSize: 12,
+    marginTop: 3,
   },
   fieldLabel: {
     color: '#8b949e',

@@ -16,7 +16,7 @@ Goal: deploy the Google/GitHub OAuth update, configure provider callback URLs on
 - [x] Add frontend API helpers for `POST /auth/social-login` and `PATCH /profile`.
 - [x] Add Google and GitHub buttons to both login and register screens.
 - [x] Replace social OAuth skeleton with backend-driven Google/GitHub OAuth start/callback/complete flow.
-- [ ] Add token persistence with a real mobile storage layer (`expo-secure-store` or AsyncStorage). Current code has only a web `localStorage` fallback.
+- [x] Add token persistence with a real mobile storage layer (`AsyncStorage`). App restart should keep the user logged in.
 - [x] Implement real Google OAuth provider flow and pass provider profile into `socialSignIn`.
 - [x] Implement real GitHub OAuth provider flow and pass provider profile into `socialSignIn`.
 - [x] Add email verification code flow for password registration.
@@ -42,7 +42,9 @@ Goal: deploy the Google/GitHub OAuth update, configure provider callback URLs on
 - [x] Wire Job apply button to `POST /posts/:id/apply`.
 - [x] Add post edit/delete UI.
 - [x] Improve post detail/comment UI to match `DevFeed.jsx`.
-- [ ] Add real media upload flow; current Media post stores title/link metadata.
+- [x] Add real media upload flow for feed composer with backend `/posts/media`.
+- [x] Add safe URL validation for deploy/media links on backend.
+- [x] Fix long Job composer modal so all fields are reachable with scroll/keyboard.
 
 ### P2 Messaging and Public Chat
 
@@ -51,13 +53,19 @@ Goal: deploy the Google/GitHub OAuth update, configure provider callback URLs on
 - [x] Add public chat backend routes: rooms, join/leave, messages.
 - [x] Add public chat screen/tab.
 - [x] Add SafeArea header fix for Feed, Messages, Chat, Public Chat, Post Detail.
+- [x] Improve DM/public chat bubble UI and spacing after APK feedback.
+- [x] Add invite people to public/group chats.
+- [x] Add group chat member listing/invite backend flow for chat rooms.
 - [ ] Decide realtime transport: Socket.io, SSE, or polling. Current flow uses manual refresh/poll-ready REST.
 
 ### P3 Moderation and Safety
 
 - [x] Apply existing text filter to public chat rooms/messages.
+- [x] Block unsafe post metadata links: non-http(s), local/private hosts, suspicious executable files, illegal terms.
 - [x] Add notification records for like, comment, bookmark, follow, message, and job apply.
+- [x] Add notification records for DM messages, comment replies, @mentions, chat invites, and chat mentions.
 - [ ] Centralize text/image moderation.
+- [ ] Add link reputation scanning / warning screen before opening unknown links.
 - [ ] Expand filters to AZ/TR/RU + better false-positive handling.
 - [ ] Add report/block/moderator workflow.
 
@@ -76,6 +84,27 @@ Goal: deploy the Google/GitHub OAuth update, configure provider callback URLs on
 - [x] Add Notifications tab and read/read-all actions.
 - [x] Add Settings privacy toggle for profile activity visibility.
 - [x] Add settings shortcut button in profile header.
+- [x] Fix profile follow/action button overflow on narrow phones.
+- [x] Apply dark/light theme and key language strings to Feed, Explore, Messages, Chat, Public Chat, Notifications, and Post Detail.
+- [x] Add comment reply, @mention tagging, and mention notifications.
+- [x] Add in-feed and post-detail video playback with `expo-av`.
+
+## APK Test Feedback - 2026-06-16
+
+- [x] App restart logged user out: replaced web `localStorage` fallback with mobile `AsyncStorage`.
+- [x] Job post composer could not scroll to lower fields: added vertical scroll + keyboard avoiding behavior.
+- [x] Job application modal can overflow on small screens: added scroll + keyboard avoiding behavior.
+- [x] Comment input keyboard closed while typing: moved comment draft to local composer state.
+- [x] Media post required URL only: added gallery image/video picker + backend upload.
+- [x] Deploy/media links should be clickable but safer: added clickable UI + backend safe URL checks.
+- [x] Profile follow button text overflow: made profile action row wrap and shrink text.
+- [ ] Google/GitHub OAuth needs final APK retest after deploy; if GitHub still fails, verify provider callback URL and Railway env variables.
+- [x] Message bubble UI needs visual polish pass.
+- [x] Global theme/language propagation needs a dedicated pass.
+- [x] Public/group chat invites need backend + UI pass.
+- [x] Comment reply/@mention needs DB/API/UI pass.
+- [x] TikTok/Instagram-like in-feed video playback needs native video dependency and UI pass.
+- [ ] Retest all of the above in a freshly built APK after backend deploy.
 
 ## Working Rule
 
