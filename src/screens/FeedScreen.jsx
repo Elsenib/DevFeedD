@@ -29,7 +29,7 @@ import * as api from '../api';
 const POST_TYPES = [
   { id: 'TEXT', label: 'Post', icon: 'terminal', color: '#8b949e' },
   { id: 'GIT', label: 'Git', icon: 'code', color: '#58a6ff' },
-  { id: 'DEPLOY', label: 'Deploy', icon: 'cloud-upload', color: '#3fb950' },
+  { id: 'DEPLOY', label: 'Live', icon: 'public', color: '#3fb950' },
   { id: 'MEDIA', label: 'Media', icon: 'videocam', color: '#818cf8' },
   { id: 'JOB', label: 'İş', icon: 'work', color: '#fbbf24' },
 ];
@@ -96,6 +96,36 @@ async function openExternalUrl(url) {
 
 const URL_PATTERN = /(https?:\/\/[^\s]+)/gi;
 
+function normalizeExternalUrl(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  if (/^https?:\/\//i.test(raw)) return raw;
+  if (/^[a-z0-9.-]+\.[a-z]{2,}(\/.*)?$/i.test(raw)) return `https://${raw}`;
+  return '';
+}
+
+function hostFromUrl(value) {
+  const url = normalizeExternalUrl(value);
+  if (!url) return '';
+  return url.replace(/^https?:\/\//i, '').split(/[/?#]/)[0].replace(/^www\./, '');
+}
+
+function inferLiveService(value) {
+  const host = hostFromUrl(value);
+  if (host.includes('vercel.app') || host.includes('vercel.com')) return 'Vercel';
+  if (host.includes('netlify.app') || host.includes('netlify.com')) return 'Netlify';
+  if (host.includes('github.io')) return 'GitHub Pages';
+  return 'Live preview';
+}
+
+function getRepoUrl(metadata = {}) {
+  const direct = normalizeExternalUrl(metadata.repoUrl || metadata.url || metadata.link);
+  if (direct) return direct;
+  const repo = String(metadata.repo || '').trim();
+  if (/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/.test(repo)) return `https://github.com/${repo}`;
+  return '';
+}
+
 function LinkifiedText({ text, style, linkStyle, numberOfLines }) {
   const value = String(text || '');
   const parts = value.split(URL_PATTERN);
@@ -126,14 +156,19 @@ function AutoVideo({ uri, style }) {
   const videoRef = useRef(null);
   const [playing, setPlaying] = useState(true);
 
+  useEffect(() => {
+    setPlaying(true);
+  }, [uri]);
+
   const toggle = async () => {
+    const nextPlaying = !playing;
+    setPlaying(nextPlaying);
     try {
-      if (playing) {
-        await videoRef.current?.pauseAsync();
-      } else {
+      if (nextPlaying) {
         await videoRef.current?.playAsync();
+      } else {
+        await videoRef.current?.pauseAsync();
       }
-      setPlaying((current) => !current);
     } catch (error) {
       // Playback can fail while the native view is still attaching.
     }
@@ -146,8 +181,12 @@ function AutoVideo({ uri, style }) {
         source={{ uri }}
         style={style}
         resizeMode={ResizeMode.COVER}
-        shouldPlay
+        shouldPlay={playing}
         isLooping
+        useNativeControls={false}
+        onLoad={() => {
+          if (playing) videoRef.current?.playAsync?.().catch(() => null);
+        }}
       />
       {!playing && (
         <View style={styles.videoPausedOverlay}>
@@ -175,6 +214,7 @@ function GitPayload({ post }) {
   const colors = theme.colors;
   const { metadata } = post;
   const commits = Array.isArray(metadata.commits) ? metadata.commits : [];
+  const repoUrl = getRepoUrl(metadata);
   return (
     <View style={[styles.gitBox, { backgroundColor: colors.surfaceStrong, borderColor: colors.border }]}>
       <View style={styles.payloadHeader}>
@@ -182,6 +222,18 @@ function GitPayload({ post }) {
         <Text style={[styles.gitRepo, { color: colors.text }]}>{metadata.repo || 'repo qeyd edilmeyib'}</Text>
         <Text style={[styles.payloadMuted, { color: colors.muted }]}>{metadata.branch || 'main'}</Text>
       </View>
+      {!!repoUrl && (
+        <TouchableOpacity
+          style={styles.repoLinkRow}
+          onPress={(event) => {
+            event?.stopPropagation?.();
+            openExternalUrl(repoUrl);
+          }}
+        >
+          <MaterialIcons name="open-in-new" size={15} color="#93c5fd" />
+          <Text style={[styles.payloadLink, styles.repoLinkText]} numberOfLines={1}>{repoUrl}</Text>
+        </TouchableOpacity>
+      )}
       {commits.length > 0 ? (
         commits.map((commit, index) => (
           <View key={`${commit.hash || index}`} style={styles.commitRow}>
@@ -205,27 +257,41 @@ function DeployPayload({ post }) {
   const { theme } = useContext(PreferencesContext);
   const colors = theme.colors;
   const { metadata } = post;
-  const deployUrl = metadata.url || metadata.link || metadata.deployUrl;
+  const deployUrl = normalizeExternalUrl(metadata.url || metadata.link || metadata.deployUrl);
+  const host = hostFromUrl(deployUrl);
+  const serviceName = metadata.service || inferLiveService(deployUrl);
   return (
     <View style={[styles.deployBox, { backgroundColor: colors.surfaceStrong, borderColor: colors.border }]}>
       <View style={styles.payloadHeader}>
-        <MaterialIcons name="cloud-upload" size={18} color="#3fb950" />
+        <MaterialIcons name="public" size={18} color="#3fb950" />
         <View style={styles.payloadBody}>
-          <Text style={[styles.payloadTitle, { color: colors.text }]}>{metadata.service || 'Deploy'} -> {metadata.env || 'Production'}</Text>
-          <Text style={styles.deployText}>Deploy uğurlu - {metadata.duration || '2m 30s'}</Text>
-          {!!deployUrl && (
-            <TouchableOpacity
-              onPress={(event) => {
-                event?.stopPropagation?.();
-                openExternalUrl(deployUrl);
-              }}
-            >
-              <Text style={styles.payloadLink} numberOfLines={1}>{deployUrl}</Text>
-            </TouchableOpacity>
-          )}
+          <Text style={[styles.payloadTitle, { color: colors.text }]}>{serviceName} -> {metadata.env || 'Production'}</Text>
+          <Text style={styles.deployText}>{host || 'Live link əlavə edilməyib'}</Text>
         </View>
         <Text style={styles.liveBadge}>LIVE</Text>
       </View>
+      {!!deployUrl && (
+        <TouchableOpacity
+          style={styles.livePreviewFrame}
+          activeOpacity={0.86}
+          onPress={(event) => {
+            event?.stopPropagation?.();
+            openExternalUrl(deployUrl);
+          }}
+        >
+          <View style={styles.livePreviewBar}>
+            <View style={[styles.liveDot, { backgroundColor: '#f87171' }]} />
+            <View style={[styles.liveDot, { backgroundColor: '#fbbf24' }]} />
+            <View style={[styles.liveDot, { backgroundColor: '#34d399' }]} />
+            <Text style={styles.livePreviewUrl} numberOfLines={1}>{host}</Text>
+          </View>
+          <View style={styles.livePreviewBody}>
+            <MaterialIcons name="language" size={28} color="#86efac" />
+            <Text style={styles.livePreviewTitle} numberOfLines={1}>{host}</Text>
+            <Text style={styles.livePreviewHint}>Vercel/Netlify layihə linkinə keç</Text>
+          </View>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -257,9 +323,11 @@ function MediaPayload({ post }) {
       )}
       <View style={[styles.mediaOverlay, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
         <Text style={styles.mediaTitle}>{metadata.title || 'Media paylaşım'}</Text>
-        <Text style={styles.mediaLink} numberOfLines={1}>
-          {mediaType === 'video' && mediaUrl ? 'Toxunanda dayanır / davam edir' : mediaUrl ? 'Açmaq üçün toxun' : 'Media əlavə edilməyib'}
-        </Text>
+        {(mediaType !== 'video' || !mediaUrl) && (
+          <Text style={styles.mediaLink} numberOfLines={1}>
+            {mediaUrl ? 'Açmaq üçün toxun' : 'Media əlavə edilməyib'}
+          </Text>
+        )}
       </View>
     </TouchableOpacity>
   );
@@ -391,9 +459,10 @@ function ComposeModal({ visible, onClose, onSubmit, submitting }) {
   const [type, setType] = useState('TEXT');
   const [caption, setCaption] = useState('');
   const [repo, setRepo] = useState('');
+  const [repoUrl, setRepoUrl] = useState('');
   const [branch, setBranch] = useState('');
   const [commitMsg, setCommitMsg] = useState('');
-  const [service, setService] = useState('Railway');
+  const [service, setService] = useState('Vercel');
   const [env, setEnv] = useState('Production');
   const [deployUrl, setDeployUrl] = useState('');
   const [mediaTitle, setMediaTitle] = useState('');
@@ -418,7 +487,8 @@ function ComposeModal({ visible, onClose, onSubmit, submitting }) {
   const extraBoxStyle = [styles.extraBox, themed.extraBox];
   const labelStyle = [styles.fieldLabel, themed.muted];
   const canSubmit = caption.trim().length > 0
-    && (type !== 'GIT' || repo.trim())
+    && (type !== 'GIT' || repo.trim() || repoUrl.trim())
+    && (type !== 'DEPLOY' || deployUrl.trim())
     && (type !== 'JOB' || company.trim())
     && (type !== 'MEDIA' || hasMedia);
 
@@ -449,15 +519,29 @@ function ComposeModal({ visible, onClose, onSubmit, submitting }) {
     });
 
     if (result.canceled || !result.assets?.[0]) return;
-    setSelectedMedia(result.assets[0]);
+    const asset = result.assets[0];
+    if (asset.type === 'video') {
+      const mimeType = String(asset.mimeType || '').toLowerCase();
+      const uri = String(asset.uri || '').toLowerCase();
+      const supportedVideo = mimeType.includes('mp4')
+        || mimeType.includes('webm')
+        || uri.endsWith('.mp4')
+        || uri.endsWith('.webm');
+      if (!supportedVideo) {
+        Alert.alert('Video formatı', 'Android-də stabil oynatma üçün MP4 və ya WebM video seç.');
+        return;
+      }
+    }
+    setSelectedMedia(asset);
   };
 
   const reset = () => {
     setCaption('');
     setRepo('');
+    setRepoUrl('');
     setBranch('');
     setCommitMsg('');
-    setService('Railway');
+    setService('Vercel');
     setEnv('Production');
     setDeployUrl('');
     setMediaTitle('');
@@ -481,7 +565,10 @@ function ComposeModal({ visible, onClose, onSubmit, submitting }) {
     setUploadingMedia(true);
     try {
       if (type === 'GIT') {
-        metadata.repo = repo.trim();
+        const normalizedRepoUrl = normalizeExternalUrl(repoUrl);
+        if (repoUrl.trim() && !normalizedRepoUrl) throw new Error('Git linkini düzgün yaz.');
+        metadata.repo = repo.trim() || (normalizedRepoUrl ? hostFromUrl(normalizedRepoUrl) : 'Git repo');
+        metadata.repoUrl = normalizedRepoUrl;
         metadata.branch = branch.trim() || 'main';
         metadata.commits = [
           {
@@ -492,10 +579,11 @@ function ComposeModal({ visible, onClose, onSubmit, submitting }) {
         metadata.stats = { additions: 0, deletions: 0, files: 1 };
       }
       if (type === 'DEPLOY') {
-        metadata.service = service.trim() || 'Deploy';
+        const normalizedDeployUrl = normalizeExternalUrl(deployUrl);
+        if (!normalizedDeployUrl) throw new Error('Vercel və ya Netlify linkini düzgün yaz.');
+        metadata.service = service.trim() || inferLiveService(normalizedDeployUrl);
         metadata.env = env.trim() || 'Production';
-        metadata.duration = '2m 30s';
-        metadata.url = deployUrl.trim();
+        metadata.url = normalizedDeployUrl;
       }
       if (type === 'MEDIA') {
         let uploadedMedia = null;
@@ -547,8 +635,10 @@ function ComposeModal({ visible, onClose, onSubmit, submitting }) {
     if (type === 'GIT') {
       return (
         <View style={extraBoxStyle}>
-          <Text style={labelStyle}>REPO ADI *</Text>
+          <Text style={labelStyle}>REPO ADI</Text>
           <TextInput value={repo} onChangeText={setRepo} placeholder="username/my-project" placeholderTextColor={colors.muted} style={modalInputStyle} autoCapitalize="none" />
+          <Text style={labelStyle}>GIT LINKI</Text>
+          <TextInput value={repoUrl} onChangeText={setRepoUrl} placeholder="https://github.com/username/my-project" placeholderTextColor={colors.muted} style={modalInputStyle} autoCapitalize="none" keyboardType="url" />
           <Text style={labelStyle}>BRANCH</Text>
           <TextInput value={branch} onChangeText={setBranch} placeholder="feat/new-feature" placeholderTextColor={colors.muted} style={modalInputStyle} autoCapitalize="none" />
           <Text style={labelStyle}>COMMIT MESAJI</Text>
@@ -560,11 +650,11 @@ function ComposeModal({ visible, onClose, onSubmit, submitting }) {
       return (
         <View style={extraBoxStyle}>
           <Text style={labelStyle}>SERVIS</Text>
-          <TextInput value={service} onChangeText={setService} placeholder="Railway, Vercel, Kubernetes" placeholderTextColor={colors.muted} style={modalInputStyle} />
+          <TextInput value={service} onChangeText={setService} placeholder="Vercel, Netlify, GitHub Pages" placeholderTextColor={colors.muted} style={modalInputStyle} />
           <Text style={labelStyle}>MUHIT</Text>
           <TextInput value={env} onChangeText={setEnv} placeholder="Production" placeholderTextColor={colors.muted} style={modalInputStyle} />
-          <Text style={labelStyle}>DEPLOY LINKI</Text>
-          <TextInput value={deployUrl} onChangeText={setDeployUrl} placeholder="https://my-app.railway.app" placeholderTextColor={colors.muted} style={modalInputStyle} autoCapitalize="none" keyboardType="url" />
+          <Text style={labelStyle}>LIVE PREVIEW LINKI *</Text>
+          <TextInput value={deployUrl} onChangeText={setDeployUrl} placeholder="https://my-app.vercel.app" placeholderTextColor={colors.muted} style={modalInputStyle} autoCapitalize="none" keyboardType="url" />
         </View>
       );
     }
@@ -1154,6 +1244,58 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginTop: 4,
   },
+  livePreviewTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  payloadBodyNoMargin: {
+    flex: 1,
+  },
+  livePreviewFrame: {
+    borderColor: 'rgba(63,185,80,0.25)',
+    borderWidth: 1,
+    borderRadius: 10,
+    marginTop: 12,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(15,32,24,0.72)',
+  },
+  livePreviewBar: {
+    minHeight: 28,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderBottomColor: 'rgba(63,185,80,0.18)',
+    borderBottomWidth: 1,
+    paddingHorizontal: 10,
+  },
+  liveDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    marginRight: 5,
+  },
+  livePreviewUrl: {
+    color: '#a7f3d0',
+    fontSize: 11,
+    marginLeft: 5,
+    flex: 1,
+  },
+  livePreviewBody: {
+    minHeight: 82,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+  },
+  livePreviewTitle: {
+    color: '#e6edf3',
+    fontWeight: '900',
+    marginTop: 6,
+    fontSize: 13,
+  },
+  livePreviewHint: {
+    color: '#86efac',
+    fontSize: 11,
+    marginTop: 3,
+  },
   mediaBox: {
     backgroundColor: '#151126',
     borderRadius: 10,
@@ -1251,6 +1393,16 @@ const styles = StyleSheet.create({
     fontSize: 13,
     flex: 1,
     marginLeft: 8,
+  },
+  repoLinkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  repoLinkText: {
+    flex: 1,
+    marginLeft: 6,
+    marginTop: 0,
   },
   commitRow: {
     borderTopColor: '#21262d',

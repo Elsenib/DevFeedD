@@ -46,11 +46,10 @@ const mediaUpload = multer({
       'image/webp',
       'image/gif',
       'video/mp4',
-      'video/quicktime',
       'video/webm',
     ];
     if (!allowed.includes(file.mimetype)) {
-      return cb(new Error('Media yalnız JPG, PNG, WebP, GIF, MP4, MOV və WebM ola bilər.'));
+      return cb(new Error('Media yalnız JPG, PNG, WebP, GIF, MP4 və WebM ola bilər.'));
     }
     cb(null, true);
   },

@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { PreferencesContext } from '../context/PreferencesContext';
+import { useNotifications } from '../context/NotificationsContext';
 import * as api from '../api';
 
 function iconFor(type) {
@@ -48,6 +49,12 @@ function ActorAvatar({ name, uri }) {
 
 export default function NotificationsScreen({ navigation }) {
   const { theme, t } = useContext(PreferencesContext);
+  const {
+    syncUnreadFromList,
+    markNotificationReadLocal,
+    markAllNotificationsReadLocal,
+    refreshUnreadNotifications,
+  } = useNotifications();
   const colors = theme.colors;
   const themed = useMemo(() => ({
     container: { backgroundColor: colors.background },
@@ -68,14 +75,16 @@ export default function NotificationsScreen({ navigation }) {
   const loadNotifications = useCallback(async () => {
     try {
       const data = await api.fetchNotifications();
-      setNotifications(Array.isArray(data) ? data : []);
+      const nextNotifications = Array.isArray(data) ? data : [];
+      setNotifications(nextNotifications);
+      syncUnreadFromList(nextNotifications);
     } catch (error) {
       Alert.alert('Bildiriş xətası', error.response?.data?.message || error.message);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [syncUnreadFromList]);
 
   useEffect(() => {
     loadNotifications();
@@ -90,12 +99,14 @@ export default function NotificationsScreen({ navigation }) {
     try {
       await api.markAllNotificationsRead();
       setNotifications((prev) => prev.map((item) => ({ ...item, read_at: item.read_at || new Date().toISOString() })));
+      markAllNotificationsReadLocal();
     } catch (error) {
       Alert.alert('Bildiriş xətası', error.response?.data?.message || error.message);
     }
   };
 
   const handleOpen = async (item) => {
+    markNotificationReadLocal(item);
     setNotifications((prev) =>
       prev.map((notification) =>
         notification.id === item.id
@@ -103,7 +114,9 @@ export default function NotificationsScreen({ navigation }) {
           : notification
       )
     );
-    api.markNotificationRead(item.id).catch(() => null);
+    api.markNotificationRead(item.id)
+      .then(refreshUnreadNotifications)
+      .catch(refreshUnreadNotifications);
 
     if (item.entity_type === 'post' && item.entity_id) {
       navigation.navigate('PostDetail', { post: { id: item.entity_id } });

@@ -1,8 +1,8 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useCallback, useContext, useEffect, useState } from 'react';
+import { useContext } from 'react';
 import { PreferencesContext } from '../context/PreferencesContext';
-import * as api from '../api';
+import { NotificationsProvider, useNotifications } from '../context/NotificationsContext';
 import FeedScreen from '../screens/FeedScreen';
 import ExploreScreen from '../screens/ExploreScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
@@ -12,26 +12,10 @@ import ProfileScreen from '../screens/ProfileScreen';
 
 const Tab = createBottomTabNavigator();
 
-export default function TabNavigator() {
+function TabNavigatorInner() {
   const { theme, t } = useContext(PreferencesContext);
+  const { unreadCount, refreshUnreadNotifications } = useNotifications();
   const colors = theme.colors;
-  const [unreadNotifications, setUnreadNotifications] = useState(0);
-
-  const refreshUnreadNotifications = useCallback(async () => {
-    try {
-      const data = await api.fetchNotifications();
-      const unread = Array.isArray(data) ? data.filter((item) => !item.read_at).length : 0;
-      setUnreadNotifications(unread);
-    } catch (error) {
-      setUnreadNotifications(0);
-    }
-  }, []);
-
-  useEffect(() => {
-    refreshUnreadNotifications();
-    const interval = setInterval(refreshUnreadNotifications, 30000);
-    return () => clearInterval(interval);
-  }, [refreshUnreadNotifications]);
 
   return (
     <Tab.Navigator
@@ -60,11 +44,19 @@ export default function TabNavigator() {
       <Tab.Screen
         name="Notifications"
         component={NotificationsScreen}
-        options={{ title: t.notifications, tabBarBadge: unreadNotifications || undefined }}
+        options={{ title: t.notifications, tabBarBadge: unreadCount || undefined }}
       />
       <Tab.Screen name="Messages" component={MessagesScreen} options={{ title: t.messages }} />
       <Tab.Screen name="PublicChat" component={PublicChatScreen} options={{ title: 'Chat' }} />
       <Tab.Screen name="Profile" component={ProfileScreen} options={{ title: t.profile }} />
     </Tab.Navigator>
+  );
+}
+
+export default function TabNavigator() {
+  return (
+    <NotificationsProvider>
+      <TabNavigatorInner />
+    </NotificationsProvider>
   );
 }

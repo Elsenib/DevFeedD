@@ -107,6 +107,14 @@ function getBackendBaseUrl(req) {
   return (process.env.PUBLIC_BACKEND_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
 }
 
+function firstEnv(...keys) {
+  for (const key of keys) {
+    const value = process.env[key];
+    if (value) return value;
+  }
+  return '';
+}
+
 function appendQuery(url, params) {
   const nextUrl = new URL(url);
   Object.entries(params).forEach(([key, value]) => {
@@ -123,8 +131,8 @@ function getOAuthConfig(provider, req) {
   if (normalizedProvider === 'google') {
     return {
       provider: 'google',
-      clientId: process.env.GOOGLE_CLIENT_ID_WEB,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      clientId: firstEnv('GOOGLE_CLIENT_ID_WEB', 'GOOGLE_CLIENT_ID', 'EXPO_PUBLIC_GOOGLE_CLIENT_ID'),
+      clientSecret: firstEnv('GOOGLE_CLIENT_SECRET', 'GOOGLE_CLIENT_SECRET_WEB'),
       redirectUri,
       authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
       tokenUrl: 'https://oauth2.googleapis.com/token',
@@ -135,8 +143,8 @@ function getOAuthConfig(provider, req) {
   if (normalizedProvider === 'github') {
     return {
       provider: 'github',
-      clientId: process.env.GITHUB_CLIENT_ID,
-      clientSecret: process.env.GITHUB_CLIENT_SECRET,
+      clientId: firstEnv('GITHUB_CLIENT_ID', 'GITHUB_CLIENT_ID_WEB', 'GIT_CLIENT_ID'),
+      clientSecret: firstEnv('GITHUB_CLIENT_SECRET', 'GITHUB_CLIENT_SECRET_WEB', 'GIT_CLIENT_SECRET'),
       redirectUri,
       authUrl: 'https://github.com/login/oauth/authorize',
       tokenUrl: 'https://github.com/login/oauth/access_token',
@@ -595,8 +603,8 @@ router.post('/oauth-callback', async (req, res) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
-          client_id: process.env.GOOGLE_CLIENT_ID_WEB,
-          client_secret: process.env.GOOGLE_CLIENT_SECRET,
+          client_id: firstEnv('GOOGLE_CLIENT_ID_WEB', 'GOOGLE_CLIENT_ID', 'EXPO_PUBLIC_GOOGLE_CLIENT_ID'),
+          client_secret: firstEnv('GOOGLE_CLIENT_SECRET', 'GOOGLE_CLIENT_SECRET_WEB'),
           code,
           grant_type: 'authorization_code',
           redirect_uri: redirectUri
