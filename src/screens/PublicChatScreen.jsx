@@ -79,14 +79,38 @@ function RoomModal({ visible, creating, onClose, onCreate }) {
   );
 }
 
-function InviteModal({ visible, inviting, roomName, onClose, onInvite }) {
-  const [email, setEmail] = useState('');
+function InviteModal({ visible, inviting, roomName, onClose, onInvite, members = [] }) {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState([]);
+  const [searching, setSearching] = useState(false);
 
-  const handleInvite = async () => {
-    const value = email.trim().toLowerCase();
-    if (!value) return;
-    await onInvite(value);
-    setEmail('');
+  const memberIds = useMemo(() => new Set(members.map((item) => String(item.id))), [members]);
+
+  useEffect(() => {
+    if (!visible) return;
+    const timeout = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const data = await api.searchUsers(query.trim());
+        const nextResults = Array.isArray(data)
+          ? data.filter((item) => !memberIds.has(String(item.id))).slice(0, 12)
+          : [];
+        setResults(nextResults);
+      } catch (error) {
+        setResults([]);
+      } finally {
+        setSearching(false);
+      }
+    }, 250);
+
+    return () => clearTimeout(timeout);
+  }, [memberIds, query, visible]);
+
+  const handleInvite = async (target) => {
+    if (!target?.id) return;
+    await onInvite({ userId: target.id, name: target.name || target.email });
+    setQuery('');
+    setResults([]);
   };
 
   return (
@@ -102,20 +126,41 @@ function InviteModal({ visible, inviting, roomName, onClose, onInvite }) {
               <MaterialIcons name="close" size={24} color="#8b949e" />
             </TouchableOpacity>
           </View>
-          <Text style={styles.fieldLabel}>EMAIL</Text>
+          <Text style={styles.fieldLabel}>ISTIFADECI AXTAR</Text>
           <TextInput
-            value={email}
-            onChangeText={setEmail}
-            placeholder="user@example.com"
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Ad, email ve ya rol"
             placeholderTextColor="#4b5563"
             style={styles.modalInput}
             autoCapitalize="none"
-            keyboardType="email-address"
           />
+          {searching ? (
+            <ActivityIndicator color="#6366f1" style={styles.inviteLoader} />
+          ) : (
+            <ScrollView style={styles.inviteResults} keyboardShouldPersistTaps="handled">
+              {results.map((item) => (
+                <TouchableOpacity
+                  key={String(item.id)}
+                  style={styles.inviteUserRow}
+                  onPress={() => handleInvite(item)}
+                  disabled={inviting}
+                >
+                  <MessageAvatar name={item.name || item.email} uri={item.avatar_url} />
+                  <View style={styles.inviteUserBody}>
+                    <Text style={styles.inviteUserName}>{item.name || item.email}</Text>
+                    <Text style={styles.inviteUserMeta}>{item.role_sub || item.role || item.email}</Text>
+                  </View>
+                  <MaterialIcons name="add-circle" size={22} color="#6366f1" />
+                </TouchableOpacity>
+              ))}
+              {!results.length && <Text style={styles.inviteEmpty}>Devet ucun istifadeci tapilmadi.</Text>}
+            </ScrollView>
+          )}
           <TouchableOpacity
-            style={[styles.createButton, !email.trim() && styles.disabledButton]}
-            onPress={handleInvite}
-            disabled={inviting || !email.trim()}
+            style={[styles.createButton, !results.length && styles.disabledButton]}
+            onPress={() => handleInvite(results[0])}
+            disabled={inviting || !results.length}
           >
             {inviting ? <ActivityIndicator color="#ffffff" /> : <Text style={styles.createButtonText}>Dəvət göndər</Text>}
           </TouchableOpacity>
@@ -261,11 +306,12 @@ export default function PublicChatScreen({ route }) {
     }
   };
 
-  const handleInvite = async (email) => {
+  const handleInvite = async ({ userId, name }) => {
     if (!selectedRoomId) return;
+    const email = name || 'Istifadeci';
     setInviting(true);
     try {
-      await api.inviteToChatRoom(selectedRoomId, { email });
+      await api.inviteToChatRoom(selectedRoomId, { userId });
       setInviteModalOpen(false);
       Alert.alert('Dəvət göndərildi', `${email} otağa əlavə edildi və bildiriş aldı.`);
       loadMembers();
@@ -312,7 +358,9 @@ export default function PublicChatScreen({ route }) {
             <Text style={styles.senderRole}>{item.role_sub || item.role}</Text>
           )}
           <Text style={[styles.messageText, themed.text, mine && styles.messageTextMine]}>{item.text}</Text>
-          <Text style={[styles.messageTime, mine && styles.messageTimeMine]}>{formatTime(item.created_at || item.createdAt)}</Text>
+          <View style={styles.messageFooter}>
+            <Text style={[styles.messageTime, mine && styles.messageTimeMine]}>{formatTime(item.created_at || item.createdAt)}</Text>
+          </View>
         </View>
       </View>
     );
@@ -330,7 +378,7 @@ export default function PublicChatScreen({ route }) {
     <SafeAreaView style={[styles.container, themed.container]} edges={['top']}>
       <KeyboardAvoidingView
         style={styles.keyboard}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 72 : 0}
       >
       <View style={[styles.header, themed.header]}>
@@ -376,6 +424,7 @@ export default function PublicChatScreen({ route }) {
           keyExtractor={(item) => item.id?.toString() ?? Math.random().toString()}
           renderItem={renderMessage}
           contentContainerStyle={styles.messagesContent}
+          keyboardShouldPersistTaps="handled"
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />}
           ListEmptyComponent={<Text style={[styles.emptyText, themed.emptyText]}>Bu otaqda hələ mesaj yoxdur.</Text>}
         />
@@ -409,6 +458,7 @@ export default function PublicChatScreen({ route }) {
         visible={inviteModalOpen}
         inviting={inviting}
         roomName={selectedRoomTitle}
+        members={members}
         onClose={() => setInviteModalOpen(false)}
         onInvite={handleInvite}
       />
@@ -519,12 +569,14 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   messageBubble: {
-    maxWidth: '84%',
+    minWidth: 104,
+    maxWidth: '88%',
     backgroundColor: '#161b22',
     borderColor: '#21262d',
     borderWidth: 1,
-    borderRadius: 12,
-    padding: 12,
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
   },
   messageBubbleMine: {
     backgroundColor: '#312e81',
@@ -552,10 +604,14 @@ const styles = StyleSheet.create({
   messageTextMine: {
     color: '#ffffff',
   },
+  messageFooter: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 3,
+  },
   messageTime: {
     color: '#6b7280',
     fontSize: 10,
-    marginTop: 6,
     textAlign: 'right',
   },
   messageTimeMine: {
@@ -664,6 +720,42 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 11,
     marginBottom: 8,
+  },
+  inviteLoader: {
+    marginVertical: 12,
+  },
+  inviteResults: {
+    maxHeight: 260,
+    marginBottom: 8,
+  },
+  inviteUserRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderColor: '#30363d',
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 10,
+    marginBottom: 8,
+    backgroundColor: '#0d1117',
+  },
+  inviteUserBody: {
+    flex: 1,
+    marginLeft: 10,
+  },
+  inviteUserName: {
+    color: '#e6edf3',
+    fontWeight: '900',
+    fontSize: 13,
+  },
+  inviteUserMeta: {
+    color: '#8b949e',
+    fontSize: 11,
+    marginTop: 3,
+  },
+  inviteEmpty: {
+    color: '#8b949e',
+    textAlign: 'center',
+    paddingVertical: 16,
   },
   createButton: {
     marginTop: 8,

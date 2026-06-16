@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -94,6 +94,70 @@ async function openExternalUrl(url) {
   }
 }
 
+const URL_PATTERN = /(https?:\/\/[^\s]+)/gi;
+
+function LinkifiedText({ text, style, linkStyle, numberOfLines }) {
+  const value = String(text || '');
+  const parts = value.split(URL_PATTERN);
+  return (
+    <Text style={style} numberOfLines={numberOfLines}>
+      {parts.map((part, index) => {
+        if (/^https?:\/\//i.test(part)) {
+          return (
+            <Text
+              key={`${part}-${index}`}
+              style={linkStyle || styles.inlineLink}
+              onPress={(event) => {
+                event?.stopPropagation?.();
+                openExternalUrl(part);
+              }}
+            >
+              {part}
+            </Text>
+          );
+        }
+        return <Text key={`${part}-${index}`}>{part}</Text>;
+      })}
+    </Text>
+  );
+}
+
+function AutoVideo({ uri, style }) {
+  const videoRef = useRef(null);
+  const [playing, setPlaying] = useState(true);
+
+  const toggle = async () => {
+    try {
+      if (playing) {
+        await videoRef.current?.pauseAsync();
+      } else {
+        await videoRef.current?.playAsync();
+      }
+      setPlaying((current) => !current);
+    } catch (error) {
+      // Playback can fail while the native view is still attaching.
+    }
+  };
+
+  return (
+    <TouchableOpacity activeOpacity={0.92} onPress={toggle}>
+      <Video
+        ref={videoRef}
+        source={{ uri }}
+        style={style}
+        resizeMode={ResizeMode.COVER}
+        shouldPlay
+        isLooping
+      />
+      {!playing && (
+        <View style={styles.videoPausedOverlay}>
+          <MaterialIcons name="play-arrow" size={34} color="#ffffff" />
+        </View>
+      )}
+    </TouchableOpacity>
+  );
+}
+
 function AuthorAvatar({ name, avatarUrl }) {
   const letter = String(name || 'U').slice(0, 1).toUpperCase();
   if (avatarUrl) {
@@ -107,46 +171,55 @@ function AuthorAvatar({ name, avatarUrl }) {
 }
 
 function GitPayload({ post }) {
+  const { theme } = useContext(PreferencesContext);
+  const colors = theme.colors;
   const { metadata } = post;
   const commits = Array.isArray(metadata.commits) ? metadata.commits : [];
   return (
-    <View style={styles.gitBox}>
+    <View style={[styles.gitBox, { backgroundColor: colors.surfaceStrong, borderColor: colors.border }]}>
       <View style={styles.payloadHeader}>
         <MaterialIcons name="code" size={16} color="#58a6ff" />
-        <Text style={styles.gitRepo}>{metadata.repo || 'repo qeyd edilmeyib'}</Text>
-        <Text style={styles.payloadMuted}>{metadata.branch || 'main'}</Text>
+        <Text style={[styles.gitRepo, { color: colors.text }]}>{metadata.repo || 'repo qeyd edilmeyib'}</Text>
+        <Text style={[styles.payloadMuted, { color: colors.muted }]}>{metadata.branch || 'main'}</Text>
       </View>
       {commits.length > 0 ? (
         commits.map((commit, index) => (
           <View key={`${commit.hash || index}`} style={styles.commitRow}>
             <Text style={styles.commitHash}>{commit.hash || 'commit'}</Text>
-            <Text style={styles.commitText}>{commit.msg || commit.message}</Text>
+            <Text style={[styles.commitText, { color: colors.text }]}>{commit.msg || commit.message}</Text>
           </View>
         ))
       ) : (
-        <Text style={styles.payloadMuted}>Commit mesaji elave edilmeyib.</Text>
+        <Text style={[styles.payloadMuted, { color: colors.muted }]}>Commit mesaji elave edilmeyib.</Text>
       )}
       <View style={styles.statsRow}>
         <Text style={styles.additionText}>+{metadata.stats?.additions ?? 0}</Text>
         <Text style={styles.deletionText}>-{metadata.stats?.deletions ?? 0}</Text>
-        <Text style={styles.payloadMuted}>{metadata.stats?.files ?? 1} fayl</Text>
+        <Text style={[styles.payloadMuted, { color: colors.muted }]}>{metadata.stats?.files ?? 1} fayl</Text>
       </View>
     </View>
   );
 }
 
 function DeployPayload({ post }) {
+  const { theme } = useContext(PreferencesContext);
+  const colors = theme.colors;
   const { metadata } = post;
   const deployUrl = metadata.url || metadata.link || metadata.deployUrl;
   return (
-    <View style={styles.deployBox}>
+    <View style={[styles.deployBox, { backgroundColor: colors.surfaceStrong, borderColor: colors.border }]}>
       <View style={styles.payloadHeader}>
         <MaterialIcons name="cloud-upload" size={18} color="#3fb950" />
         <View style={styles.payloadBody}>
-          <Text style={styles.payloadTitle}>{metadata.service || 'Deploy'} -> {metadata.env || 'Production'}</Text>
+          <Text style={[styles.payloadTitle, { color: colors.text }]}>{metadata.service || 'Deploy'} -> {metadata.env || 'Production'}</Text>
           <Text style={styles.deployText}>Deploy uğurlu - {metadata.duration || '2m 30s'}</Text>
           {!!deployUrl && (
-            <TouchableOpacity onPress={() => openExternalUrl(deployUrl)}>
+            <TouchableOpacity
+              onPress={(event) => {
+                event?.stopPropagation?.();
+                openExternalUrl(deployUrl);
+              }}
+            >
               <Text style={styles.payloadLink} numberOfLines={1}>{deployUrl}</Text>
             </TouchableOpacity>
           )}
@@ -158,38 +231,34 @@ function DeployPayload({ post }) {
 }
 
 function MediaPayload({ post }) {
+  const { theme } = useContext(PreferencesContext);
+  const colors = theme.colors;
   const { metadata } = post;
   const mediaUrl = metadata.mediaUrl || metadata.url;
   const mediaType = metadata.mediaType || (String(metadata.mimeType || '').startsWith('image/') ? 'image' : 'video');
   return (
     <TouchableOpacity
-      style={styles.mediaBox}
+      style={[styles.mediaBox, { backgroundColor: colors.surfaceStrong, borderColor: colors.border }]}
       activeOpacity={mediaUrl ? 0.82 : 1}
-      onPress={() => {
+      onPress={(event) => {
+        event?.stopPropagation?.();
         if (mediaType !== 'video') openExternalUrl(mediaUrl);
       }}
-      disabled={!mediaUrl || mediaType === 'video'}
+      disabled={!mediaUrl}
     >
       {mediaType === 'image' && mediaUrl ? (
         <Image source={{ uri: mediaUrl }} style={styles.mediaPreviewImage} />
       ) : mediaType === 'video' && mediaUrl ? (
-        <Video
-          source={{ uri: mediaUrl }}
-          style={styles.mediaPreviewVideo}
-          resizeMode={ResizeMode.COVER}
-          useNativeControls
-          shouldPlay={false}
-          isLooping={false}
-        />
+        <AutoVideo uri={mediaUrl} style={styles.mediaPreviewVideo} />
       ) : (
         <View style={styles.mediaPreviewIcon}>
           <MaterialIcons name="play-circle-outline" size={46} color="#c4b5fd" />
         </View>
       )}
-      <View style={styles.mediaOverlay}>
+      <View style={[styles.mediaOverlay, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
         <Text style={styles.mediaTitle}>{metadata.title || 'Media paylaşım'}</Text>
         <Text style={styles.mediaLink} numberOfLines={1}>
-          {mediaType === 'video' && mediaUrl ? 'Video player' : mediaUrl ? 'Açmaq üçün toxun' : 'Media əlavə edilməyib'}
+          {mediaType === 'video' && mediaUrl ? 'Toxunanda dayanır / davam edir' : mediaUrl ? 'Açmaq üçün toxun' : 'Media əlavə edilməyib'}
         </Text>
       </View>
     </TouchableOpacity>
@@ -197,10 +266,12 @@ function MediaPayload({ post }) {
 }
 
 function JobPayload({ post, onApplyJob }) {
+  const { theme } = useContext(PreferencesContext);
+  const colors = theme.colors;
   const metadata = post.metadata || {};
   const requirements = metadata.requirements || [];
   return (
-    <View style={styles.jobBox}>
+    <View style={[styles.jobBox, { backgroundColor: colors.surfaceStrong, borderColor: colors.border }]}>
       <View style={styles.jobHeaderRow}>
         <View style={styles.payloadBody}>
           <Text style={styles.jobCompany}>{metadata.company || 'Şirkət qeyd edilməyib'}</Text>
@@ -264,7 +335,7 @@ function PostCard({ post, onPress, onAuthorPress, onLike, onBookmark, onApplyJob
         </View>
       </View>
 
-      <Text style={[styles.postCaption, themed.text]}>{post.caption}</Text>
+      <LinkifiedText text={post.caption} style={[styles.postCaption, themed.text]} linkStyle={styles.inlineLink} />
       {post.tags.length > 0 && (
         <View style={styles.tagsRow}>
           {post.tags.map((tag) => (
@@ -348,7 +419,7 @@ function ComposeModal({ visible, onClose, onSubmit, submitting }) {
   const labelStyle = [styles.fieldLabel, themed.muted];
   const canSubmit = caption.trim().length > 0
     && (type !== 'GIT' || repo.trim())
-    && (type !== 'JOB' || (company.trim() && requirements.length > 0))
+    && (type !== 'JOB' || company.trim())
     && (type !== 'MEDIA' || hasMedia);
 
   const addTag = () => {
@@ -444,12 +515,16 @@ function ComposeModal({ visible, onClose, onSubmit, submitting }) {
         metadata.fileName = uploadedMedia?.mediaFileName || selectedMedia?.fileName || selectedMedia?.name || '';
       }
       if (type === 'JOB') {
+        const nextRequirements = [
+          ...requirements,
+          requirementInput.trim(),
+        ].map((item) => item.trim()).filter(Boolean);
         metadata.company = company.trim();
         metadata.location = location.trim() || 'Remote';
         metadata.salary = salary.trim();
         metadata.employmentType = employmentType.trim() || 'Full-time';
         metadata.deadline = deadline.trim();
-        metadata.requirements = requirements;
+        metadata.requirements = [...new Set(nextRequirements)];
       }
 
       await onSubmit({
@@ -1047,6 +1122,11 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     fontSize: 14,
   },
+  inlineLink: {
+    color: '#58a6ff',
+    fontWeight: '800',
+    textDecorationLine: 'underline',
+  },
   tagsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1092,6 +1172,16 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 220,
     backgroundColor: '#0d1117',
+  },
+  videoPausedOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.25)',
   },
   mediaPreviewIcon: {
     height: 150,

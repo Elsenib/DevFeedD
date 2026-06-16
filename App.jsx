@@ -47,6 +47,18 @@ function getOAuthParam(url, key) {
   return Array.isArray(value) ? value[0] : value;
 }
 
+function friendlyOAuthError(provider, value) {
+  const message = decodeURIComponent(String(value || ''));
+  const providerName = provider === 'github' ? 'GitHub' : 'Google';
+  if (message === 'access_denied') {
+    return `${providerName} girişinə icazə verilmədi. OAuth consent screen test mərhələsindədirsə, bu email test users siyahısına əlavə olunmalıdır.`;
+  }
+  if (/redirect_uri_mismatch/i.test(message)) {
+    return `${providerName} callback URL uyğun deyil. Provider console-da backend callback URL-i dəqiq əlavə olunmalıdır.`;
+  }
+  return message || `${providerName} girişi tamamlanmadı.`;
+}
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
@@ -127,7 +139,7 @@ export default function App() {
 
           const oauthError = getOAuthParam(result.url, 'error');
           if (oauthError) {
-            throw new Error(decodeURIComponent(String(oauthError)));
+            throw new Error(friendlyOAuthError(provider, oauthError));
           }
 
           const sessionId = getOAuthParam(result.url, 'sessionId');

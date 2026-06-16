@@ -111,7 +111,9 @@ export default function ChatScreen({ route, navigation }) {
             {mine ? 'Sən' : item.sender?.name || item.sender_name || screenTitle}
           </Text>
           <Text style={[styles.messageText, themed.text, mine && styles.messageTextMine]}>{item.text}</Text>
-          <Text style={[styles.messageTime, mine && styles.messageTimeMine]}>{formatTime(item.createdAt || item.created_at)}</Text>
+          <View style={styles.messageFooter}>
+            <Text style={[styles.messageTime, mine && styles.messageTimeMine]}>{formatTime(item.createdAt || item.created_at)}</Text>
+          </View>
         </View>
       </View>
     );
@@ -129,7 +131,7 @@ export default function ChatScreen({ route, navigation }) {
     <SafeAreaView style={[styles.container, themed.container]} edges={['top']}>
       <KeyboardAvoidingView
         style={styles.keyboard}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 72 : 0}
       >
       <View style={[styles.header, themed.header]}>
@@ -150,6 +152,7 @@ export default function ChatScreen({ route, navigation }) {
         keyExtractor={(item) => item.id?.toString() ?? Math.random().toString()}
         renderItem={renderMessage}
         contentContainerStyle={styles.messagesContent}
+        keyboardShouldPersistTaps="handled"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />}
         ListEmptyComponent={<Text style={[styles.emptyText, themed.emptyText]}>Hələ mesaj yoxdur. İlk mesajı yaz.</Text>}
       />
@@ -237,12 +240,14 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   messageBubble: {
-    maxWidth: '82%',
+    minWidth: 104,
+    maxWidth: '88%',
     backgroundColor: '#161b22',
     borderColor: '#21262d',
     borderWidth: 1,
-    borderRadius: 12,
-    padding: 12,
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
   },
   messageBubbleMine: {
     backgroundColor: '#312e81',
@@ -286,10 +291,14 @@ const styles = StyleSheet.create({
   messageTextMine: {
     color: '#ffffff',
   },
+  messageFooter: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 3,
+  },
   messageTime: {
     color: '#6b7280',
     fontSize: 10,
-    marginTop: 6,
     textAlign: 'right',
   },
   messageTimeMine: {

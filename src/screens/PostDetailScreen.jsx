@@ -1,11 +1,13 @@
-import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   FlatList,
   Image,
+  KeyboardAvoidingView,
   Linking,
   Modal,
+  Platform,
   StyleSheet,
   Text,
   TextInput,
@@ -93,33 +95,102 @@ async function openExternalUrl(url) {
   }
 }
 
+const URL_PATTERN = /(https?:\/\/[^\s]+)/gi;
+
+function LinkifiedText({ text, style, linkStyle, numberOfLines }) {
+  const value = String(text || '');
+  const parts = value.split(URL_PATTERN);
+  return (
+    <Text style={style} numberOfLines={numberOfLines}>
+      {parts.map((part, index) => {
+        if (/^https?:\/\//i.test(part)) {
+          return (
+            <Text
+              key={`${part}-${index}`}
+              style={linkStyle || styles.inlineLink}
+              onPress={() => openExternalUrl(part)}
+            >
+              {part}
+            </Text>
+          );
+        }
+        return <Text key={`${part}-${index}`}>{part}</Text>;
+      })}
+    </Text>
+  );
+}
+
+function AutoVideo({ uri, style }) {
+  const videoRef = useRef(null);
+  const [playing, setPlaying] = useState(true);
+
+  const toggle = async () => {
+    try {
+      if (playing) {
+        await videoRef.current?.pauseAsync();
+      } else {
+        await videoRef.current?.playAsync();
+      }
+      setPlaying((current) => !current);
+    } catch (error) {
+      // Native playback may not be ready on the first tap.
+    }
+  };
+
+  return (
+    <TouchableOpacity activeOpacity={0.92} onPress={toggle}>
+      <Video
+        ref={videoRef}
+        source={{ uri }}
+        style={style}
+        resizeMode={ResizeMode.COVER}
+        shouldPlay
+        isLooping
+      />
+      {!playing && (
+        <View style={styles.videoPausedOverlay}>
+          <MaterialIcons name="play-arrow" size={34} color="#ffffff" />
+        </View>
+      )}
+    </TouchableOpacity>
+  );
+}
+
 function PayloadPreview({ post }) {
+  const { theme } = useContext(PreferencesContext);
+  const colors = theme.colors;
   const metadata = post.metadata || {};
   if (post.type === 'GIT') {
     const commits = Array.isArray(metadata.commits) ? metadata.commits : [];
     return (
-      <View style={styles.gitBox}>
+      <View style={[styles.gitBox, { backgroundColor: colors.surfaceStrong, borderColor: colors.border }]}>
         <View style={styles.payloadHeader}>
           <MaterialIcons name="code" size={17} color="#58a6ff" />
-          <Text style={styles.gitRepo}>{metadata.repo || 'repo qeyd edilmeyib'}</Text>
-          <Text style={styles.payloadMuted}>{metadata.branch || 'main'}</Text>
+          <Text style={[styles.gitRepo, { color: colors.text }]}>{metadata.repo || 'repo qeyd edilmeyib'}</Text>
+          <Text style={[styles.payloadMuted, { color: colors.muted }]}>{metadata.branch || 'main'}</Text>
         </View>
         {commits.map((commit, index) => (
           <View key={`${commit.hash || index}`} style={styles.commitRow}>
             <Text style={styles.commitHash}>{commit.hash || 'commit'}</Text>
-            <Text style={styles.commitText}>{commit.msg || commit.message || post.caption}</Text>
+            <Text style={[styles.commitText, { color: colors.text }]}>{commit.msg || commit.message || post.caption}</Text>
           </View>
         ))}
       </View>
     );
   }
   if (post.type === 'DEPLOY') {
+    const deployUrl = metadata.url || metadata.link || metadata.deployUrl;
     return (
-      <View style={styles.deployBox}>
+      <View style={[styles.deployBox, { backgroundColor: colors.surfaceStrong, borderColor: colors.border }]}>
         <MaterialIcons name="cloud-upload" size={20} color="#3fb950" />
         <View style={styles.payloadBody}>
-          <Text style={styles.payloadTitle}>{metadata.service || 'Deploy'} -> {metadata.env || 'Production'}</Text>
+          <Text style={[styles.payloadTitle, { color: colors.text }]}>{metadata.service || 'Deploy'} -> {metadata.env || 'Production'}</Text>
           <Text style={styles.deployText}>Deploy ugurlu - {metadata.duration || '2m 30s'}</Text>
+          {!!deployUrl && (
+            <TouchableOpacity onPress={() => openExternalUrl(deployUrl)}>
+              <Text style={styles.payloadLink} numberOfLines={1}>{deployUrl}</Text>
+            </TouchableOpacity>
+          )}
         </View>
         <Text style={styles.liveBadge}>LIVE</Text>
       </View>
@@ -130,31 +201,25 @@ function PayloadPreview({ post }) {
     const mediaType = metadata.mediaType || (String(metadata.mimeType || '').startsWith('image/') ? 'image' : 'video');
     return (
       <TouchableOpacity
-        style={styles.mediaBox}
+        style={[styles.mediaBox, { backgroundColor: colors.surfaceStrong, borderColor: colors.border }]}
         activeOpacity={mediaUrl ? 0.85 : 1}
         onPress={() => {
           if (mediaType !== 'video') openExternalUrl(mediaUrl);
         }}
-        disabled={!mediaUrl || mediaType === 'video'}
+        disabled={!mediaUrl}
       >
         {mediaType === 'image' && mediaUrl ? (
           <Image source={{ uri: mediaUrl }} style={styles.mediaPreviewImage} />
         ) : mediaType === 'video' && mediaUrl ? (
-          <Video
-            source={{ uri: mediaUrl }}
-            style={styles.mediaPreviewVideo}
-            resizeMode={ResizeMode.COVER}
-            useNativeControls
-            shouldPlay={false}
-          />
+          <AutoVideo uri={mediaUrl} style={styles.mediaPreviewVideo} />
         ) : (
           <View style={styles.mediaPreviewIcon}>
             <MaterialIcons name="play-circle-outline" size={42} color="#818cf8" />
           </View>
         )}
-        <View style={styles.mediaOverlay}>
+        <View style={[styles.mediaOverlay, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
           <Text style={styles.mediaTitle}>{metadata.title || 'Media paylaşım'}</Text>
-          <Text style={styles.mediaLink}>{mediaType === 'video' && mediaUrl ? 'Video player' : mediaUrl || 'Media əlavə edilməyib'}</Text>
+          <Text style={styles.mediaLink}>{mediaType === 'video' && mediaUrl ? 'Toxunanda dayanır / davam edir' : mediaUrl || 'Media əlavə edilməyib'}</Text>
         </View>
       </TouchableOpacity>
     );
@@ -162,7 +227,7 @@ function PayloadPreview({ post }) {
   if (post.type === 'JOB') {
     const requirements = Array.isArray(metadata.requirements) ? metadata.requirements : [];
     return (
-      <View style={styles.jobBox}>
+      <View style={[styles.jobBox, { backgroundColor: colors.surfaceStrong, borderColor: colors.border }]}>
         {requirements.map((item) => (
           <Text key={item} style={styles.jobChip}>{item}</Text>
         ))}
@@ -563,8 +628,8 @@ export default function PostDetailScreen({ route, navigation }) {
           </View>
         </View>
 
-        <Text style={[styles.postTitle, themed.title]}>{post.title}</Text>
-        {!!post.body && <Text style={[styles.postBody, themed.title]}>{post.body}</Text>}
+        <LinkifiedText text={post.title} style={[styles.postTitle, themed.title]} linkStyle={styles.inlineLink} />
+        {!!post.body && <LinkifiedText text={post.body} style={[styles.postBody, themed.title]} linkStyle={styles.inlineLink} />}
         {post.tags.length > 0 && (
           <View style={styles.tagsRow}>
             {post.tags.map((tag) => (
@@ -657,11 +722,17 @@ export default function PostDetailScreen({ route, navigation }) {
 
   return (
     <SafeAreaView style={[styles.container, themed.container]} edges={['top']}>
+      <KeyboardAvoidingView
+        style={styles.keyboard}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 72 : 0}
+      >
       <FlatList
         data={comments}
         keyExtractor={(item) => item.id?.toString() ?? Math.random().toString()}
         ListHeaderComponent={renderHeader()}
         contentContainerStyle={styles.listContent}
+        keyboardShouldPersistTaps="handled"
         renderItem={({ item }) => (
           <View style={[styles.commentCard, themed.commentCard]}>
             <AuthorAvatar name={item.name || item.user?.name || item.sender?.name} avatarUrl={item.avatar_url || item.user?.avatar_url || item.sender?.avatar_url} />
@@ -701,6 +772,7 @@ export default function PostDetailScreen({ route, navigation }) {
         onClose={() => setApplyOpen(false)}
         onSubmit={handleSubmitJobApplication}
       />
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -709,6 +781,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#0d1117',
+  },
+  keyboard: {
+    flex: 1,
   },
   center: {
     flex: 1,
@@ -829,6 +904,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginBottom: 12,
   },
+  inlineLink: {
+    color: '#58a6ff',
+    fontWeight: '800',
+    textDecorationLine: 'underline',
+  },
   tagsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -928,6 +1008,16 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 230,
     backgroundColor: '#0d1117',
+  },
+  videoPausedOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.25)',
   },
   mediaPreviewIcon: {
     height: 145,
