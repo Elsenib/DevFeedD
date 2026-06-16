@@ -104,7 +104,12 @@ function randomToken(bytes = 32) {
 }
 
 function getBackendBaseUrl(req) {
-  return (process.env.PUBLIC_BACKEND_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
+  const raw = (process.env.PUBLIC_BACKEND_URL || `${req.protocol}://${req.get('host')}`).trim();
+  try {
+    return new URL(raw).origin.replace(/\/$/, '');
+  } catch (error) {
+    return raw.replace(/\/auth\/.*$/i, '').replace(/\/$/, '');
+  }
 }
 
 function firstEnv(...keys) {
