@@ -3,6 +3,7 @@ const db = require('../db');
 const { auth } = require('../middleware/auth');
 const { containsIllegalWords } = require('../middleware/contentFilter');
 const { createNotification } = require('../services/notifications');
+const { notBlockedSql, isBlockedBetween } = require('../services/moderation');
 
 const router = express.Router();
 
@@ -15,7 +16,8 @@ router.get('/', auth, async (req, res) => {
        FROM conversations c
        JOIN users ua ON ua.id = c.user_a_id
        JOIN users ub ON ub.id = c.user_b_id
-       WHERE c.user_a_id = $1 OR c.user_b_id = $1
+       WHERE (c.user_a_id = $1 OR c.user_b_id = $1)
+         AND ${notBlockedSql('c.user_a_id', 'c.user_b_id')}
        ORDER BY c.updated_at DESC`,
       [req.user.id]
     );
@@ -122,6 +124,9 @@ router.post('/', auth, async (req, res) => {
     if (!otherUser) {
       return res.status(404).json({ message: 'User not found' });
     }
+    if (await isBlockedBetween(req.user.id, otherUser.id)) {
+      return res.status(403).json({ message: 'Bu istifadəçi ilə yazışmaq mümkün deyil.' });
+    }
 
     const existing = await db.query(
       `SELECT id FROM conversations
@@ -160,7 +165,7 @@ router.post('/:id/messages', auth, async (req, res) => {
 
   try {
     const conversationResult = await db.query(
-      `SELECT id FROM conversations
+      `SELECT id, user_a_id, user_b_id FROM conversations
        WHERE id = $1
          AND ($2 = user_a_id OR $2 = user_b_id)`,
       [id, req.user.id]
@@ -168,6 +173,10 @@ router.post('/:id/messages', auth, async (req, res) => {
 
     if (conversationResult.rows.length === 0) {
       return res.status(404).json({ message: 'Conversation not found' });
+    }
+    const { user_a_id: userAId, user_b_id: userBId } = conversationResult.rows[0];
+    if (await isBlockedBetween(userAId, userBId)) {
+      return res.status(403).json({ message: 'Bu istifadəçi ilə yazışmaq mümkün deyil.' });
     }
 
     const insertResult = await db.query(

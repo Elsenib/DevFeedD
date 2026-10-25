@@ -1,7 +1,9 @@
 const db = require('../db');
+const { isBlockedBetween } = require('./moderation');
 
 async function createNotification({ userId, actorId, type, entityType, entityId, text }) {
   if (!userId || String(userId) === String(actorId || '')) return null;
+  if (actorId && await isBlockedBetween(userId, actorId)) return null;
 
   const result = await db.query(
     `INSERT INTO notifications (user_id, actor_id, type, entity_type, entity_id, text)

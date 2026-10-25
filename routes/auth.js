@@ -4,9 +4,12 @@ const jwt = require('jsonwebtoken');
 const dns = require('dns').promises;
 const crypto = require('crypto');
 const db = require('../db');
+const { rateLimit } = require('../middleware/rateLimit');
 
 const router = express.Router();
-const jwtSecret = process.env.JWT_SECRET || 'devfeed-secret';
+
+const loginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10, message: 'Çox sayda cəhd. 15 dəqiqə sonra yenidən yoxlayın.' });
+const registerLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 10, message: 'Çox sayda qeydiyyat cəhdi. Bir az sonra yenidən yoxlayın.' });
 
 const DISPOSABLE_EMAIL_DOMAINS = new Set([
   'mailinator.com', '10minutemail.com', 'guerrillamail.com', 'trashmail.com', 'tempmail.com',
@@ -96,7 +99,7 @@ function makeVerificationCode() {
 }
 
 function makeToken(user) {
-  return jwt.sign({ id: user.id, email: user.email, name: user.name }, jwtSecret, { expiresIn: '30d' });
+  return jwt.sign({ id: user.id, email: user.email, name: user.name }, process.env.JWT_SECRET, { expiresIn: '30d' });
 }
 
 function randomToken(bytes = 32) {
@@ -283,7 +286,7 @@ async function fetchOAuthProfile(provider, accessToken) {
   throw new Error('Unsupported provider');
 }
 
-router.post('/register', async (req, res) => {
+router.post('/register', registerLimiter, async (req, res) => {
   const { name, email, password, role, skills, languages } = req.body;
   const normalizedEmail = normalizeEmail(email);
   const trimmedName = String(name || '').trim();
@@ -357,7 +360,7 @@ router.post('/register', async (req, res) => {
   }
 });
 
-router.post('/verify-email', async (req, res) => {
+router.post('/verify-email', loginLimiter, async (req, res) => {
   const normalizedEmail = normalizeEmail(req.body.email);
   const code = String(req.body.code || '').trim();
 
@@ -410,7 +413,7 @@ router.post('/verify-email', async (req, res) => {
   }
 });
 
-router.post('/login', async (req, res) => {
+router.post('/login', loginLimiter, async (req, res) => {
   const { email, password } = req.body;
   const normalizedEmail = normalizeEmail(email);
   if (!normalizedEmail || !password) {
@@ -438,22 +441,6 @@ router.post('/login', async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Login failed' });
-  }
-});
-
-router.post('/social-login', async (req, res) => {
-  const { provider, providerId, email, name, avatarUrl } = req.body;
-  const normalizedEmail = normalizeEmail(email);
-  if (!provider || !providerId || !normalizedEmail || !name) {
-    return res.status(400).json({ message: 'provider, providerId, email and name are required.' });
-  }
-
-  try {
-    const result = await performOAuthLogin({ provider, providerId, email: normalizedEmail, name, avatarUrl });
-    res.json(result);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Social login failed.' });
   }
 });
 

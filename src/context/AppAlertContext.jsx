@@ -52,6 +52,7 @@ export function AppAlertProvider({ children }) {
 
   const close = () => setAlertState(null);
   const icon = alertState ? iconFor(alertState.title, alertState.buttons) : null;
+  const stacked = (alertState?.buttons.length || 0) > 2;
 
   return (
     <>
@@ -70,7 +71,7 @@ export function AppAlertProvider({ children }) {
               </View>
             </View>
 
-            <View style={styles.buttonRow}>
+            <View style={stacked ? styles.buttonColumn : styles.buttonRow}>
               {alertState?.buttons.map((button, index) => {
                 const destructive = button.style === 'destructive';
                 const cancel = button.style === 'cancel';
@@ -81,7 +82,7 @@ export function AppAlertProvider({ children }) {
                       styles.button,
                       cancel && styles.cancelButton,
                       destructive && styles.destructiveButton,
-                      index > 0 && styles.buttonSpacing,
+                      index > 0 && (stacked ? styles.buttonStackSpacing : styles.buttonSpacing),
                     ]}
                     onPress={() => {
                       close();
@@ -168,6 +169,12 @@ function createStyles(colors) {
     },
     buttonSpacing: {
       marginLeft: 8,
+    },
+    buttonColumn: {
+      marginTop: 18,
+    },
+    buttonStackSpacing: {
+      marginTop: 8,
     },
     cancelButton: {
       backgroundColor: colors.surfaceStrong,

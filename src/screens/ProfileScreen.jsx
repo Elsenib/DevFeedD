@@ -17,6 +17,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { AuthContext } from '../context/AuthContext';
 import { PreferencesContext } from '../context/PreferencesContext';
 import * as api from '../api';
+import { PAYMENTS_ENABLED } from '../constants/config';
+import { openModerationMenu } from '../utils/moderation';
 
 function splitList(value) {
   if (Array.isArray(value)) return value.filter(Boolean);
@@ -232,7 +234,7 @@ export default function ProfileScreen({ route, navigation }) {
       const [profileData, postsData, configData] = await Promise.all([
         isOwnProfile ? api.fetchProfile() : api.fetchUserProfile(targetUserId),
         isOwnProfile ? api.fetchMyPosts().catch(() => []) : api.fetchUserPosts(targetUserId).catch(() => ({ posts: [] })),
-        api.fetchSupportConfig().catch(() => null),
+        PAYMENTS_ENABLED ? api.fetchSupportConfig().catch(() => null) : null,
       ]);
       setProfile(profileData);
       setMyPosts(Array.isArray(postsData) ? postsData : (postsData.posts || []));
@@ -350,6 +352,17 @@ export default function ProfileScreen({ route, navigation }) {
     }
   };
 
+  const handleProfileMore = () => {
+    openModerationMenu({
+      targetType: 'user',
+      targetId: profile?.id || targetUserId,
+      userId: profile?.id || targetUserId,
+      userName: profile?.name,
+      currentUserId: user?.id,
+      onBlocked: () => navigation.goBack(),
+    });
+  };
+
   const handleMessage = async () => {
     if (!profile?.id) return;
     try {
@@ -435,10 +448,18 @@ export default function ProfileScreen({ route, navigation }) {
               <Text style={styles.actionButtonText} numberOfLines={1}>Mesaj</Text>
             </TouchableOpacity>
           )}
-          <TouchableOpacity style={[styles.actionButton, styles.supportButton]} onPress={() => setSupportOpen(true)}>
-            <MaterialIcons name="local-cafe" size={18} color="#111827" />
-            <Text style={styles.supportButtonText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82}>Dəstək ol</Text>
-          </TouchableOpacity>
+          {PAYMENTS_ENABLED && (
+            <TouchableOpacity style={[styles.actionButton, styles.supportButton]} onPress={() => setSupportOpen(true)}>
+              <MaterialIcons name="local-cafe" size={18} color="#111827" />
+              <Text style={styles.supportButtonText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82}>Dəstək ol</Text>
+            </TouchableOpacity>
+          )}
+          {!isOwnProfile && (
+            <TouchableOpacity style={[styles.actionButton, styles.moreAction]} onPress={handleProfileMore}>
+              <MaterialIcons name="more-horiz" size={18} color={colors.text} />
+              <Text style={styles.moreActionText} numberOfLines={1}>Seçimlər</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         <View style={styles.card}>
@@ -457,10 +478,12 @@ export default function ProfileScreen({ route, navigation }) {
           </View>
         </View>
 
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Buy me a coffee</Text>
-          <Text style={styles.bodyText}>Bu profili minimum 1 AZN ilə dəstəklə. Manual ödəniş hesab nömrəsi ilə aparılır.</Text>
-        </View>
+        {PAYMENTS_ENABLED && (
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>Buy me a coffee</Text>
+            <Text style={styles.bodyText}>Bu profili minimum 1 AZN ilə dəstəklə. Manual ödəniş hesab nömrəsi ilə aparılır.</Text>
+          </View>
+        )}
 
         <View style={styles.card}>
           <View style={styles.sectionHeaderRow}>
@@ -675,6 +698,16 @@ function createStyles(colors) {
     },
     supportButton: {
       backgroundColor: colors.warning,
+    },
+    moreAction: {
+      backgroundColor: colors.surface,
+      borderColor: colors.border,
+      borderWidth: 1,
+    },
+    moreActionText: {
+      color: colors.text,
+      fontWeight: '900',
+      marginLeft: 7,
     },
     supportButtonText: {
       color: '#111827',

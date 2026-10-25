@@ -25,6 +25,7 @@ import { AuthContext } from '../context/AuthContext';
 import { PreferencesContext } from '../context/PreferencesContext';
 import JobApplicationModal from '../components/JobApplicationModal';
 import * as api from '../api';
+import { openModerationMenu } from '../utils/moderation';
 
 const POST_TYPES = [
   { id: 'TEXT', label: 'Post', icon: 'terminal', color: '#8b949e' },
@@ -373,7 +374,7 @@ function PostPayload({ post, onApplyJob }) {
   return null;
 }
 
-function PostCard({ post, onPress, onAuthorPress, onLike, onBookmark, onApplyJob }) {
+function PostCard({ post, onPress, onAuthorPress, onLike, onBookmark, onApplyJob, onMore }) {
   const { theme } = useContext(PreferencesContext);
   const colors = theme.colors;
   const themed = useMemo(() => ({
@@ -401,6 +402,18 @@ function PostCard({ post, onPress, onAuthorPress, onLike, onBookmark, onApplyJob
         <View style={[styles.typeBadge, { borderColor: kind.color, backgroundColor: `${kind.color}18` }]}>
           <Text style={[styles.typeBadgeText, { color: kind.color }]}>{kind.label.toUpperCase()}</Text>
         </View>
+        {onMore && (
+          <TouchableOpacity
+            style={styles.moreButton}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            onPress={(event) => {
+              event?.stopPropagation?.();
+              onMore(post);
+            }}
+          >
+            <MaterialIcons name="more-vert" size={20} color={colors.muted} />
+          </TouchableOpacity>
+        )}
       </View>
 
       <LinkifiedText text={post.caption} style={[styles.postCaption, themed.text]} linkStyle={styles.inlineLink} />
@@ -939,6 +952,18 @@ export default function FeedScreen({ navigation }) {
     }
   };
 
+  const handlePostMore = (post) => {
+    const authorId = post.user_id || post.userId;
+    openModerationMenu({
+      targetType: 'post',
+      targetId: post.id,
+      userId: authorId,
+      userName: post.authorName,
+      currentUserId: user?.id,
+      onBlocked: () => setPosts((prev) => prev.filter((item) => String(item.user_id || item.userId) !== String(authorId))),
+    });
+  };
+
   const handleAuthorPress = (post) => {
     const authorId = post.user_id || post.userId;
     if (!authorId) return;
@@ -1013,6 +1038,7 @@ export default function FeedScreen({ navigation }) {
               onLike={handleLike}
               onBookmark={handleBookmark}
               onApplyJob={handleApplyJob}
+              onMore={String(item.user_id || item.userId) === String(user?.id) ? undefined : handlePostMore}
             />
           )}
           contentContainerStyle={styles.listContent}
@@ -1189,6 +1215,10 @@ const styles = StyleSheet.create({
     color: '#8b949e',
     fontSize: 11,
     marginTop: 2,
+  },
+  moreButton: {
+    marginLeft: 6,
+    padding: 2,
   },
   typeBadge: {
     borderWidth: 1,

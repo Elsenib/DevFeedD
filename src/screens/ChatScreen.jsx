@@ -6,6 +6,7 @@ import {
   Image,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   RefreshControl,
   StyleSheet,
   Text,
@@ -18,6 +19,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { AuthContext } from '../context/AuthContext';
 import { PreferencesContext } from '../context/PreferencesContext';
 import * as api from '../api';
+import { openModerationMenu } from '../utils/moderation';
 
 function formatTime(value) {
   if (!value) return '';
@@ -101,10 +103,39 @@ export default function ChatScreen({ route, navigation }) {
     }
   };
 
+  const otherUser = conversation?.participants?.other;
+
+  const handleConversationMore = () => {
+    if (!otherUser?.id) return;
+    openModerationMenu({
+      targetType: 'user',
+      targetId: otherUser.id,
+      userId: otherUser.id,
+      userName: otherUser.name,
+      currentUserId: user?.id,
+      onBlocked: () => navigation.goBack(),
+    });
+  };
+
+  const handleMessageLongPress = (item) => {
+    openModerationMenu({
+      targetType: 'message',
+      targetId: item.id,
+      userId: item.sender?.id || item.sender_id,
+      userName: item.sender?.name || item.sender_name,
+      currentUserId: user?.id,
+      onBlocked: () => navigation.goBack(),
+    });
+  };
+
   const renderMessage = ({ item }) => {
     const mine = String(item.sender?.id || item.sender_id || '') === String(user?.id || '');
     return (
-      <View style={[styles.messageRow, mine && styles.messageRowMine]}>
+      <Pressable
+        style={[styles.messageRow, mine && styles.messageRowMine]}
+        onLongPress={mine ? undefined : () => handleMessageLongPress(item)}
+        delayLongPress={350}
+      >
         {!mine && <MessageAvatar name={item.sender?.name || item.sender_name || screenTitle} uri={item.sender?.avatar_url || item.sender_avatar_url} />}
         <View style={[styles.messageBubble, themed.bubble, mine && styles.messageBubbleMine, mine && themed.mineBubble]}>
           <Text style={[styles.senderName, mine && styles.senderNameMine]}>
@@ -115,7 +146,7 @@ export default function ChatScreen({ route, navigation }) {
             <Text style={[styles.messageTime, mine && styles.messageTimeMine]}>{formatTime(item.createdAt || item.created_at)}</Text>
           </View>
         </View>
-      </View>
+      </Pressable>
     );
   };
 
@@ -145,6 +176,11 @@ export default function ChatScreen({ route, navigation }) {
         <TouchableOpacity style={[styles.iconButton, themed.iconButton]} onPress={loadConversation}>
           <MaterialIcons name="refresh" size={20} color={colors.muted} />
         </TouchableOpacity>
+        {!!otherUser?.id && (
+          <TouchableOpacity style={[styles.iconButton, themed.iconButton, { marginLeft: 8 }]} onPress={handleConversationMore}>
+            <MaterialIcons name="more-vert" size={20} color={colors.muted} />
+          </TouchableOpacity>
+        )}
       </View>
 
       <FlatList

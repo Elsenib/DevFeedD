@@ -8,7 +8,7 @@ const auth = (req, res, next) => {
 
   const token = authHeader.split(' ')[1];
   try {
-    const payload = jwt.verify(token, process.env.JWT_SECRET || 'devfeed-secret');
+    const payload = jwt.verify(token, process.env.JWT_SECRET);
     req.user = payload;
     next();
   } catch (error) {
@@ -25,7 +25,7 @@ const optionalAuth = (req, res, next) => {
 
   const token = authHeader.split(' ')[1];
   try {
-    req.user = jwt.verify(token, process.env.JWT_SECRET || 'devfeed-secret');
+    req.user = jwt.verify(token, process.env.JWT_SECRET);
   } catch (error) {
     req.user = null;
   }

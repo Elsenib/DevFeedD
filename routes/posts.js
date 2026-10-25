@@ -6,6 +6,7 @@ const pool = require('../db');
 const { auth, optionalAuth } = require('../middleware/auth');
 const { containsIllegalWords, checkBadWords } = require('../middleware/contentFilter');
 const { createNotification } = require('../services/notifications');
+const { notBlockedSql, isBlockedBetween } = require('../services/moderation');
 
 const router = express.Router();
 const resumesDir = path.join(__dirname, '../uploads/resumes');
@@ -182,6 +183,7 @@ router.get('/', optionalAuth, async (req, res) => {
         EXISTS(SELECT 1 FROM post_bookmarks WHERE post_id = p.id AND user_id = $1) as bookmarked_by_me
        FROM posts p
        JOIN users u ON p.user_id = u.id
+       WHERE ${notBlockedSql('$1', 'p.user_id')}
        ORDER BY p.created_at DESC
        LIMIT $2 OFFSET $3`,
       [viewerId, limit, offset]
@@ -211,11 +213,12 @@ router.get('/search', optionalAuth, async (req, res) => {
         EXISTS(SELECT 1 FROM post_bookmarks WHERE post_id = p.id AND user_id = $1) as bookmarked_by_me
        FROM posts p
        JOIN users u ON p.user_id = u.id
-       WHERE $2 = ''
+       WHERE ${notBlockedSql('$1', 'p.user_id')}
+         AND ($2 = ''
           OR p.title ILIKE $3
           OR p.caption ILIKE $3
           OR p.body ILIKE $3
-          OR EXISTS (SELECT 1 FROM unnest(p.tags) tag WHERE tag ILIKE $3)
+          OR EXISTS (SELECT 1 FROM unnest(p.tags) tag WHERE tag ILIKE $3))
        ORDER BY p.created_at DESC
        LIMIT 40`,
       [viewerId, q, pattern]
@@ -608,9 +611,10 @@ router.post('/:id/comments', auth, async (req, res) => {
 });
 
 // GET /posts/:id/comments
-router.get('/:id/comments', async (req, res) => {
+router.get('/:id/comments', optionalAuth, async (req, res) => {
   try {
     const { id } = req.params;
+    const viewerId = req.user?.id || 0;
     const result = await pool.query(
       `SELECT c.id, c.post_id, c.user_id, c.parent_id, c.reply_to_user_id, c.text, c.created_at,
               u.name, u.avatar_url,
@@ -619,8 +623,9 @@ router.get('/:id/comments', async (req, res) => {
        JOIN users u ON c.user_id = u.id
        LEFT JOIN users reply_user ON reply_user.id = c.reply_to_user_id
        WHERE c.post_id = $1
+         AND ${notBlockedSql('$2', 'c.user_id')}
        ORDER BY c.created_at DESC`,
-      [id]
+      [id, viewerId]
     );
     res.json(result.rows);
   } catch (error) {
@@ -630,7 +635,7 @@ router.get('/:id/comments', async (req, res) => {
 });
 
 // POST /posts/:id/apply
-router.post('/:id/apply', auth, async (req, res, next) => {
+router.post('/:id/apply', auth, async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user.id;
@@ -646,6 +651,7 @@ router.post('/:id/apply', auth, async (req, res, next) => {
     if (!jobPost) return res.status(404).json({ error: 'Post not found' });
     if (jobPost.post_type !== 'JOB') return res.status(400).json({ error: 'Only JOB posts can be applied to' });
     if (String(jobPost.user_id) === String(userId)) return res.status(400).json({ error: 'Öz iş elanına müraciət etmək olmaz.' });
+    if (await isBlockedBetween(userId, jobPost.user_id)) return res.status(403).json({ error: 'Bu elana müraciət etmək mümkün deyil.' });
     if (!String(applicant_phone || '').trim()) return res.status(400).json({ error: 'Əlaqə nömrəsi lazımdır.' });
     if (!String(resume_url || '').trim()) return res.status(400).json({ error: 'CV PDF faylı lazımdır.' });
 
@@ -717,13 +723,12 @@ router.post('/:id/apply', auth, async (req, res, next) => {
 
     res.json({ message: 'Application submitted', conversationId, application: applicationResult.rows[0] });
   } catch (error) {
-    if (error?.code === '42703') return next();
     console.error('POST /posts/:id/apply real flow error:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
-router.get('/:id/applications', auth, async (req, res, next) => {
+router.get('/:id/applications', auth, async (req, res) => {
   try {
     const { id } = req.params;
     const postResult = await pool.query('SELECT user_id FROM posts WHERE id = $1', [id]);
@@ -743,82 +748,7 @@ router.get('/:id/applications', auth, async (req, res, next) => {
 
     res.json(applicationsResult.rows);
   } catch (error) {
-    if (error?.code === '42703') return next();
     console.error('GET /posts/:id/applications real flow error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Legacy fallback: POST /posts/:id/apply
-router.post('/:id/apply', auth, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const user_id = req.user.id;
-    const { cover_letter = '', resume_url = '' } = req.body;
-
-    const postResult = await pool.query('SELECT post_type FROM posts WHERE id = $1', [id]);
-    if (postResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Post not found' });
-    }
-    if (postResult.rows[0].post_type !== 'JOB') {
-      return res.status(400).json({ error: 'Only JOB posts can be applied to' });
-    }
-    if (containsIllegalWords(cover_letter) || containsIllegalWords(resume_url)) {
-      return res.status(400).json({ error: 'Müraciət məzmunu uyğun deyil.' });
-    }
-
-    await pool.query(
-      `INSERT INTO job_applications (post_id, user_id, status, cover_letter, resume_url)
-       VALUES ($1, $2, 'APPLIED', $3, $4)
-       ON CONFLICT (post_id, user_id)
-       DO UPDATE SET status = EXCLUDED.status, cover_letter = EXCLUDED.cover_letter, resume_url = EXCLUDED.resume_url, created_at = NOW()`,
-      [id, user_id, cover_letter, resume_url]
-    );
-
-    const postOwner = await pool.query('SELECT user_id FROM posts WHERE id = $1', [id]);
-    const ownerId = postOwner.rows[0].user_id;
-
-    const existingConversation = await pool.query(
-      `SELECT id FROM conversations
-       WHERE (user_a_id = $1 AND user_b_id = $2)
-          OR (user_a_id = $2 AND user_b_id = $1)`,
-      [user_id, ownerId]
-    );
-
-    let conversationId;
-    if (existingConversation.rows.length > 0) {
-      conversationId = existingConversation.rows[0].id;
-    } else {
-      const conversationResult = await pool.query(
-        'INSERT INTO conversations (user_a_id, user_b_id, last_message, updated_at) VALUES ($1, $2, $3, NOW()) RETURNING id',
-        [user_id, ownerId, 'İş müraciəti göndərildi']
-      );
-      conversationId = conversationResult.rows[0].id;
-    }
-
-    const messageText = `Mən bu vakansiyaya müraciət etdim. CV: ${resume_url || 'Mövcud deyil'}\nMəktub: ${cover_letter || 'Məktub əlavə edilməyib'}`;
-    await pool.query(
-      'INSERT INTO messages (conversation_id, sender_id, text) VALUES ($1, $2, $3)',
-      [conversationId, user_id, messageText]
-    );
-
-    await pool.query(
-      'UPDATE conversations SET last_message = $1, updated_at = NOW() WHERE id = $2',
-      [messageText, conversationId]
-    );
-
-    await createNotification({
-      userId: ownerId,
-      actorId: user_id,
-      type: 'job_application',
-      entityType: 'post',
-      entityId: id,
-      text: `${req.user.name || 'Bir istifadəçi'} iş elanına müraciət etdi.`,
-    });
-
-    res.json({ message: 'Application submitted', conversationId });
-  } catch (error) {
-    console.error('POST /posts/:id/apply error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -835,36 +765,6 @@ router.get('/:id/application-status', auth, async (req, res) => {
     res.json({ applied: result.rows.length > 0, status: result.rows[0]?.status || null });
   } catch (error) {
     console.error('GET /posts/:id/application-status error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-router.get('/:id/applications', auth, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const user_id = req.user.id;
-
-    const postResult = await pool.query('SELECT user_id FROM posts WHERE id = $1', [id]);
-    if (postResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Post not found' });
-    }
-    if (postResult.rows[0].user_id !== user_id) {
-      return res.status(403).json({ error: 'Not authorized to view applications' });
-    }
-
-    const applicationsResult = await pool.query(
-      `SELECT ja.user_id, ja.status, ja.cover_letter, ja.resume_url, ja.created_at,
-              u.name, u.email, u.role, u.avatar_url
-       FROM job_applications ja
-       JOIN users u ON u.id = ja.user_id
-       WHERE ja.post_id = $1
-       ORDER BY ja.created_at DESC`,
-      [id]
-    );
-
-    res.json(applicationsResult.rows);
-  } catch (error) {
-    console.error('GET /posts/:id/applications error:', error);
     res.status(500).json({ error: error.message });
   }
 });

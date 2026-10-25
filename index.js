@@ -12,8 +12,16 @@ const chatRoutes = require('./routes/chat');
 const supportRoutes = require('./routes/support');
 const usersRoutes = require('./routes/users');
 const notificationsRoutes = require('./routes/notifications');
+const reportsRoutes = require('./routes/reports');
+const legalRoutes = require('./routes/legal');
 
 dotenv.config();
+
+if (!process.env.JWT_SECRET) {
+  console.error('JWT_SECRET is not set. Refusing to start.');
+  process.exit(1);
+}
+
 const app = express();
 app.set('trust proxy', 1);
 app.use(cors());
@@ -36,6 +44,8 @@ app.use('/chat', chatRoutes);
 app.use('/support', supportRoutes);
 app.use('/users', usersRoutes);
 app.use('/notifications', notificationsRoutes);
+app.use('/reports', reportsRoutes);
+app.use('/', legalRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -310,6 +320,28 @@ const createSchema = async () => {
         status TEXT NOT NULL DEFAULT 'PENDING_MANUAL_CONFIRMATION',
         note TEXT,
         reference TEXT UNIQUE NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS user_blocks (
+        blocker_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        blocked_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        PRIMARY KEY (blocker_id, blocked_id),
+        CHECK (blocker_id <> blocked_id)
+      );
+    `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS content_reports (
+        id SERIAL PRIMARY KEY,
+        reporter_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        target_type TEXT NOT NULL,
+        target_id INTEGER NOT NULL,
+        reason TEXT NOT NULL,
+        details TEXT,
+        status TEXT NOT NULL DEFAULT 'OPEN',
         created_at TIMESTAMPTZ DEFAULT NOW()
       );
     `);

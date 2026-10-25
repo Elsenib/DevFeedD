@@ -7,6 +7,7 @@ import {
   KeyboardAvoidingView,
   Modal,
   Platform,
+  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -20,6 +21,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { AuthContext } from '../context/AuthContext';
 import { PreferencesContext } from '../context/PreferencesContext';
 import * as api from '../api';
+import { openModerationMenu } from '../utils/moderation';
 
 function formatTime(value) {
   if (!value) return '';
@@ -345,10 +347,26 @@ export default function PublicChatScreen({ route }) {
     }
   };
 
+  const handleMessageLongPress = (item) => {
+    const authorId = item.user_id || item.userId;
+    openModerationMenu({
+      targetType: 'chat_message',
+      targetId: item.id,
+      userId: authorId,
+      userName: item.name,
+      currentUserId: user?.id,
+      onBlocked: () => setMessages((prev) => prev.filter((message) => String(message.user_id || message.userId) !== String(authorId))),
+    });
+  };
+
   const renderMessage = ({ item }) => {
     const mine = String(item.user_id || item.userId || '') === String(user?.id || '');
     return (
-      <View style={[styles.messageRow, mine && styles.messageRowMine]}>
+      <Pressable
+        style={[styles.messageRow, mine && styles.messageRowMine]}
+        onLongPress={mine ? undefined : () => handleMessageLongPress(item)}
+        delayLongPress={350}
+      >
         {!mine && <MessageAvatar name={item.name} uri={item.avatar_url} />}
         <View style={[styles.messageBubble, themed.bubble, mine && styles.messageBubbleMine, mine && themed.mineBubble]}>
           <Text style={[styles.senderName, mine && styles.senderNameMine]}>
@@ -362,7 +380,7 @@ export default function PublicChatScreen({ route }) {
             <Text style={[styles.messageTime, mine && styles.messageTimeMine]}>{formatTime(item.created_at || item.createdAt)}</Text>
           </View>
         </View>
-      </View>
+      </Pressable>
     );
   };
 

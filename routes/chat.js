@@ -3,6 +3,7 @@ const db = require('../db');
 const { auth } = require('../middleware/auth');
 const { containsIllegalWords, checkBadWords } = require('../middleware/contentFilter');
 const { createNotification } = require('../services/notifications');
+const { notBlockedSql } = require('../services/moderation');
 
 const router = express.Router();
 
@@ -245,9 +246,10 @@ router.get('/rooms/:id/messages', auth, async (req, res) => {
        FROM chat_messages cm
        JOIN users u ON u.id = cm.user_id
        WHERE cm.room_id = $1
+         AND ${notBlockedSql('$3', 'cm.user_id')}
        ORDER BY cm.created_at DESC
        LIMIT $2`,
-      [id, Number(limit)]
+      [id, Number(limit), req.user.id]
     );
 
     res.json(result.rows.reverse());

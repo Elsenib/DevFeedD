@@ -245,8 +245,37 @@ router.patch('/', auth, async (req, res) => {
     res.json({ user });
   } catch (error) {
     console.error(error);
-    // For debugging in dev, return error message and stack
-    res.status(500).json({ message: error.message || 'Could not update profile', stack: error.stack });
+    res.status(500).json({ message: 'Could not update profile' });
+  }
+});
+
+// Permanently delete the current user's account and all data tied to it.
+router.delete('/', auth, async (req, res) => {
+  const client = await db.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await client.query('DELETE FROM users WHERE id = $1 RETURNING email, avatar_url', [req.user.id]);
+    const deleted = result.rows[0];
+    if (!deleted) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ message: 'User not found' });
+    }
+    await client.query('DELETE FROM email_verification_codes WHERE email = $1', [deleted.email]);
+    await client.query("DELETE FROM oauth_login_sessions WHERE user_payload->>'id' = $1", [String(req.user.id)]);
+    await client.query('COMMIT');
+
+    const avatarFile = String(deleted.avatar_url || '').split('/uploads/avatars/')[1];
+    if (avatarFile) {
+      fs.unlink(path.join(avatarUploadDir, path.basename(avatarFile)), () => {});
+    }
+
+    res.json({ deleted: true });
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('DELETE /profile error:', error);
+    res.status(500).json({ message: 'Hesab silinmədi. Yenidən cəhd edin.' });
+  } finally {
+    client.release();
   }
 });
 

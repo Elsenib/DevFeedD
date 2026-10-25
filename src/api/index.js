@@ -29,17 +29,6 @@ export async function verifyEmailRegistration(email, code) {
   return response.data;
 }
 
-export async function socialLogin({ provider, providerId, email, name, avatarUrl }) {
-  const response = await api.post('/auth/social-login', {
-    provider,
-    providerId,
-    email,
-    name,
-    avatarUrl,
-  });
-  return response.data;
-}
-
 export async function startOAuth(provider, redirectUri) {
   const response = await api.get(`/auth/oauth/start/${provider}`, {
     params: { redirectUri },
@@ -291,12 +280,36 @@ export async function markAllNotificationsRead() {
   return response.data;
 }
 
+export async function deleteAccount() {
+  const response = await api.delete('/profile');
+  return response.data;
+}
+
+export async function blockUser(userId) {
+  const response = await api.post(`/users/${userId}/block`);
+  return response.data;
+}
+
+export async function unblockUser(userId) {
+  const response = await api.delete(`/users/${userId}/block`);
+  return response.data;
+}
+
+export async function fetchBlockedUsers() {
+  const response = await api.get('/users/blocked');
+  return response.data;
+}
+
+export async function reportContent({ targetType, targetId, reason, details = '' }) {
+  const response = await api.post('/reports', { targetType, targetId, reason, details });
+  return response.data;
+}
+
 export default {
   setToken,
   login,
   register,
   verifyEmailRegistration,
-  socialLogin,
   startOAuth,
   completeOAuth,
   updateProfile,
@@ -343,4 +356,9 @@ export default {
   markNotificationRead,
   markAllNotificationsRead,
   fetchMyPosts,
+  deleteAccount,
+  blockUser,
+  unblockUser,
+  fetchBlockedUsers,
+  reportContent,
 };

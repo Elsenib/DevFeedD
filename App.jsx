@@ -123,34 +123,28 @@ export default function App() {
         await persistAuth(data.token, nextUser);
         return data;
       },
-      socialSignIn: async (provider, profile) => {
-        let data;
+      socialSignIn: async (provider) => {
+        const redirectUri = Linking.createURL('oauth', { scheme: 'devfeed' });
+        const started = await api.startOAuth(provider, redirectUri);
+        const result = await WebBrowser.openAuthSessionAsync(started.authUrl, redirectUri);
 
-        if (profile?.providerId && profile?.email && profile?.name) {
-          data = await api.socialLogin({ provider, ...profile });
-        } else {
-          const redirectUri = Linking.createURL('oauth', { scheme: 'devfeed' });
-          const started = await api.startOAuth(provider, redirectUri);
-          const result = await WebBrowser.openAuthSessionAsync(started.authUrl, redirectUri);
-
-          if (result.type !== 'success' || !result.url) {
-            throw new Error('OAuth penceresi tamamlanmadi.');
-          }
-
-          const oauthError = getOAuthParam(result.url, 'error');
-          if (oauthError) {
-            throw new Error(friendlyOAuthError(provider, oauthError));
-          }
-
-          const sessionId = getOAuthParam(result.url, 'sessionId');
-          if (!sessionId) {
-            throw new Error('OAuth sessiyasi alinmadi.');
-          }
-
-          data = await api.completeOAuth(sessionId);
+        if (result.type !== 'success' || !result.url) {
+          throw new Error('OAuth penceresi tamamlanmadi.');
         }
 
-        const nextUser = normalizeUser(data.user || (profile ? { email: profile.email, name: profile.name } : null));
+        const oauthError = getOAuthParam(result.url, 'error');
+        if (oauthError) {
+          throw new Error(friendlyOAuthError(provider, oauthError));
+        }
+
+        const sessionId = getOAuthParam(result.url, 'sessionId');
+        if (!sessionId) {
+          throw new Error('OAuth sessiyasi alinmadi.');
+        }
+
+        const data = await api.completeOAuth(sessionId);
+
+        const nextUser = normalizeUser(data.user);
         setToken(data.token);
         setUser(nextUser);
         await persistAuth(data.token, nextUser);

@@ -1,9 +1,11 @@
 import { useContext, useEffect, useMemo, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Linking, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AuthContext } from '../context/AuthContext';
 import { LANGUAGES, PreferencesContext, THEME_MODES } from '../context/PreferencesContext';
+import { API_BASE_URL } from '../constants/config';
+import * as api from '../api';
 
 export default function SettingsScreen({ navigation }) {
   const { user, signOut, updateCurrentUser } = useContext(AuthContext);
@@ -12,9 +14,59 @@ export default function SettingsScreen({ navigation }) {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [activityVisible, setActivityVisible] = useState(user?.activity_visible !== false);
 
+  const [blockedUsers, setBlockedUsers] = useState([]);
+  const [deleting, setDeleting] = useState(false);
+
   useEffect(() => {
     setActivityVisible(user?.activity_visible !== false);
   }, [user?.activity_visible]);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      api.fetchBlockedUsers().then(setBlockedUsers).catch(() => {});
+    });
+    return unsubscribe;
+  }, [navigation]);
+
+  const handleUnblock = async (blockedUser) => {
+    try {
+      await api.unblockUser(blockedUser.id);
+      setBlockedUsers((current) => current.filter((item) => item.id !== blockedUser.id));
+    } catch (error) {
+      Alert.alert('Xəta', error.response?.data?.message || error.message);
+    }
+  };
+
+  const deleteAccount = async () => {
+    setDeleting(true);
+    try {
+      await api.deleteAccount();
+      await signOut();
+    } catch (error) {
+      setDeleting(false);
+      Alert.alert('Hesab silinmədi', error.response?.data?.message || error.message);
+    }
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Hesabı sil',
+      'Profiliniz, postlarınız, şərhləriniz, mesajlarınız və müraciətləriniz birdəfəlik silinəcək. Bu əməliyyatı geri qaytarmaq olmaz.',
+      [
+        { text: 'Ləğv et', style: 'cancel' },
+        {
+          text: 'Davam et',
+          style: 'destructive',
+          onPress: () => setTimeout(() => {
+            Alert.alert('Əminsiniz?', 'Hesabınız indi silinəcək.', [
+              { text: 'Xeyr', style: 'cancel' },
+              { text: 'Bəli, sil', style: 'destructive', onPress: deleteAccount },
+            ]);
+          }, 300),
+        },
+      ]
+    );
+  };
 
   const handleSignOut = () => {
     Alert.alert('Çıxış', 'Hesabdan çıxmaq istəyirsiniz?', [
@@ -120,16 +172,42 @@ export default function SettingsScreen({ navigation }) {
         </View>
       </View>
 
-      <Text style={styles.sectionTitle}>Destek</Text>
-      <TouchableOpacity style={styles.cardRow} onPress={() => navigation.navigate('Main', { screen: 'Profile' })}>
-        <View style={[styles.cardIcon, styles.supportIcon]}>
-          <MaterialIcons name="local-cafe" size={20} color="#111827" />
+      <Text style={styles.sectionTitle}>Bloklanmış istifadəçilər</Text>
+      <View style={styles.card}>
+        {blockedUsers.length === 0 ? (
+          <Text style={styles.cardSubtitle}>Bloklanmış istifadəçi yoxdur. Profil, post və ya mesajdakı menyudan istifadəçini bloklaya bilərsiniz.</Text>
+        ) : (
+          blockedUsers.map((item) => (
+            <View key={item.id} style={styles.blockedRow}>
+              <Text style={styles.blockedName} numberOfLines={1}>{item.name}</Text>
+              <TouchableOpacity style={styles.unblockButton} onPress={() => handleUnblock(item)}>
+                <Text style={styles.unblockText}>Blokdan çıxar</Text>
+              </TouchableOpacity>
+            </View>
+          ))
+        )}
+      </View>
+
+      <Text style={styles.sectionTitle}>Hüquqi</Text>
+      <TouchableOpacity style={styles.cardRow} onPress={() => Linking.openURL(`${API_BASE_URL}/privacy`)}>
+        <View style={[styles.cardIcon, styles.privacyIcon]}>
+          <MaterialIcons name="policy" size={20} color="#ffffff" />
         </View>
         <View style={styles.cardBody}>
-          <Text style={styles.cardTitle}>Buy me a coffee</Text>
-          <Text style={styles.cardSubtitle}>Profildə minimum 1 AZN dəstək axınını aç</Text>
+          <Text style={styles.cardTitle}>Məxfilik siyasəti və qaydalar</Text>
+          <Text style={styles.cardSubtitle}>Hansı məlumatları topladığımız və məzmun qaydaları</Text>
         </View>
-        <MaterialIcons name="chevron-right" size={24} color={colors.muted} />
+        <MaterialIcons name="open-in-new" size={20} color={colors.muted} />
+      </TouchableOpacity>
+
+      <TouchableOpacity style={styles.cardRow} onPress={handleDeleteAccount} disabled={deleting}>
+        <View style={[styles.cardIcon, styles.dangerIcon]}>
+          <MaterialIcons name="delete-forever" size={20} color="#ffffff" />
+        </View>
+        <View style={styles.cardBody}>
+          <Text style={[styles.cardTitle, styles.dangerText]}>{deleting ? 'Silinir...' : 'Hesabı sil'}</Text>
+          <Text style={styles.cardSubtitle}>Hesabınızı və bütün məlumatlarınızı birdəfəlik silin</Text>
+        </View>
       </TouchableOpacity>
 
       <Text style={styles.footerText}>DevFeed Mobile 1.0.0</Text>
@@ -199,8 +277,32 @@ function createStyles(colors) {
     dangerIcon: {
       backgroundColor: colors.danger,
     },
-    supportIcon: {
-      backgroundColor: colors.warning,
+    dangerText: {
+      color: colors.danger,
+    },
+    blockedRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: 8,
+    },
+    blockedName: {
+      color: colors.text,
+      fontWeight: '800',
+      flex: 1,
+      marginRight: 10,
+    },
+    unblockButton: {
+      borderColor: colors.border,
+      borderWidth: 1,
+      borderRadius: 8,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+    },
+    unblockText: {
+      color: colors.primary,
+      fontWeight: '800',
+      fontSize: 12,
     },
     privacyIcon: {
       backgroundColor: colors.success,

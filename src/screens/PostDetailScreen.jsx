@@ -21,6 +21,8 @@ import { AuthContext } from '../context/AuthContext';
 import { PreferencesContext } from '../context/PreferencesContext';
 import JobApplicationModal from '../components/JobApplicationModal';
 import * as api from '../api';
+import { PAYMENTS_ENABLED } from '../constants/config';
+import { openModerationMenu } from '../utils/moderation';
 
 const POST_TYPES = {
   TEXT: { label: 'POST', color: '#8b949e', icon: 'terminal' },
@@ -595,6 +597,34 @@ export default function PostDetailScreen({ route, navigation }) {
     }
   };
 
+  const handlePostMore = () => {
+    openModerationMenu({
+      targetType: 'post',
+      targetId: post.id,
+      userId: post.user_id,
+      userName: post.authorName,
+      currentUserId: user?.id,
+      onBlocked: () => navigation.goBack(),
+    });
+  };
+
+  const handleCommentMore = (comment) => {
+    openModerationMenu({
+      targetType: 'comment',
+      targetId: comment.id,
+      userId: comment.user_id,
+      userName: comment.name,
+      currentUserId: user?.id,
+      onBlocked: () => {
+        if (String(comment.user_id) === String(post.user_id)) {
+          navigation.goBack();
+          return;
+        }
+        setComments((prev) => prev.filter((item) => String(item.user_id) !== String(comment.user_id)));
+      },
+    });
+  };
+
   const handleAuthorPress = () => {
     const authorId = post.user_id || post.userId;
     if (!authorId) return;
@@ -670,7 +700,9 @@ export default function PostDetailScreen({ route, navigation }) {
             </TouchableOpacity>
           </View>
         ) : (
-          <View style={styles.headerSpacer} />
+          <TouchableOpacity style={[styles.iconButton, themed.iconButton]} onPress={handlePostMore}>
+            <MaterialIcons name="more-vert" size={20} color={colors.muted} />
+          </TouchableOpacity>
         )}
       </View>
 
@@ -713,6 +745,7 @@ export default function PostDetailScreen({ route, navigation }) {
               <Text style={styles.applicationsTitle}>Müraciətlər</Text>
               <Text style={styles.applicationsCount}>{applications.length}</Text>
             </View>
+            {PAYMENTS_ENABLED && (
             <TouchableOpacity style={styles.boostButton} onPress={handleBoostJob} disabled={boostingJob}>
               {boostingJob ? (
                 <ActivityIndicator color="#111827" />
@@ -723,6 +756,7 @@ export default function PostDetailScreen({ route, navigation }) {
                 </>
               )}
             </TouchableOpacity>
+            )}
             {applications.length > 0 ? (
               applications.slice(0, 4).map((item) => (
                 <View key={String(item.id || item.user_id)} style={styles.applicationRow}>
@@ -803,6 +837,7 @@ export default function PostDetailScreen({ route, navigation }) {
                 <Text style={styles.replyMeta}>@{item.reply_to_name} cavab</Text>
               )}
               <Text style={[styles.commentText, themed.title]}>{item.text}</Text>
+              <View style={styles.commentActions}>
               <TouchableOpacity
                 style={styles.replyButton}
                 onPress={() => setReplyTarget({
@@ -814,6 +849,13 @@ export default function PostDetailScreen({ route, navigation }) {
                 <MaterialIcons name="reply" size={14} color="#58a6ff" />
                 <Text style={styles.replyButtonText}>Cavab ver</Text>
               </TouchableOpacity>
+              {String(item.user_id) !== String(user?.id) && (
+                <TouchableOpacity style={[styles.replyButton, styles.reportButton]} onPress={() => handleCommentMore(item)}>
+                  <MaterialIcons name="flag" size={14} color={colors.muted} />
+                  <Text style={[styles.replyButtonText, { color: colors.muted }]}>Şikayət</Text>
+                </TouchableOpacity>
+              )}
+              </View>
             </View>
           </View>
         )}
@@ -1381,6 +1423,13 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
     marginBottom: 3,
+  },
+  commentActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  reportButton: {
+    marginLeft: 16,
   },
   replyButton: {
     marginTop: 8,
