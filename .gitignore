@@ -21,3 +21,9 @@ build/
 *.cer
 .yarn/cache/
 .pnp.js
+
+# Generated / local-only
+android/
+ios/
+eas-inspect/
+.git-broken/
