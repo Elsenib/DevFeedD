@@ -73,13 +73,14 @@ export default function JobApplicationModal({ visible, post, submitting, onClose
         keyboardVerticalOffset={Platform.OS === 'ios' ? 18 : 0}
       >
         <View style={styles.sheet}>
+          <View style={styles.handle} />
           <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
             <View style={styles.header}>
               <View style={styles.headerText}>
                 <Text style={styles.title}>Müraciət et</Text>
                 <Text style={styles.subtitle} numberOfLines={2}>{title}</Text>
               </View>
-              <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+              <TouchableOpacity style={styles.closeButton} onPress={onClose} accessibilityLabel="Bağla">
                 <MaterialIcons name="close" size={22} color="#8790A6" />
               </TouchableOpacity>
             </View>
@@ -89,7 +90,7 @@ export default function JobApplicationModal({ visible, post, submitting, onClose
               value={coverLetter}
               onChangeText={setCoverLetter}
               placeholder="Özünü qısa təqdim et, uyğun təcrübəni yaz..."
-              placeholderTextColor="#6b7280"
+              placeholderTextColor="#7C859A"
               style={[styles.input, styles.textarea]}
               multiline
               textAlignVertical="top"
@@ -100,7 +101,7 @@ export default function JobApplicationModal({ visible, post, submitting, onClose
               value={phone}
               onChangeText={setPhone}
               placeholder="+994..."
-              placeholderTextColor="#6b7280"
+              placeholderTextColor="#7C859A"
               style={styles.input}
               keyboardType="phone-pad"
             />
@@ -119,7 +120,7 @@ export default function JobApplicationModal({ visible, post, submitting, onClose
               onPress={handleSubmit}
               disabled={submitting}
             >
-              {submitting ? <ActivityIndicator color="#ffffff" /> : <Text style={styles.submitText}>Müraciəti göndər</Text>}
+              {submitting ? <ActivityIndicator color="#1A0A02" /> : <Text style={styles.submitText}>Müraciəti göndər</Text>}
             </TouchableOpacity>
           </ScrollView>
         </View>
@@ -131,17 +132,28 @@ export default function JobApplicationModal({ visible, post, submitting, onClose
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.75)',
+    backgroundColor: 'rgba(0,0,0,0.7)',
     justifyContent: 'flex-end',
   },
   sheet: {
     backgroundColor: '#10131D',
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
     borderColor: '#1F2433',
     borderWidth: 1,
-    padding: 18,
+    borderBottomWidth: 0,
+    paddingHorizontal: 18,
+    paddingTop: 8,
+    paddingBottom: 20,
     maxHeight: '92%',
+  },
+  handle: {
+    alignSelf: 'center',
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#2A3040',
+    marginBottom: 10,
   },
   header: {
     flexDirection: 'row',
@@ -153,74 +165,81 @@ const styles = StyleSheet.create({
   },
   title: {
     color: '#F1F4FA',
-    fontSize: 18,
-    fontWeight: '900',
+    fontSize: 20,
+    fontWeight: '800',
+    letterSpacing: -0.4,
   },
   subtitle: {
     color: '#8790A6',
-    fontSize: 12,
-    marginTop: 4,
+    fontSize: 13,
+    marginTop: 3,
   },
   closeButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
+    marginRight: -10,
   },
   label: {
     color: '#8790A6',
     fontSize: 11,
-    fontWeight: '900',
-    marginBottom: 6,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+    marginBottom: 8,
   },
   input: {
-    backgroundColor: '#06080F',
-    borderColor: '#2A3040',
+    backgroundColor: '#0B0E17',
+    borderColor: '#1F2433',
     borderWidth: 1,
-    borderRadius: 10,
+    borderRadius: 14,
     color: '#F1F4FA',
-    paddingHorizontal: 12,
-    paddingVertical: 11,
-    marginBottom: 12,
+    paddingHorizontal: 14,
+    minHeight: 48,
+    marginBottom: 14,
+    fontSize: 14,
   },
   textarea: {
-    minHeight: 100,
+    minHeight: 104,
+    paddingTop: 12,
   },
   resumeButton: {
-    backgroundColor: '#06080F',
+    backgroundColor: '#0B0E17',
     borderColor: '#2A3040',
-    borderWidth: 1,
-    borderRadius: 10,
-    padding: 12,
+    borderStyle: 'dashed',
+    borderWidth: 1.5,
+    borderRadius: 16,
+    padding: 14,
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 14,
+    marginBottom: 18,
   },
   resumeTextBlock: {
     flex: 1,
-    marginLeft: 10,
+    marginLeft: 12,
   },
   resumeTitle: {
     color: '#F1F4FA',
-    fontWeight: '900',
+    fontWeight: '700',
   },
   resumeMeta: {
     color: '#8790A6',
-    fontSize: 11,
+    fontSize: 12,
     marginTop: 3,
   },
   submitButton: {
-    backgroundColor: '#f59e0b',
-    borderRadius: 10,
-    paddingVertical: 13,
+    backgroundColor: '#FF7A2F',
+    borderRadius: 25,
+    height: 50,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   disabledButton: {
-    opacity: 0.65,
+    opacity: 0.6,
   },
   submitText: {
-    color: '#111827',
-    fontWeight: '900',
+    color: '#1A0A02',
+    fontWeight: '800',
+    fontSize: 15,
   },
 });

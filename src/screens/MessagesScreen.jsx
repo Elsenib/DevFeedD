@@ -20,56 +20,108 @@ import * as api from '../api';
 import { AuroraGlow, HeaderIconButton, ScreenHeader } from '../components/ScreenChrome';
 import { avatarTone } from '../utils/avatarTone';
 import { timeAgo } from '../utils/time';
+import Avatar from '../components/Avatar';
 
 
 function ConversationAvatar({ title, avatarUrl }) {
-  const letter = String(title || 'S').slice(0, 1).toUpperCase();
-  if (avatarUrl) return <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />;
-  const tone = avatarTone(title);
-  return (
-    <View style={[styles.avatar, { backgroundColor: tone.bg }]}>
-      <Text style={[styles.avatarText, { color: tone.fg }]}>{letter}</Text>
-    </View>
-  );
+  return <Avatar name={title} uri={avatarUrl} size={44} />;
 }
 
-function NewConversationModal({ visible, creating, onClose, onCreate }) {
-  const [email, setEmail] = useState('');
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-  const handleSubmit = async () => {
-    const value = email.trim().toLowerCase();
-    if (!value) return;
-    await onCreate(value);
-    setEmail('');
-  };
+// Pick someone by name (live search) or, as a fallback, by exact e-mail.
+function NewConversationModal({ visible, creating, onClose, onCreate }) {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState([]);
+  const [searching, setSearching] = useState(false);
+  const value = query.trim();
+
+  useEffect(() => {
+    if (!visible) {
+      setQuery('');
+      setResults([]);
+      return undefined;
+    }
+    if (value.length < 2) {
+      setResults([]);
+      return undefined;
+    }
+    let cancelled = false;
+    setSearching(true);
+    const timer = setTimeout(() => {
+      api.searchUsers(value)
+        .then((data) => {
+          if (!cancelled) setResults(Array.isArray(data) ? data.slice(0, 8) : []);
+        })
+        .catch(() => {
+          if (!cancelled) setResults([]);
+        })
+        .finally(() => {
+          if (!cancelled) setSearching(false);
+        });
+    }, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [value, visible]);
+
+  const isEmail = EMAIL_PATTERN.test(value);
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
         <View style={styles.newChatSheet}>
+          <View style={styles.sheetHandle} />
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Yeni söhbət</Text>
-            <TouchableOpacity onPress={onClose}>
-              <MaterialIcons name="close" size={24} color="#8790A6" />
+            <TouchableOpacity onPress={onClose} style={styles.sheetClose} accessibilityLabel="Bağla">
+              <MaterialIcons name="close" size={22} color="#8790A6" />
             </TouchableOpacity>
           </View>
-          <Text style={styles.fieldLabel}>İSTİFADƏÇİ EMAILİ</Text>
-          <TextInput
-            value={email}
-            onChangeText={setEmail}
-            placeholder="user@example.com"
-            placeholderTextColor="#4b5563"
-            style={styles.emailInput}
-            autoCapitalize="none"
-            keyboardType="email-address"
-          />
-          <TouchableOpacity
-            style={[styles.createButton, !email.trim() && styles.disabledButton]}
-            onPress={handleSubmit}
-            disabled={creating || !email.trim()}
-          >
-            {creating ? <ActivityIndicator color="#ffffff" /> : <Text style={styles.createButtonText}>Söhbət aç</Text>}
-          </TouchableOpacity>
+          <View style={styles.searchField}>
+            <MaterialIcons name="search" size={20} color="#8790A6" />
+            <TextInput
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Ad və ya e-poçt yaz..."
+              placeholderTextColor="#7C859A"
+              style={styles.emailInput}
+              autoCapitalize="none"
+              autoFocus
+            />
+            {searching && <ActivityIndicator size="small" color="#FF7A2F" />}
+          </View>
+
+          {results.map((person) => (
+            <TouchableOpacity
+              key={person.id}
+              style={styles.personRow}
+              onPress={() => onCreate({ userId: person.id })}
+              disabled={creating}
+            >
+              <Avatar name={person.name} uri={person.avatar_url} size={40} />
+              <View style={styles.personText}>
+                <Text style={styles.personName} numberOfLines={1}>{person.name}</Text>
+                <Text style={styles.personRole} numberOfLines={1}>{person.role_sub || person.role || 'DevFeed üzvü'}</Text>
+              </View>
+              <MaterialIcons name="chat-bubble-outline" size={19} color="#8790A6" />
+            </TouchableOpacity>
+          ))}
+
+          {value.length >= 2 && !searching && results.length === 0 && (
+            <Text style={styles.searchEmpty}>{isEmail ? 'Bu e-poçtla söhbət aça bilərsən.' : 'Heç kim tapılmadı.'}</Text>
+          )}
+
+          {isEmail && (
+            <TouchableOpacity
+              style={[styles.createButton, creating && styles.disabledButton]}
+              onPress={() => onCreate({ email: value.toLowerCase() })}
+              disabled={creating}
+            >
+              {creating ? <ActivityIndicator color="#1A0A02" /> : <Text style={styles.createButtonText}>E-poçtla söhbət aç</Text>}
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     </Modal>
@@ -126,10 +178,10 @@ export default function MessagesScreen({ navigation }) {
     loadConversations();
   };
 
-  const handleCreate = async (email) => {
+  const handleCreate = async (target) => {
     setCreating(true);
     try {
-      const conversation = await api.createConversation({ email });
+      const conversation = await api.createConversation(target);
       setModalOpen(false);
       await loadConversations();
       navigation.navigate('Chat', {
@@ -240,7 +292,7 @@ export default function MessagesScreen({ navigation }) {
         renderItem={activeTab === 'chats' ? renderConversation : renderApplication}
         ListEmptyComponent={
           <Text style={[styles.emptyText, themed.emptyText]}>
-            {activeTab === 'chats' ? 'Hələ söhbət yoxdur. Email ilə ilk söhbəti aç.' : 'Hələ iş müraciəti yoxdur.'}
+            {activeTab === 'chats' ? 'Hələ söhbət yoxdur. Yuxarıdakı ✎ düyməsi ilə yeni söhbət başlat.' : 'Hələ iş müraciəti yoxdur.'}
           </Text>
         }
       />
@@ -439,22 +491,27 @@ const styles = StyleSheet.create({
   },
   newChatSheet: {
     backgroundColor: '#10131D',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
     borderColor: '#1F2433',
     borderWidth: 1,
-    padding: 18,
+    borderBottomWidth: 0,
+    paddingHorizontal: 18,
+    paddingTop: 8,
+    paddingBottom: 24,
+    minHeight: 360,
   },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 14,
+    marginBottom: 10,
   },
   modalTitle: {
     color: '#F1F4FA',
-    fontSize: 17,
-    fontWeight: '900',
+    fontSize: 20,
+    fontWeight: '800',
+    letterSpacing: -0.4,
   },
   fieldLabel: {
     color: '#8790A6',
@@ -463,27 +520,28 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   emailInput: {
-    backgroundColor: '#06080F',
-    borderColor: '#2A3040',
-    borderWidth: 1,
-    borderRadius: 10,
+    flex: 1,
+    outlineStyle: 'none',
     color: '#F1F4FA',
-    paddingHorizontal: 12,
-    paddingVertical: 11,
-    marginBottom: 12,
+    fontSize: 15,
+    paddingHorizontal: 10,
+    minHeight: 48,
   },
   createButton: {
     backgroundColor: '#FF7A2F',
-    borderRadius: 10,
-    paddingVertical: 13,
+    borderRadius: 25,
+    height: 50,
     alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 14,
   },
   disabledButton: {
     backgroundColor: '#1F2433',
   },
   createButtonText: {
-    color: '#ffffff',
-    fontWeight: '900',
+    color: '#1A0A02',
+    fontWeight: '800',
+    fontSize: 15,
   },
   chatRow: {
     flexDirection: 'row',
@@ -497,5 +555,56 @@ const styles = StyleSheet.create({
     height: 3,
     borderRadius: 2,
     marginTop: 8,
+  },
+  sheetHandle: {
+    alignSelf: 'center',
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#2A3040',
+    marginBottom: 10,
+  },
+  sheetClose: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: -10,
+  },
+  searchField: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0B0E17',
+    borderColor: '#1F2433',
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    marginBottom: 8,
+  },
+  personRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    gap: 12,
+  },
+  personText: {
+    flex: 1,
+    minWidth: 0,
+  },
+  personName: {
+    color: '#F1F4FA',
+    fontWeight: '700',
+    fontSize: 15,
+  },
+  personRole: {
+    color: '#8790A6',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  searchEmpty: {
+    color: '#8790A6',
+    fontSize: 13,
+    textAlign: 'center',
+    marginTop: 16,
   },
 });

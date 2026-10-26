@@ -21,6 +21,7 @@ import { PreferencesContext } from '../context/PreferencesContext';
 import * as api from '../api';
 import { avatarTone } from '../utils/avatarTone';
 import { openModerationMenu } from '../utils/moderation';
+import Avatar from '../components/Avatar';
 
 function formatTime(value) {
   if (!value) return '';
@@ -30,14 +31,7 @@ function formatTime(value) {
 }
 
 function MessageAvatar({ name, uri }) {
-  const letter = String(name || 'U').slice(0, 1).toUpperCase();
-  if (uri) return <Image source={{ uri }} style={styles.messageAvatarImage} />;
-  const tone = avatarTone(name);
-  return (
-    <View style={[styles.messageAvatar, { backgroundColor: tone.bg }]}>
-      <Text style={[styles.messageAvatarText, { color: tone.fg }]}>{letter}</Text>
-    </View>
-  );
+  return <Avatar name={name} uri={uri} size={30} />;
 }
 
 export default function ChatScreen({ route, navigation }) {

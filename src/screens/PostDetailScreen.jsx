@@ -24,6 +24,7 @@ import { PAYMENTS_ENABLED } from '../constants/config';
 import { openModerationMenu } from '../utils/moderation';
 import { DeployPayload, MediaPayload } from './FeedScreen';
 import { AuroraGlow } from '../components/ScreenChrome';
+import Avatar from '../components/Avatar';
 
 const POST_TYPES = {
   TEXT: { label: 'POST', color: '#8790A6', icon: 'notes' },
@@ -72,15 +73,7 @@ function formatDate(value) {
 }
 
 function AuthorAvatar({ name, avatarUrl }) {
-  const letter = String(name || 'U').slice(0, 1).toUpperCase();
-  if (avatarUrl) {
-    return <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />;
-  }
-  return (
-    <View style={styles.avatar}>
-      <Text style={styles.avatarText}>{letter}</Text>
-    </View>
-  );
+  return <Avatar name={name} uri={avatarUrl} size={42} />;
 }
 
 async function openExternalUrl(url) {

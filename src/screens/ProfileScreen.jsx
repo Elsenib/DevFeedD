@@ -19,7 +19,7 @@ import { PreferencesContext } from '../context/PreferencesContext';
 import * as api from '../api';
 import { PAYMENTS_ENABLED } from '../constants/config';
 import { AuroraGlow, HeaderIconButton } from '../components/ScreenChrome';
-import { avatarTone } from '../utils/avatarTone';
+import Avatar from '../components/Avatar';
 import { openModerationMenu } from '../utils/moderation';
 
 function splitList(value) {
@@ -408,13 +408,7 @@ export default function ProfileScreen({ route, navigation }) {
         <View style={styles.hero}>
           <TouchableOpacity style={styles.avatarRing} onPress={handlePickAvatar} disabled={uploadingAvatar || !isOwnProfile} accessibilityLabel={isOwnProfile ? 'Profil şəklini dəyiş' : displayName}>
             <View style={[styles.avatarRingInner, { borderColor: colors.background }]}>
-              {profile?.avatar_url ? (
-                <Image source={{ uri: profile.avatar_url }} style={styles.avatarImage} />
-              ) : (
-                <View style={[styles.avatar, { backgroundColor: avatarTone(displayName).bg }]}>
-                  <Text style={[styles.avatarText, { color: avatarTone(displayName).fg }]}>{displayName.slice(0, 1).toUpperCase()}</Text>
-                </View>
-              )}
+              <Avatar name={displayName} uri={profile?.avatar_url} size={76} />
             </View>
             {isOwnProfile && (
               <View style={[styles.cameraBadge, { borderColor: colors.background }]}>

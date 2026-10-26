@@ -30,13 +30,14 @@ import JobApplicationModal from '../components/JobApplicationModal';
 import * as api from '../api';
 import { openModerationMenu } from '../utils/moderation';
 import { repairUploadUrl } from '../utils/media';
+import Avatar from '../components/Avatar';
 
 const POST_TYPES = [
-  { id: 'TEXT', label: 'Post', icon: 'notes', color: '#8790A6' },
-  { id: 'GIT', label: 'Git', icon: 'code', color: '#FF9A5C' },
-  { id: 'DEPLOY', label: 'Live', icon: 'public', color: '#3fb950' },
-  { id: 'MEDIA', label: 'Media', icon: 'videocam', color: '#FF9A5C' },
-  { id: 'JOB', label: 'İş', icon: 'work', color: '#fbbf24' },
+  { id: 'TEXT', label: 'Post', icon: 'notes', color: '#A9AFBF' },
+  { id: 'GIT', label: 'Kod', icon: 'code', color: '#6CB6FF' },
+  { id: 'DEPLOY', label: 'Demo', icon: 'web', color: '#FF9A5C' },
+  { id: 'MEDIA', label: 'Video', icon: 'play-circle-outline', color: '#FF6B8A' },
+  { id: 'JOB', label: 'İş', icon: 'work-outline', color: '#F5B83D' },
 ];
 
 const FEED_TABS = [
@@ -229,16 +230,7 @@ function FeedVideo({ uri, post, active }) {
 }
 
 function AuthorAvatar({ name, avatarUrl, size }) {
-  const letter = String(name || 'U').slice(0, 1).toUpperCase();
-  const sized = size ? { width: size, height: size, borderRadius: size / 2 } : null;
-  if (avatarUrl) {
-    return <Image source={{ uri: avatarUrl }} style={[styles.avatarImage, sized]} />;
-  }
-  return (
-    <View style={[styles.avatar, sized]}>
-      <Text style={styles.avatarText}>{letter}</Text>
-    </View>
-  );
+  return <Avatar name={name} uri={avatarUrl} size={size || 42} />;
 }
 
 function GitPayload({ post }) {
@@ -702,11 +694,11 @@ function ComposeModal({ visible, onClose, onSubmit, submitting }) {
         <View style={extraBoxStyle}>
           <Text style={labelStyle}>REPO ADI</Text>
           <TextInput value={repo} onChangeText={setRepo} placeholder="username/my-project" placeholderTextColor={colors.muted} style={modalInputStyle} autoCapitalize="none" />
-          <Text style={labelStyle}>GIT LINKI</Text>
+          <Text style={labelStyle}>GİT LİNKİ</Text>
           <TextInput value={repoUrl} onChangeText={setRepoUrl} placeholder="https://github.com/username/my-project" placeholderTextColor={colors.muted} style={modalInputStyle} autoCapitalize="none" keyboardType="url" />
           <Text style={labelStyle}>BRANCH</Text>
           <TextInput value={branch} onChangeText={setBranch} placeholder="feat/new-feature" placeholderTextColor={colors.muted} style={modalInputStyle} autoCapitalize="none" />
-          <Text style={labelStyle}>COMMIT MESAJI</Text>
+          <Text style={labelStyle}>COMMİT MESAJI</Text>
           <TextInput value={commitMsg} onChangeText={setCommitMsg} placeholder="Fix: login validation" placeholderTextColor={colors.muted} style={modalInputStyle} />
         </View>
       );
@@ -714,11 +706,11 @@ function ComposeModal({ visible, onClose, onSubmit, submitting }) {
     if (type === 'DEPLOY') {
       return (
         <View style={extraBoxStyle}>
-          <Text style={labelStyle}>SERVIS</Text>
+          <Text style={labelStyle}>SERVİS</Text>
           <TextInput value={service} onChangeText={setService} placeholder="Vercel, Netlify, GitHub Pages" placeholderTextColor={colors.muted} style={modalInputStyle} />
-          <Text style={labelStyle}>MUHIT</Text>
+          <Text style={labelStyle}>MÜHİT</Text>
           <TextInput value={env} onChangeText={setEnv} placeholder="Production" placeholderTextColor={colors.muted} style={modalInputStyle} />
-          <Text style={labelStyle}>LIVE PREVIEW LINKI *</Text>
+          <Text style={labelStyle}>DEMO LİNKİ *</Text>
           <TextInput value={deployUrl} onChangeText={setDeployUrl} placeholder="https://my-app.vercel.app" placeholderTextColor={colors.muted} style={modalInputStyle} autoCapitalize="none" keyboardType="url" />
         </View>
       );
@@ -756,10 +748,10 @@ function ComposeModal({ visible, onClose, onSubmit, submitting }) {
     if (type === 'MEDIA') {
       return (
         <View style={extraBoxStyle}>
-          <Text style={labelStyle}>MEDIA BAŞLIĞI</Text>
+          <Text style={labelStyle}>BAŞLIQ</Text>
           <TextInput value={mediaTitle} onChangeText={setMediaTitle} placeholder="Demo video, UI preview..." placeholderTextColor={colors.muted} style={modalInputStyle} />
           <TouchableOpacity style={styles.mediaPickerButton} onPress={pickMedia}>
-            <MaterialIcons name={selectedMedia ? 'perm-media' : 'add-photo-alternate'} size={19} color="#c4b5fd" />
+            <MaterialIcons name={selectedMedia ? 'perm-media' : 'add-photo-alternate'} size={19} color="#FF9A5C" />
             <View style={styles.mediaPickerTextBlock}>
               <Text style={styles.mediaPickerTitle}>{selectedMedia?.fileName || selectedMedia?.name || 'Şəkil və ya video seç'}</Text>
               <Text style={styles.mediaPickerMeta}>{selectedMedia ? 'Posta yüklənəcək' : 'Instagram/TikTok kimi qalereyadan paylaş'}</Text>
@@ -802,10 +794,11 @@ function ComposeModal({ visible, onClose, onSubmit, submitting }) {
         keyboardVerticalOffset={Platform.OS === 'ios' ? 18 : 0}
       >
         <View style={[styles.composeSheet, themed.sheet]}>
+          <View style={[styles.sheetHandle, { backgroundColor: colors.border }]} />
           <View style={styles.modalHeader}>
-            <Text style={[styles.modalTitle, themed.title]}>Yeni Paylaşım</Text>
-            <TouchableOpacity onPress={onClose}>
-              <MaterialIcons name="close" size={24} color={colors.muted} />
+            <Text style={[styles.modalTitle, themed.title]}>Nə paylaşırsan?</Text>
+            <TouchableOpacity onPress={onClose} style={styles.sheetClose} accessibilityLabel="Bağla">
+              <MaterialIcons name="close" size={22} color={colors.muted} />
             </TouchableOpacity>
           </View>
 
@@ -815,21 +808,26 @@ function ComposeModal({ visible, onClose, onSubmit, submitting }) {
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.typeTabs}>
+            <View style={styles.typeTabs} accessibilityRole="radiogroup">
               {POST_TYPES.map((item) => {
                 const active = item.id === type;
                 return (
                   <TouchableOpacity
                     key={item.id}
-                    style={[styles.typeTab, active && { borderColor: item.color, backgroundColor: `${item.color}18` }]}
+                    style={[
+                      styles.typeTab,
+                      { borderColor: active ? item.color : colors.border, backgroundColor: active ? `${item.color}1F` : colors.surfaceStrong },
+                    ]}
                     onPress={() => setType(item.id)}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: active }}
                   >
-                    <MaterialIcons name={item.icon} size={15} color={active ? item.color : '#8790A6'} />
-                    <Text style={[styles.typeTabText, active && { color: item.color }]}>{item.label}</Text>
+                    <MaterialIcons name={item.icon} size={22} color={item.color} />
+                    <Text style={[styles.typeTabText, { color: active ? colors.text : colors.muted }]}>{item.label}</Text>
                   </TouchableOpacity>
                 );
               })}
-            </ScrollView>
+            </View>
 
             <TextInput
               value={caption}
@@ -859,14 +857,14 @@ function ComposeModal({ visible, onClose, onSubmit, submitting }) {
               <Text style={[styles.publicInfoText, themed.muted]}>Hamıya açıq</Text>
             </View>
             <TouchableOpacity
-              style={[styles.submitButton, { backgroundColor: canSubmit ? activeType.color : '#1F2433' }]}
+              style={[styles.submitButton, { backgroundColor: canSubmit ? colors.primary : colors.surfaceStrong }]}
               onPress={handleSubmit}
               disabled={!canSubmit || working}
             >
               {working ? (
-                <ActivityIndicator color="#ffffff" />
+                <ActivityIndicator color={colors.onPrimary} />
               ) : (
-                <Text style={styles.submitButtonText}>Paylas</Text>
+                <Text style={[styles.submitButtonText, { color: canSubmit ? colors.onPrimary : colors.muted }]}>Paylaş</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -1662,93 +1660,93 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   composeSheet: {
-    backgroundColor: '#10131D',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    borderColor: '#1F2433',
-    borderWidth: 1,
-    padding: 18,
     maxHeight: '92%',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    paddingTop: 8,
   },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 14,
+    paddingHorizontal: 18,
+    paddingBottom: 6,
   },
   modalTitle: {
-    color: '#F1F4FA',
-    fontSize: 17,
-    fontWeight: '900',
+    fontSize: 20,
+    fontWeight: '800',
+    letterSpacing: -0.4,
   },
   typeTabs: {
+    flexDirection: 'row',
+    gap: 8,
     marginBottom: 14,
   },
   composeScroll: {
     flexGrow: 0,
   },
   composeScrollContent: {
+    paddingHorizontal: 18,
+    paddingTop: 6,
     paddingBottom: 8,
   },
   typeTab: {
-    flexDirection: 'row',
+    flex: 1,
+    height: 70,
+    borderRadius: 16,
+    borderWidth: 1.5,
     alignItems: 'center',
-    borderColor: '#2A3040',
-    borderWidth: 1,
-    borderRadius: 18,
-    paddingHorizontal: 11,
-    paddingVertical: 7,
-    marginRight: 8,
+    justifyContent: 'center',
+    gap: 6,
   },
   typeTabText: {
-    color: '#8790A6',
     fontSize: 12,
-    fontWeight: '800',
-    marginLeft: 5,
+    fontWeight: '700',
   },
   captionInput: {
-    backgroundColor: '#06080F',
-    borderColor: '#2A3040',
+    minHeight: 110,
+    borderRadius: 18,
     borderWidth: 1,
-    borderRadius: 12,
-    color: '#F1F4FA',
-    minHeight: 104,
-    padding: 12,
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    paddingBottom: 12,
+    fontSize: 15,
+    lineHeight: 22,
     textAlignVertical: 'top',
-    fontSize: 14,
     marginBottom: 12,
   },
   extraBox: {
-    backgroundColor: '#06080F',
-    borderColor: '#1F2433',
+    borderRadius: 18,
     borderWidth: 1,
-    borderRadius: 12,
-    padding: 12,
+    padding: 14,
     marginBottom: 12,
   },
   fieldLabel: {
-    color: '#8790A6',
     fontSize: 11,
-    fontWeight: '900',
-    marginBottom: 6,
-    marginTop: 4,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+    marginBottom: 8,
   },
   modalInput: {
     backgroundColor: '#10131D',
     borderColor: '#2A3040',
     borderWidth: 1,
-    borderRadius: 9,
+    borderRadius: 14,
     color: '#F1F4FA',
-    paddingHorizontal: 11,
-    paddingVertical: 10,
-    marginBottom: 8,
+    paddingHorizontal: 14,
+    minHeight: 48,
+    marginBottom: 10,
+    fontSize: 14,
   },
   mediaPickerButton: {
     backgroundColor: '#10131D',
-    borderColor: '#312e81',
-    borderWidth: 1,
-    borderRadius: 10,
-    padding: 12,
+    borderColor: '#2A3040',
+    borderStyle: 'dashed',
+    borderWidth: 1.5,
+    borderRadius: 16,
+    padding: 14,
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 10,
@@ -1775,16 +1773,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#10131D',
     borderColor: '#2A3040',
     borderWidth: 1,
-    borderRadius: 9,
+    borderRadius: 14,
     color: '#F1F4FA',
-    paddingHorizontal: 11,
-    paddingVertical: 10,
+    paddingHorizontal: 14,
+    minHeight: 48,
+    fontSize: 14,
   },
   addSmallButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 9,
-    backgroundColor: '#1F2433',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#FF7A2F',
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: 8,
@@ -1812,7 +1811,9 @@ const styles = StyleSheet.create({
   modalFooter: {
     borderTopColor: '#1F2433',
     borderTopWidth: 1,
-    paddingTop: 14,
+    paddingTop: 12,
+    paddingBottom: 16,
+    paddingHorizontal: 18,
     flexDirection: 'row',
     alignItems: 'center',
   },
@@ -1827,15 +1828,16 @@ const styles = StyleSheet.create({
     marginLeft: 5,
   },
   submitButton: {
-    borderRadius: 10,
+    minWidth: 120,
+    height: 48,
+    borderRadius: 24,
     paddingHorizontal: 22,
-    paddingVertical: 11,
-    minWidth: 92,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   submitButtonText: {
-    color: '#ffffff',
-    fontWeight: '900',
+    fontSize: 15,
+    fontWeight: '800',
   },
   aurora: {
     position: 'absolute',
@@ -2075,5 +2077,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '800',
     marginLeft: 4,
+  },
+  sheetHandle: {
+    alignSelf: 'center',
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    marginBottom: 10,
+  },
+  sheetClose: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: -10,
   },
 });

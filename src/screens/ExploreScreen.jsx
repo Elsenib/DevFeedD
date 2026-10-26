@@ -18,6 +18,7 @@ import { PreferencesContext } from '../context/PreferencesContext';
 import * as api from '../api';
 import { AuroraGlow, ScreenHeader } from '../components/ScreenChrome';
 import { avatarTone } from '../utils/avatarTone';
+import Avatar from '../components/Avatar';
 
 function parseMetadata(metadata) {
   if (!metadata) return {};
@@ -43,16 +44,8 @@ function normalizePost(row) {
   };
 }
 
-function Avatar({ name, uri, size = 42 }) {
-  const letter = String(name || 'U').slice(0, 1).toUpperCase();
-  const style = { width: size, height: size, borderRadius: size / 2 };
-  if (uri) return <Image source={{ uri }} style={[styles.avatarImage, style]} />;
-  const tone = avatarTone(name);
-  return (
-    <View style={[styles.avatar, style, { backgroundColor: tone.bg }]}>
-      <Text style={[styles.avatarText, { color: tone.fg }]}>{letter}</Text>
-    </View>
-  );
+function UserAvatar({ name, uri, size = 42 }) {
+  return <Avatar name={name} uri={uri} size={size} />;
 }
 
 export default function ExploreScreen({ navigation }) {
@@ -141,7 +134,7 @@ export default function ExploreScreen({ navigation }) {
 
   const renderUser = ({ item }) => (
     <TouchableOpacity style={[styles.resultCard, themed.resultCard]} onPress={() => navigation.navigate('UserProfile', { userId: item.id })}>
-      <Avatar name={item.name} uri={item.avatar_url} />
+      <UserAvatar name={item.name} uri={item.avatar_url} />
       <View style={styles.resultBody}>
         <Text style={[styles.resultTitle, themed.resultTitle]}>{item.name || item.email}</Text>
         <Text style={[styles.resultSubtitle, themed.resultSubtitle]}>{item.role_sub || item.role || item.bio || 'DevFeed member'}</Text>
@@ -170,7 +163,7 @@ export default function ExploreScreen({ navigation }) {
 
   const renderPost = ({ item }) => (
     <TouchableOpacity style={[styles.resultCard, themed.resultCard]} onPress={() => navigation.navigate('PostDetail', { post: item })}>
-      <Avatar name={item.authorName} uri={item.authorAvatar} />
+      <UserAvatar name={item.authorName} uri={item.authorAvatar} />
       <View style={styles.resultBody}>
         <View style={styles.postTop}>
           <Text style={styles.typeBadge}>{item.type}</Text>

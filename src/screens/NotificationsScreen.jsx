@@ -18,6 +18,7 @@ import * as api from '../api';
 import { AuroraGlow, HeaderIconButton, ScreenHeader } from '../components/ScreenChrome';
 import { avatarTone } from '../utils/avatarTone';
 import { timeAgo } from '../utils/time';
+import Avatar from '../components/Avatar';
 
 function iconFor(type) {
   if (type === 'post_like') return { name: 'favorite', color: '#f85149' };
@@ -35,14 +36,7 @@ function iconFor(type) {
 
 
 function ActorAvatar({ name, uri }) {
-  const letter = String(name || 'D').slice(0, 1).toUpperCase();
-  if (uri) return <Image source={{ uri }} style={styles.avatarImage} />;
-  const tone = avatarTone(name || 'DevFeed');
-  return (
-    <View style={[styles.avatar, { backgroundColor: tone.bg }]}>
-      <Text style={[styles.avatarText, { color: tone.fg }]}>{letter}</Text>
-    </View>
-  );
+  return <Avatar name={name || 'DevFeed'} uri={uri} size={42} />;
 }
 
 export default function NotificationsScreen({ navigation }) {

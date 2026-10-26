@@ -35,6 +35,22 @@ function normalizeUser(user) {
   };
 }
 
+// Reads the user id from the JWT payload. Used when a stored user object is
+// missing its id, which would otherwise make every message look like someone else's.
+function idFromToken(token) {
+  try {
+    const part = String(token).split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+    let bits = '';
+    for (const ch of part.replace(/=+$/, '')) bits += chars.indexOf(ch).toString(2).padStart(6, '0');
+    let json = '';
+    for (let i = 0; i + 8 <= bits.length; i += 8) json += String.fromCharCode(parseInt(bits.slice(i, i + 8), 2));
+    return JSON.parse(json).id ?? null;
+  } catch (error) {
+    return null;
+  }
+}
+
 async function persistAuth(nextToken, nextUser) {
   if (!nextToken || !nextUser) {
     await AsyncStorage.removeItem(AUTH_STORAGE_KEY);
@@ -98,9 +114,14 @@ export default function App() {
     api.setToken(token);
   }, [token]);
 
+  const currentUser = useMemo(
+    () => (user && user.id == null && token ? { ...user, id: idFromToken(token) } : user),
+    [user, token]
+  );
+
   const authContext = useMemo(
     () => ({
-      user,
+      user: currentUser,
       token,
       signIn: async ({ email, password }) => {
         const data = await api.login(email, password);
@@ -195,7 +216,7 @@ export default function App() {
         return data;
       },
     }),
-    [token, user]
+    [token, user, currentUser]
   );
 
   if (loading || (!fontsLoaded && !fontError)) {
