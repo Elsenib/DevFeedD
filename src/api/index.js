@@ -315,6 +315,11 @@ export async function reportContent({ targetType, targetId, reason, details = ''
   return response.data;
 }
 
+export async function fetchAdminMe() {
+  const response = await api.get('/admin/api/me');
+  return response.data;
+}
+
 export async function fetchAiStatus() {
   const response = await api.get('/ai/status');
   return response.data;
@@ -383,6 +388,7 @@ export default {
   reportContent,
   fetchFollowers,
   fetchFollowing,
+  fetchAdminMe,
   fetchAiStatus,
   askAi,
 };

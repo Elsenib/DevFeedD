@@ -1,6 +1,7 @@
 import { useContext, useEffect, useMemo, useState } from 'react';
 import { Alert, Linking, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import * as WebBrowser from 'expo-web-browser';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AuthContext } from '../context/AuthContext';
 import { LANGUAGES, PreferencesContext, THEME_MODES } from '../context/PreferencesContext';
@@ -10,7 +11,7 @@ import appConfig from '../../app.json';
 import { AuroraGlow, ScreenHeader } from '../components/ScreenChrome';
 
 export default function SettingsScreen({ navigation }) {
-  const { user, signOut, updateCurrentUser } = useContext(AuthContext);
+  const { user, token, signOut, updateCurrentUser } = useContext(AuthContext);
   const { theme, themeMode, language, setThemeMode, setLanguage, t } = useContext(PreferencesContext);
   const colors = theme.colors;
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -18,6 +19,7 @@ export default function SettingsScreen({ navigation }) {
 
   const [blockedUsers, setBlockedUsers] = useState([]);
   const [deleting, setDeleting] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     setActivityVisible(user?.activity_visible !== false);
@@ -26,9 +28,17 @@ export default function SettingsScreen({ navigation }) {
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
       api.fetchBlockedUsers().then(setBlockedUsers).catch(() => {});
+      api.fetchAdminMe().then(() => setIsAdmin(true)).catch(() => setIsAdmin(false));
     });
     return unsubscribe;
   }, [navigation]);
+
+  // The token rides in the URL fragment, which browsers never send to the server.
+  const openAdminPanel = () => {
+    WebBrowser.openBrowserAsync(`${API_BASE_URL}/admin#token=${encodeURIComponent(token || '')}`).catch((error) => {
+      Alert.alert('Panel açılmadı', error.message);
+    });
+  };
 
   const handleUnblock = async (blockedUser) => {
     try {
@@ -191,6 +201,22 @@ export default function SettingsScreen({ navigation }) {
           ))
         )}
       </View>
+
+      {isAdmin && (
+        <>
+          <Text style={styles.sectionTitle}>Admin</Text>
+          <TouchableOpacity style={styles.cardRow} onPress={openAdminPanel}>
+            <View style={[styles.cardIcon, { backgroundColor: colors.primary }]}>
+              <MaterialIcons name="admin-panel-settings" size={20} color={colors.onPrimary} />
+            </View>
+            <View style={styles.cardBody}>
+              <Text style={styles.cardTitle}>Admin paneli</Text>
+              <Text style={styles.cardSubtitle}>Şikayətlər, istifadəçilər və paylaşımlar</Text>
+            </View>
+            <MaterialIcons name="open-in-new" size={20} color={colors.muted} />
+          </TouchableOpacity>
+        </>
+      )}
 
       <Text style={styles.sectionTitle}>Hüquqi</Text>
       <TouchableOpacity style={styles.cardRow} onPress={() => Linking.openURL(`${API_BASE_URL}/privacy`)}>

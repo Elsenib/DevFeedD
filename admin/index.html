@@ -173,6 +173,13 @@ const POST_TYPES = { TEXT: 'Post', GIT: 'Kod', DEPLOY: 'Demo', MEDIA: 'Media', J
 const $ = (id) => document.getElementById(id);
 let token = null;
 try { token = localStorage.getItem(TOKEN_KEY); } catch (e) {}
+// The app opens the panel as /admin#token=…; take it and clear it from the address bar.
+const handoff = new URLSearchParams(location.hash.slice(1)).get('token');
+if (handoff) {
+  token = handoff;
+  try { localStorage.setItem(TOKEN_KEY, token); } catch (e) {}
+  history.replaceState(null, '', location.pathname);
+}
 
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const MONTHS = ['yan', 'fev', 'mar', 'apr', 'may', 'iyn', 'iyl', 'avq', 'sen', 'okt', 'noy', 'dek'];
