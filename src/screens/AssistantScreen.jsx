@@ -7,6 +7,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -43,13 +44,20 @@ export default function AssistantScreen({ navigation }) {
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
   const [remaining, setRemaining] = useState(null);
+  // false until the server has an API key: suggested questions get prepared answers.
+  const [enabled, setEnabled] = useState(true);
   const listRef = useRef(null);
 
   useEffect(() => {
     AsyncStorage.getItem(storageKey)
       .then((saved) => saved && setMessages(JSON.parse(saved)))
       .catch(() => {});
-    api.fetchAiStatus().then((status) => setRemaining(status.remaining)).catch(() => {});
+    api.fetchAiStatus()
+      .then((status) => {
+        setRemaining(status.remaining);
+        setEnabled(status.enabled !== false);
+      })
+      .catch(() => {});
   }, [storageKey]);
 
   const save = (next) => {
@@ -126,7 +134,7 @@ export default function AssistantScreen({ navigation }) {
           <View style={styles.headerText}>
             <Text style={[styles.title, { color: colors.text }]}>DevFeed AI</Text>
             <Text style={[styles.subtitle, { color: colors.muted }]}>
-              {remaining === null ? 'Developer köməkçin' : `Bu gün ${remaining} sual qalıb`}
+              {!enabled ? 'Beta · hazır suallarla işləyir' : remaining === null ? 'Developer köməkçin' : `Bu gün ${remaining} sual qalıb`}
             </Text>
           </View>
           {messages.length > 0 && (
@@ -168,6 +176,16 @@ export default function AssistantScreen({ navigation }) {
             ) : null
           }
         />
+
+        {!enabled && messages.length > 0 && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipsBar} contentContainerStyle={styles.chips} keyboardShouldPersistTaps="handled">
+            {SUGGESTIONS.map((item) => (
+              <Pressable key={item} style={[styles.chip, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={() => send(item)} disabled={sending}>
+                <Text style={[styles.chipText, { color: colors.text }]} numberOfLines={1}>{item}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        )}
 
         <View style={[styles.composer, { borderTopColor: colors.border, backgroundColor: colors.background }]}>
           <TextInput
@@ -312,6 +330,25 @@ const styles = StyleSheet.create({
   },
   suggestionText: {
     fontSize: 14,
+    fontWeight: '600',
+  },
+  chipsBar: {
+    flexGrow: 0,
+  },
+  chips: {
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingBottom: 8,
+    gap: 8,
+  },
+  chip: {
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  chipText: {
+    fontSize: 13,
     fontWeight: '600',
   },
   composer: {
