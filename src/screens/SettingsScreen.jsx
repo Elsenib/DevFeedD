@@ -6,6 +6,7 @@ import { AuthContext } from '../context/AuthContext';
 import { LANGUAGES, PreferencesContext, THEME_MODES } from '../context/PreferencesContext';
 import { API_BASE_URL } from '../constants/config';
 import * as api from '../api';
+import appConfig from '../../app.json';
 import { AuroraGlow, ScreenHeader } from '../components/ScreenChrome';
 
 export default function SettingsScreen({ navigation }) {
@@ -209,7 +210,7 @@ export default function SettingsScreen({ navigation }) {
         </View>
       </TouchableOpacity>
 
-      <Text style={styles.footerText}>DevFeed Mobile 1.0.0</Text>
+      <Text style={styles.footerText}>DevFeed {appConfig.expo.version} ({appConfig.expo.android.versionCode})</Text>
     </ScrollView>
     </SafeAreaView>
   );
