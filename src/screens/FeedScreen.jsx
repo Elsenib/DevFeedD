@@ -29,6 +29,7 @@ import { PreferencesContext } from '../context/PreferencesContext';
 import JobApplicationModal from '../components/JobApplicationModal';
 import * as api from '../api';
 import { openModerationMenu } from '../utils/moderation';
+import { repairUploadUrl } from '../utils/media';
 
 const POST_TYPES = [
   { id: 'TEXT', label: 'Post', icon: 'notes', color: '#8790A6' },
@@ -367,7 +368,7 @@ function MediaPayload({ post, active }) {
   const { theme } = useContext(PreferencesContext);
   const colors = theme.colors;
   const { metadata } = post;
-  const mediaUrl = metadata.mediaUrl || metadata.url;
+  const mediaUrl = repairUploadUrl(metadata.mediaUrl || metadata.url);
   const mediaType = metadata.mediaType || (String(metadata.mimeType || '').startsWith('image/') ? 'image' : 'video');
 
   if (mediaType === 'video' && mediaUrl) return <FeedVideo uri={mediaUrl} post={post} active={active} />;

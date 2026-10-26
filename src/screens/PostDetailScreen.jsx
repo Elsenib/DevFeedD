@@ -23,6 +23,7 @@ import JobApplicationModal from '../components/JobApplicationModal';
 import * as api from '../api';
 import { PAYMENTS_ENABLED } from '../constants/config';
 import { openModerationMenu } from '../utils/moderation';
+import { repairUploadUrl } from '../utils/media';
 
 const POST_TYPES = {
   TEXT: { label: 'POST', color: '#8790A6', icon: 'notes' },
@@ -258,7 +259,7 @@ function PayloadPreview({ post }) {
     );
   }
   if (post.type === 'MEDIA') {
-    const mediaUrl = metadata.mediaUrl || metadata.url;
+    const mediaUrl = repairUploadUrl(metadata.mediaUrl || metadata.url);
     const mediaType = metadata.mediaType || (String(metadata.mimeType || '').startsWith('image/') ? 'image' : 'video');
     return (
       <TouchableOpacity

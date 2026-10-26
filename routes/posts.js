@@ -63,7 +63,14 @@ function getUploadedMediaType(file) {
 }
 
 function getPublicUploadUrl(req, folder, filename) {
-  const base = (process.env.PUBLIC_BACKEND_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
+  // PUBLIC_BACKEND_URL may be set to a full callback URL; only its origin is a valid base.
+  const raw = (process.env.PUBLIC_BACKEND_URL || `${req.protocol}://${req.get('host')}`).trim();
+  let base;
+  try {
+    base = new URL(raw).origin;
+  } catch (error) {
+    base = raw.replace(/\/auth\/.*$/i, '').replace(/\/$/, '');
+  }
   return `${base}/uploads/${folder}/${filename}`;
 }
 
