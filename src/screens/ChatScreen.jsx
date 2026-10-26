@@ -19,6 +19,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { AuthContext } from '../context/AuthContext';
 import { PreferencesContext } from '../context/PreferencesContext';
 import * as api from '../api';
+import { avatarTone } from '../utils/avatarTone';
 import { openModerationMenu } from '../utils/moderation';
 
 function formatTime(value) {
@@ -31,9 +32,10 @@ function formatTime(value) {
 function MessageAvatar({ name, uri }) {
   const letter = String(name || 'U').slice(0, 1).toUpperCase();
   if (uri) return <Image source={{ uri }} style={styles.messageAvatarImage} />;
+  const tone = avatarTone(name);
   return (
-    <View style={styles.messageAvatar}>
-      <Text style={styles.messageAvatarText}>{letter}</Text>
+    <View style={[styles.messageAvatar, { backgroundColor: tone.bg }]}>
+      <Text style={[styles.messageAvatarText, { color: tone.fg }]}>{letter}</Text>
     </View>
   );
 }
@@ -169,15 +171,15 @@ export default function ChatScreen({ route, navigation }) {
         <TouchableOpacity style={[styles.iconButton, themed.iconButton]} onPress={() => navigation.goBack()}>
           <MaterialIcons name="arrow-back" size={22} color={colors.text} />
         </TouchableOpacity>
-        <View style={styles.headerText}>
-          <Text style={[styles.title, themed.title]}>{screenTitle}</Text>
-          <Text style={[styles.subtitle, themed.subtitle]}>Şəxsi mesaj</Text>
+        <View style={styles.headerPerson}>
+          <MessageAvatar name={screenTitle} uri={otherUser?.avatar_url} />
+          <View style={styles.headerText}>
+            <Text style={[styles.title, themed.title]} numberOfLines={1}>{screenTitle}</Text>
+            <Text style={[styles.subtitle, themed.subtitle]}>Şəxsi mesaj</Text>
+          </View>
         </View>
-        <TouchableOpacity style={[styles.iconButton, themed.iconButton]} onPress={loadConversation}>
-          <MaterialIcons name="refresh" size={20} color={colors.muted} />
-        </TouchableOpacity>
         {!!otherUser?.id && (
-          <TouchableOpacity style={[styles.iconButton, themed.iconButton, { marginLeft: 8 }]} onPress={handleConversationMore}>
+          <TouchableOpacity style={[styles.iconButton, themed.iconButton]} onPress={handleConversationMore} accessibilityLabel="Seçimlər">
             <MaterialIcons name="more-vert" size={20} color={colors.muted} />
           </TouchableOpacity>
         )}
@@ -250,7 +252,7 @@ const styles = StyleSheet.create({
   },
   headerText: {
     flex: 1,
-    marginHorizontal: 12,
+    minWidth: 0,
   },
   title: {
     color: '#F1F4FA',
@@ -307,9 +309,8 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   messageAvatarText: {
-    color: '#ffffff',
-    fontSize: 11,
-    fontWeight: '900',
+    fontSize: 12,
+    fontWeight: '800',
   },
   senderName: {
     color: '#8790A6',
@@ -318,14 +319,14 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   senderNameMine: {
-    color: '#c7d2fe',
+    color: 'rgba(26,10,2,0.7)',
   },
   messageText: {
     color: '#F1F4FA',
     lineHeight: 20,
   },
   messageTextMine: {
-    color: '#ffffff',
+    color: '#1A0A02',
   },
   messageFooter: {
     flexDirection: 'row',
@@ -338,7 +339,7 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   messageTimeMine: {
-    color: '#c7d2fe',
+    color: 'rgba(26,10,2,0.6)',
   },
   emptyText: {
     color: '#8790A6',
@@ -368,7 +369,7 @@ const styles = StyleSheet.create({
   sendButton: {
     width: 44,
     height: 44,
-    borderRadius: 12,
+    borderRadius: 22,
     backgroundColor: '#FF7A2F',
     alignItems: 'center',
     justifyContent: 'center',
@@ -376,5 +377,12 @@ const styles = StyleSheet.create({
   },
   disabledButton: {
     backgroundColor: '#1F2433',
+  },
+  headerPerson: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 12,
+    gap: 10,
   },
 });

@@ -17,20 +17,18 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { PreferencesContext } from '../context/PreferencesContext';
 import * as api from '../api';
+import { AuroraGlow, HeaderIconButton, ScreenHeader } from '../components/ScreenChrome';
+import { avatarTone } from '../utils/avatarTone';
+import { timeAgo } from '../utils/time';
 
-function formatTime(value) {
-  if (!value) return '';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleDateString();
-}
 
 function ConversationAvatar({ title, avatarUrl }) {
   const letter = String(title || 'S').slice(0, 1).toUpperCase();
   if (avatarUrl) return <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />;
+  const tone = avatarTone(title);
   return (
-    <View style={styles.avatar}>
-      <Text style={styles.avatarText}>{letter}</Text>
+    <View style={[styles.avatar, { backgroundColor: tone.bg }]}>
+      <Text style={[styles.avatarText, { color: tone.fg }]}>{letter}</Text>
     </View>
   );
 }
@@ -168,18 +166,17 @@ export default function MessagesScreen({ navigation }) {
 
   const renderConversation = ({ item }) => (
     <TouchableOpacity
-      style={[styles.chatCard, themed.card]}
+      style={[styles.chatRow, { borderBottomColor: colors.border }]}
       onPress={() => navigation.navigate('Chat', { conversationId: item.id, title: item.title })}
     >
       <ConversationAvatar title={item.title} avatarUrl={item.avatar_url || item.otherUser?.avatar_url} />
       <View style={styles.chatBody}>
         <View style={styles.chatTopRow}>
           <Text style={[styles.chatTitle, themed.text]}>{item.title || 'Söhbət'}</Text>
-          <Text style={[styles.chatTime, themed.muted]}>{formatTime(item.updatedAt || item.time)}</Text>
+          <Text style={[styles.chatTime, themed.muted]}>{timeAgo(item.updatedAt || item.time)}</Text>
         </View>
         <Text style={[styles.chatLast, themed.muted]} numberOfLines={1}>{item.lastMessage || 'Hələ mesaj yoxdur'}</Text>
       </View>
-      <MaterialIcons name="chevron-right" size={24} color={colors.muted} />
     </TouchableOpacity>
   );
 
@@ -217,43 +214,22 @@ export default function MessagesScreen({ navigation }) {
 
   return (
     <SafeAreaView style={[styles.container, themed.container]} edges={['top']}>
-      <View style={[styles.header, themed.header]}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            accessibilityLabel="Geri"
-            style={{ width: 40, height: 40, borderRadius: 20, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', marginRight: 12 }}
-          >
-            <MaterialIcons name="arrow-back" size={21} color={colors.text} />
-          </TouchableOpacity>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.title, themed.title]}>{t.messages}</Text>
-            <Text style={[styles.subtitle, themed.subtitle]}>{t.messagesSubtitle}</Text>
-          </View>
-        </View>
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          <TouchableOpacity style={styles.plusButton} onPress={() => navigation.navigate('PublicChat')} accessibilityLabel="Ümumi chat otaqları">
-            <MaterialIcons name="forum" size={21} color="#ffffff" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.plusButton} onPress={() => setModalOpen(true)} accessibilityLabel="Yeni söhbət">
-            <MaterialIcons name="add" size={24} color="#ffffff" />
-          </TouchableOpacity>
-        </View>
-      </View>
+      <AuroraGlow />
+      <ScreenHeader title={t.messages} subtitle={t.messagesSubtitle} onBack={() => navigation.goBack()}>
+        <HeaderIconButton icon="forum" onPress={() => navigation.navigate('PublicChat')} label="Ümumi chat otaqları" />
+        <HeaderIconButton icon="edit" onPress={() => setModalOpen(true)} label="Yeni söhbət" />
+      </ScreenHeader>
 
-      <View style={styles.tabs}>
-        <TouchableOpacity
-          style={[styles.tabButton, themed.tabButton, activeTab === 'chats' && styles.tabButtonActive, activeTab === 'chats' && themed.tabButtonActive]}
-          onPress={() => setActiveTab('chats')}
-        >
-          <Text style={[styles.tabText, themed.tabText, activeTab === 'chats' && styles.tabTextActive, activeTab === 'chats' && themed.tabTextActive]}>{t.chats}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tabButton, themed.tabButton, activeTab === 'applications' && styles.tabButtonActive, activeTab === 'applications' && themed.tabButtonActive]}
-          onPress={() => setActiveTab('applications')}
-        >
-          <Text style={[styles.tabText, themed.tabText, activeTab === 'applications' && styles.tabTextActive, activeTab === 'applications' && themed.tabTextActive]}>{t.applications}</Text>
-        </TouchableOpacity>
+      <View style={styles.tabs} accessibilityRole="tablist">
+        {[['chats', t.chats], ['applications', t.applications]].map(([id, label]) => {
+          const selected = activeTab === id;
+          return (
+            <TouchableOpacity key={id} style={styles.tabButton} onPress={() => setActiveTab(id)} accessibilityRole="tab" accessibilityState={{ selected }}>
+              <Text style={[styles.tabText, { color: selected ? colors.text : colors.muted, fontWeight: selected ? '800' : '600' }]}>{label}</Text>
+              <View style={[styles.tabBar, { backgroundColor: selected ? colors.primary : 'transparent' }]} />
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
       <FlatList
@@ -320,34 +296,27 @@ const styles = StyleSheet.create({
   },
   tabs: {
     flexDirection: 'row',
-    padding: 10,
-    borderBottomColor: '#1F2433',
-    borderBottomWidth: 1,
+    paddingHorizontal: 16,
+    marginBottom: 4,
   },
   tabButton: {
-    flex: 1,
-    borderColor: '#2A3040',
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingVertical: 10,
-    alignItems: 'center',
-    marginHorizontal: 4,
-    backgroundColor: '#10131D',
+    marginRight: 22,
+    minHeight: 44,
+    justifyContent: 'center',
   },
   tabButtonActive: {
     backgroundColor: '#312e81',
     borderColor: '#FF7A2F',
   },
   tabText: {
-    color: '#8790A6',
-    fontWeight: '900',
+    fontSize: 15,
   },
   tabTextActive: {
     color: '#ffffff',
   },
   listContent: {
-    padding: 14,
-    paddingBottom: 90,
+    paddingHorizontal: 16,
+    paddingBottom: 40,
   },
   chatCard: {
     backgroundColor: '#10131D',
@@ -368,8 +337,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   avatarText: {
-    color: '#ffffff',
-    fontWeight: '900',
+    fontWeight: '800',
+    fontSize: 16,
   },
   avatarImage: {
     width: 44,
@@ -515,5 +484,18 @@ const styles = StyleSheet.create({
   createButtonText: {
     color: '#ffffff',
     fontWeight: '900',
+  },
+  chatRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  tabBar: {
+    alignSelf: 'center',
+    width: 22,
+    height: 3,
+    borderRadius: 2,
+    marginTop: 8,
   },
 });

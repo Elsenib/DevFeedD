@@ -4,6 +4,7 @@ import {
   Alert,
   FlatList,
   Image,
+  Pressable,
   RefreshControl,
   StyleSheet,
   Text,
@@ -15,6 +16,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { PreferencesContext } from '../context/PreferencesContext';
 import * as api from '../api';
+import { AuroraGlow, ScreenHeader } from '../components/ScreenChrome';
+import { avatarTone } from '../utils/avatarTone';
 
 function parseMetadata(metadata) {
   if (!metadata) return {};
@@ -44,9 +47,10 @@ function Avatar({ name, uri, size = 42 }) {
   const letter = String(name || 'U').slice(0, 1).toUpperCase();
   const style = { width: size, height: size, borderRadius: size / 2 };
   if (uri) return <Image source={{ uri }} style={[styles.avatarImage, style]} />;
+  const tone = avatarTone(name);
   return (
-    <View style={[styles.avatar, style]}>
-      <Text style={styles.avatarText}>{letter}</Text>
+    <View style={[styles.avatar, style, { backgroundColor: tone.bg }]}>
+      <Text style={[styles.avatarText, { color: tone.fg }]}>{letter}</Text>
     </View>
   );
 }
@@ -143,15 +147,24 @@ export default function ExploreScreen({ navigation }) {
         <Text style={[styles.resultSubtitle, themed.resultSubtitle]}>{item.role_sub || item.role || item.bio || 'DevFeed member'}</Text>
         <Text style={[styles.resultMeta, themed.resultMeta]}>{Number(item.followers_count || 0)} izləyici</Text>
       </View>
-      <TouchableOpacity
-        style={[styles.followButton, item.following_by_me && styles.followButtonActive]}
+      <Pressable
+        style={[
+          styles.followPill,
+          item.following_by_me
+            ? { borderColor: colors.border, backgroundColor: 'transparent' }
+            : { borderColor: colors.primary, backgroundColor: colors.primary },
+        ]}
+        hitSlop={6}
         onPress={(event) => {
           event?.stopPropagation?.();
           handleToggleFollow(item);
         }}
+        accessibilityLabel={item.following_by_me ? `${item.name} izlənilir` : `${item.name} izlə`}
       >
-        <MaterialIcons name={item.following_by_me ? 'check' : 'person-add'} size={17} color="#ffffff" />
-      </TouchableOpacity>
+        <Text style={[styles.followPillText, { color: item.following_by_me ? colors.text : colors.onPrimary }]}>
+          {item.following_by_me ? 'İzlənilir' : 'İzlə'}
+        </Text>
+      </Pressable>
     </TouchableOpacity>
   );
 
@@ -174,10 +187,8 @@ export default function ExploreScreen({ navigation }) {
 
   return (
     <SafeAreaView style={[styles.container, themed.container]} edges={['top']}>
-      <View style={[styles.header, themed.header]}>
-        <Text style={[styles.title, themed.title]}>{t.explore}</Text>
-        <Text style={[styles.subtitle, themed.subtitle]}>{t.exploreSubtitle}</Text>
-      </View>
+      <AuroraGlow />
+      <ScreenHeader title={t.explore} subtitle={t.exploreSubtitle} />
 
       <View style={[styles.searchRow, themed.searchRow]}>
         <MaterialIcons name="search" size={20} color={colors.muted} />
@@ -193,15 +204,16 @@ export default function ExploreScreen({ navigation }) {
         />
       </View>
 
-      <View style={styles.tabs}>
-        <TouchableOpacity style={[styles.tab, themed.tab, activeTab === 'users' && styles.tabActive, activeTab === 'users' && themed.tabActive]} onPress={() => setActiveTab('users')}>
-          <MaterialIcons name="people" size={18} color={activeTab === 'users' ? '#ffffff' : '#8790A6'} />
-          <Text style={[styles.tabText, activeTab === 'users' && styles.tabTextActive]}>İstifadəçilər</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.tab, themed.tab, activeTab === 'posts' && styles.tabActive, activeTab === 'posts' && themed.tabActive]} onPress={() => setActiveTab('posts')}>
-          <MaterialIcons name="dynamic-feed" size={18} color={activeTab === 'posts' ? '#ffffff' : '#8790A6'} />
-          <Text style={[styles.tabText, activeTab === 'posts' && styles.tabTextActive]}>Postlar</Text>
-        </TouchableOpacity>
+      <View style={styles.tabs} accessibilityRole="tablist">
+        {[['users', 'İstifadəçilər'], ['posts', 'Postlar']].map(([id, label]) => {
+          const selected = activeTab === id;
+          return (
+            <Pressable key={id} style={styles.tab} onPress={() => setActiveTab(id)} accessibilityRole="tab" accessibilityState={{ selected }}>
+              <Text style={[styles.tabText, { color: selected ? colors.text : colors.muted, fontWeight: selected ? '800' : '600' }]}>{label}</Text>
+              <View style={[styles.tabBar, { backgroundColor: selected ? colors.primary : 'transparent' }]} />
+            </Pressable>
+          );
+        })}
       </View>
 
       {loading ? (
@@ -245,13 +257,15 @@ const styles = StyleSheet.create({
     marginTop: 3,
   },
   searchRow: {
-    margin: 14,
+    marginHorizontal: 16,
+    marginTop: 6,
+    marginBottom: 10,
     backgroundColor: '#10131D',
     borderColor: '#2A3040',
     borderWidth: 1,
-    borderRadius: 12,
-    minHeight: 46,
-    paddingHorizontal: 12,
+    borderRadius: 16,
+    minHeight: 50,
+    paddingHorizontal: 14,
     flexDirection: 'row',
     alignItems: 'center',
   },
@@ -262,30 +276,20 @@ const styles = StyleSheet.create({
   },
   tabs: {
     flexDirection: 'row',
-    paddingHorizontal: 14,
-    marginBottom: 8,
+    paddingHorizontal: 16,
+    marginBottom: 6,
   },
   tab: {
-    flex: 1,
-    borderColor: '#2A3040',
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingVertical: 10,
-    marginRight: 8,
-    alignItems: 'center',
+    marginRight: 22,
+    minHeight: 44,
     justifyContent: 'center',
-    flexDirection: 'row',
-    backgroundColor: '#10131D',
   },
   tabActive: {
     backgroundColor: '#FF7A2F',
     borderColor: '#FF7A2F',
   },
   tabText: {
-    color: '#8790A6',
-    fontWeight: '900',
-    marginLeft: 6,
-    fontSize: 12,
+    fontSize: 15,
   },
   tabTextActive: {
     color: '#ffffff',
@@ -303,7 +307,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#10131D',
     borderColor: '#1F2433',
     borderWidth: 1,
-    borderRadius: 12,
+    borderRadius: 20,
     padding: 14,
     marginBottom: 10,
     flexDirection: 'row',
@@ -318,8 +322,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#1F2433',
   },
   avatarText: {
-    color: '#ffffff',
-    fontWeight: '900',
+    fontWeight: '800',
   },
   resultBody: {
     flex: 1,
@@ -368,5 +371,26 @@ const styles = StyleSheet.create({
     color: '#8790A6',
     textAlign: 'center',
     marginTop: 24,
+  },
+  followPill: {
+    minWidth: 84,
+    height: 36,
+    paddingHorizontal: 14,
+    borderRadius: 18,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 10,
+  },
+  followPillText: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  tabBar: {
+    alignSelf: 'center',
+    width: 22,
+    height: 3,
+    borderRadius: 2,
+    marginTop: 8,
   },
 });

@@ -15,6 +15,9 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { PreferencesContext } from '../context/PreferencesContext';
 import { useNotifications } from '../context/NotificationsContext';
 import * as api from '../api';
+import { AuroraGlow, HeaderIconButton, ScreenHeader } from '../components/ScreenChrome';
+import { avatarTone } from '../utils/avatarTone';
+import { timeAgo } from '../utils/time';
 
 function iconFor(type) {
   if (type === 'post_like') return { name: 'favorite', color: '#f85149' };
@@ -30,19 +33,14 @@ function iconFor(type) {
   return { name: 'notifications', color: '#FF7A2F' };
 }
 
-function formatTime(value) {
-  if (!value) return '';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleDateString();
-}
 
 function ActorAvatar({ name, uri }) {
   const letter = String(name || 'D').slice(0, 1).toUpperCase();
   if (uri) return <Image source={{ uri }} style={styles.avatarImage} />;
+  const tone = avatarTone(name || 'DevFeed');
   return (
-    <View style={styles.avatar}>
-      <Text style={styles.avatarText}>{letter}</Text>
+    <View style={[styles.avatar, { backgroundColor: tone.bg }]}>
+      <Text style={[styles.avatarText, { color: tone.fg }]}>{letter}</Text>
     </View>
   );
 }
@@ -139,32 +137,30 @@ export default function NotificationsScreen({ navigation }) {
     const icon = iconFor(item.type);
     const unread = !item.read_at;
     return (
-      <TouchableOpacity style={[styles.card, themed.card, unread && styles.cardUnread, unread && themed.cardUnread]} onPress={() => handleOpen(item)}>
-        <ActorAvatar name={item.actor_name} uri={item.actor_avatar_url} />
-        <View style={styles.body}>
-          <View style={styles.topRow}>
-            <Text style={[styles.text, themed.text]} numberOfLines={2}>{item.text}</Text>
-            <View style={[styles.iconBadge, { backgroundColor: `${icon.color}22` }]}>
-              <MaterialIcons name={icon.name} size={16} color={icon.color} />
-            </View>
+      <TouchableOpacity style={[styles.row, { borderBottomColor: colors.border }]} onPress={() => handleOpen(item)}>
+        <View>
+          <ActorAvatar name={item.actor_name} uri={item.actor_avatar_url} />
+          <View style={[styles.iconBadge, { backgroundColor: icon.color, borderColor: colors.background }]}>
+            <MaterialIcons name={icon.name} size={11} color="#06080F" />
           </View>
-          <Text style={[styles.time, themed.time]}>{formatTime(item.created_at)}</Text>
         </View>
+        <View style={styles.body}>
+          <Text style={[styles.text, { color: unread ? colors.text : colors.muted, fontWeight: unread ? '700' : '500' }]} numberOfLines={3}>
+            {item.text}
+          </Text>
+          <Text style={[styles.time, themed.time]}>{timeAgo(item.created_at)}</Text>
+        </View>
+        {unread && <View style={[styles.unreadDot, { backgroundColor: colors.primary }]} />}
       </TouchableOpacity>
     );
   };
 
   return (
     <SafeAreaView style={[styles.container, themed.container]} edges={['top']}>
-      <View style={[styles.header, themed.header]}>
-        <View>
-          <Text style={[styles.title, themed.title]}>{t.notifications}</Text>
-          <Text style={[styles.subtitle, themed.subtitle]}>{t.notificationsSubtitle}</Text>
-        </View>
-        <TouchableOpacity style={[styles.iconButton, themed.iconButton]} onPress={handleReadAll}>
-          <MaterialIcons name="done-all" size={20} color={colors.text} />
-        </TouchableOpacity>
-      </View>
+      <AuroraGlow />
+      <ScreenHeader title={t.notifications} subtitle={t.notificationsSubtitle}>
+        <HeaderIconButton icon="done-all" onPress={handleReadAll} label="Hamısını oxunmuş et" />
+      </ScreenHeader>
 
       {loading ? (
         <View style={styles.center}>
@@ -225,21 +221,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   listContent: {
-    padding: 14,
+    paddingHorizontal: 16,
+    paddingTop: 4,
     paddingBottom: 150,
   },
-  card: {
-    backgroundColor: '#10131D',
-    borderColor: '#1F2433',
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 10,
+  row: {
     flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  cardUnread: {
-    borderColor: '#FF7A2F',
-    backgroundColor: '#111827',
+  unreadDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginLeft: 10,
   },
   avatar: {
     width: 42,
@@ -256,8 +252,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#1F2433',
   },
   avatarText: {
-    color: '#ffffff',
-    fontWeight: '900',
+    fontWeight: '800',
+    fontSize: 16,
   },
   body: {
     flex: 1,
@@ -268,23 +264,23 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   text: {
-    flex: 1,
-    color: '#F1F4FA',
     lineHeight: 20,
-    fontWeight: '700',
+    fontSize: 14,
   },
   iconBadge: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    position: 'absolute',
+    right: -3,
+    bottom: -3,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 10,
   },
   time: {
-    color: '#8790A6',
-    fontSize: 11,
-    marginTop: 6,
+    fontSize: 12,
+    marginTop: 4,
   },
   emptyText: {
     color: '#8790A6',

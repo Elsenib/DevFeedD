@@ -1,6 +1,8 @@
 import { useContext, useState } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { AuthContext } from '../context/AuthContext';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { AuthBackdrop, BrandMark, authStyles as styles } from '../components/AuthChrome';
 
 export default function LoginScreen({ navigation }) {
   const { signIn, socialSignIn } = useContext(AuthContext);
@@ -45,7 +47,7 @@ export default function LoginScreen({ navigation }) {
         <ActivityIndicator color="#ffffff" />
       ) : (
         <>
-          <Text style={styles.socialIcon}>{icon}</Text>
+          <MaterialCommunityIcons name={icon} size={20} color="#F1F4FA" style={styles.socialIcon} />
           <Text style={styles.socialButtonText}>{label}</Text>
         </>
       )}
@@ -54,14 +56,16 @@ export default function LoginScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>DevFeed</Text>
+      <AuthBackdrop />
+      <BrandMark />
+      <Text style={styles.title}>Xoş gəldin</Text>
       <Text style={styles.subtitle}>Developerlər üçün sosial platforma.</Text>
       <View style={styles.formCard}>
         <TextInput
           value={email}
           onChangeText={setEmail}
           placeholder="E-poçt"
-          placeholderTextColor="#94a3b8"
+          placeholderTextColor="#7C859A"
           keyboardType="email-address"
           autoCapitalize="none"
           style={styles.input}
@@ -70,12 +74,12 @@ export default function LoginScreen({ navigation }) {
           value={password}
           onChangeText={setPassword}
           placeholder="Şifrə"
-          placeholderTextColor="#94a3b8"
+          placeholderTextColor="#7C859A"
           secureTextEntry
           style={styles.input}
         />
         <TouchableOpacity style={styles.button} onPress={handleLogin} disabled={loading}>
-          {loading ? <ActivityIndicator color="#ffffff" /> : <Text style={styles.buttonText}>Daxil ol</Text>}
+          {loading ? <ActivityIndicator color="#1A0A02" /> : <Text style={styles.buttonText}>Daxil ol</Text>}
         </TouchableOpacity>
 
         <View style={styles.dividerContainer}>
@@ -84,101 +88,13 @@ export default function LoginScreen({ navigation }) {
           <View style={styles.divider} />
         </View>
 
-        {renderSocialButton('github', 'GitHub ilə davam et', 'GH')}
-        {renderSocialButton('google', 'Google ilə davam et', 'G')}
+        {renderSocialButton('github', 'GitHub ilə davam et', 'github')}
+        {renderSocialButton('google', 'Google ilə davam et', 'google')}
 
         <TouchableOpacity onPress={() => navigation.navigate('Register')}>
-          <Text style={styles.switchText}>Hesabın yoxdursa, qeydiyyatdan keç</Text>
+          <Text style={styles.switchText}>Hesabın yoxdur? <Text style={styles.switchAccent}>Qeydiyyatdan keç</Text></Text>
         </TouchableOpacity>
       </View>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#06080F',
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-  },
-  title: {
-    color: '#e2e8f0',
-    fontSize: 34,
-    fontWeight: '900',
-    marginBottom: 10,
-  },
-  subtitle: {
-    color: '#94a3b8',
-    fontSize: 15,
-    lineHeight: 22,
-    marginBottom: 28,
-  },
-  formCard: {
-    backgroundColor: '#0b1120',
-    borderRadius: 20,
-    padding: 22,
-    borderColor: '#111827',
-    borderWidth: 1,
-  },
-  input: {
-    backgroundColor: '#121827',
-    color: '#e2e8f0',
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 14,
-    borderColor: '#1e293b',
-    borderWidth: 1,
-  },
-  button: {
-    backgroundColor: '#FF7A2F',
-    borderRadius: 14,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  buttonText: {
-    color: '#ffffff',
-    fontWeight: '700',
-  },
-  dividerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 16,
-  },
-  divider: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#1e293b',
-  },
-  dividerText: {
-    marginHorizontal: 12,
-    color: '#64748b',
-    fontSize: 13,
-  },
-  socialButton: {
-    backgroundColor: '#1e293b',
-    borderRadius: 14,
-    paddingVertical: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    marginBottom: 12,
-  },
-  socialIcon: {
-    color: '#e2e8f0',
-    fontSize: 13,
-    fontWeight: '800',
-    marginRight: 8,
-  },
-  socialButtonText: {
-    color: '#e2e8f0',
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  switchText: {
-    color: '#94a3b8',
-    textAlign: 'center',
-    marginTop: 8,
-  },
-});

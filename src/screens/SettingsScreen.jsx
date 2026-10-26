@@ -6,6 +6,7 @@ import { AuthContext } from '../context/AuthContext';
 import { LANGUAGES, PreferencesContext, THEME_MODES } from '../context/PreferencesContext';
 import { API_BASE_URL } from '../constants/config';
 import * as api from '../api';
+import { AuroraGlow, ScreenHeader } from '../components/ScreenChrome';
 
 export default function SettingsScreen({ navigation }) {
   const { user, signOut, updateCurrentUser } = useContext(AuthContext);
@@ -87,11 +88,9 @@ export default function SettingsScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+    <AuroraGlow />
+    <ScreenHeader title={t.settings} subtitle="Profil, görünüş və tətbiq ayarları" onBack={() => navigation.goBack()} />
     <ScrollView contentContainerStyle={styles.content}>
-      <View style={styles.header}>
-        <Text style={styles.title}>{t.settings}</Text>
-        <Text style={styles.subtitle}>Profil, görünüş və tətbiq ayarları</Text>
-      </View>
 
       <Text style={styles.sectionTitle}>{t.account}</Text>
       <TouchableOpacity style={styles.cardRow} onPress={() => navigation.navigate('Main', { screen: 'Profile', params: { openEdit: true } })}>
@@ -249,7 +248,7 @@ function createStyles(colors) {
     },
     card: {
       backgroundColor: colors.surface,
-      borderRadius: 12,
+      borderRadius: 18,
       padding: 14,
       marginBottom: 12,
       borderColor: colors.border,
@@ -257,7 +256,7 @@ function createStyles(colors) {
     },
     cardRow: {
       backgroundColor: colors.surface,
-      borderRadius: 12,
+      borderRadius: 18,
       padding: 14,
       marginBottom: 10,
       borderColor: colors.border,

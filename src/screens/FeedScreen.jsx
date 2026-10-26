@@ -285,7 +285,7 @@ function GitPayload({ post }) {
   );
 }
 
-function DeployPayload({ post }) {
+export function DeployPayload({ post }) {
   const { theme } = useContext(PreferencesContext);
   const colors = theme.colors;
   const { metadata } = post;
@@ -364,7 +364,7 @@ function DeployPayload({ post }) {
   );
 }
 
-function MediaPayload({ post, active }) {
+export function MediaPayload({ post, active }) {
   const { theme } = useContext(PreferencesContext);
   const colors = theme.colors;
   const { metadata } = post;

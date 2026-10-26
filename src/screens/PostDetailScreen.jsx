@@ -16,14 +16,14 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { ResizeMode, Video } from 'expo-av';
 import { AuthContext } from '../context/AuthContext';
 import { PreferencesContext } from '../context/PreferencesContext';
 import JobApplicationModal from '../components/JobApplicationModal';
 import * as api from '../api';
 import { PAYMENTS_ENABLED } from '../constants/config';
 import { openModerationMenu } from '../utils/moderation';
-import { repairUploadUrl } from '../utils/media';
+import { DeployPayload, MediaPayload } from './FeedScreen';
+import { AuroraGlow } from '../components/ScreenChrome';
 
 const POST_TYPES = {
   TEXT: { label: 'POST', color: '#8790A6', icon: 'notes' },
@@ -153,51 +153,6 @@ function LinkifiedText({ text, style, linkStyle, numberOfLines }) {
   );
 }
 
-function AutoVideo({ uri, style }) {
-  const videoRef = useRef(null);
-  const [playing, setPlaying] = useState(true);
-
-  useEffect(() => {
-    setPlaying(true);
-  }, [uri]);
-
-  const toggle = async () => {
-    const nextPlaying = !playing;
-    setPlaying(nextPlaying);
-    try {
-      if (nextPlaying) {
-        await videoRef.current?.playAsync();
-      } else {
-        await videoRef.current?.pauseAsync();
-      }
-    } catch (error) {
-      // Native playback may not be ready on the first tap.
-    }
-  };
-
-  return (
-    <TouchableOpacity activeOpacity={0.92} onPress={toggle}>
-      <Video
-        ref={videoRef}
-        source={{ uri }}
-        style={style}
-        resizeMode={ResizeMode.COVER}
-        shouldPlay={playing}
-        isLooping
-        useNativeControls={false}
-        onLoad={() => {
-          if (playing) videoRef.current?.playAsync?.().catch(() => null);
-        }}
-      />
-      {!playing && (
-        <View style={styles.videoPausedOverlay}>
-          <MaterialIcons name="play-arrow" size={34} color="#ffffff" />
-        </View>
-      )}
-    </TouchableOpacity>
-  );
-}
-
 function PayloadPreview({ post }) {
   const { theme } = useContext(PreferencesContext);
   const colors = theme.colors;
@@ -227,67 +182,8 @@ function PayloadPreview({ post }) {
       </View>
     );
   }
-  if (post.type === 'DEPLOY') {
-    const deployUrl = normalizeExternalUrl(metadata.url || metadata.link || metadata.deployUrl);
-    const host = hostFromUrl(deployUrl);
-    const serviceName = metadata.service || inferLiveService(deployUrl);
-    return (
-      <View style={[styles.deployBox, { backgroundColor: colors.surfaceStrong, borderColor: colors.border }]}>
-        <View style={styles.livePreviewTop}>
-          <View style={styles.payloadBodyNoMargin}>
-            <Text style={[styles.payloadTitle, { color: colors.text }]}>{serviceName} -> {metadata.env || 'Production'}</Text>
-            <Text style={styles.deployText}>{host || 'Live link əlavə edilməyib'}</Text>
-          </View>
-          <Text style={styles.liveBadge}>LIVE</Text>
-        </View>
-        {!!deployUrl && (
-          <TouchableOpacity style={styles.livePreviewFrame} activeOpacity={0.86} onPress={() => openExternalUrl(deployUrl)}>
-            <View style={styles.livePreviewBar}>
-              <View style={[styles.liveDot, { backgroundColor: '#f87171' }]} />
-              <View style={[styles.liveDot, { backgroundColor: '#fbbf24' }]} />
-              <View style={[styles.liveDot, { backgroundColor: '#34d399' }]} />
-              <Text style={styles.livePreviewUrl} numberOfLines={1}>{host}</Text>
-            </View>
-            <View style={styles.livePreviewBody}>
-              <MaterialIcons name="language" size={28} color="#86efac" />
-              <Text style={styles.livePreviewTitle} numberOfLines={1}>{host}</Text>
-              <Text style={styles.livePreviewHint}>Vercel/Netlify layihə linkinə keç</Text>
-            </View>
-          </TouchableOpacity>
-        )}
-      </View>
-    );
-  }
-  if (post.type === 'MEDIA') {
-    const mediaUrl = repairUploadUrl(metadata.mediaUrl || metadata.url);
-    const mediaType = metadata.mediaType || (String(metadata.mimeType || '').startsWith('image/') ? 'image' : 'video');
-    return (
-      <TouchableOpacity
-        style={[styles.mediaBox, { backgroundColor: colors.surfaceStrong, borderColor: colors.border }]}
-        activeOpacity={mediaUrl ? 0.85 : 1}
-        onPress={() => {
-          if (mediaType !== 'video') openExternalUrl(mediaUrl);
-        }}
-        disabled={!mediaUrl}
-      >
-        {mediaType === 'image' && mediaUrl ? (
-          <Image source={{ uri: mediaUrl }} style={styles.mediaPreviewImage} />
-        ) : mediaType === 'video' && mediaUrl ? (
-          <AutoVideo uri={mediaUrl} style={styles.mediaPreviewVideo} />
-        ) : (
-          <View style={styles.mediaPreviewIcon}>
-            <MaterialIcons name="play-circle-outline" size={42} color="#FF9A5C" />
-          </View>
-        )}
-        <View style={[styles.mediaOverlay, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
-          <Text style={styles.mediaTitle}>{metadata.title || 'Media paylaşım'}</Text>
-          {(mediaType !== 'video' || !mediaUrl) && (
-            <Text style={styles.mediaLink}>{mediaUrl || 'Media əlavə edilməyib'}</Text>
-          )}
-        </View>
-      </TouchableOpacity>
-    );
-  }
+  if (post.type === 'DEPLOY') return <DeployPayload post={post} />;
+  if (post.type === 'MEDIA') return <MediaPayload post={post} active />;
   if (post.type === 'JOB') {
     const requirements = Array.isArray(metadata.requirements) ? metadata.requirements : [];
     return (
@@ -427,7 +323,7 @@ export default function PostDetailScreen({ route, navigation }) {
   const colors = theme.colors;
   const themed = useMemo(() => ({
     container: { backgroundColor: colors.background },
-    header: { backgroundColor: colors.background, borderBottomColor: colors.border },
+    header: { backgroundColor: 'transparent', borderBottomColor: colors.border },
     iconButton: { backgroundColor: colors.surface, borderColor: colors.border },
     title: { color: colors.text },
     muted: { color: colors.muted },
@@ -686,6 +582,7 @@ export default function PostDetailScreen({ route, navigation }) {
 
   const renderHeader = () => (
     <View>
+      <AuroraGlow height={240} />
       <View style={[styles.header, themed.header]}>
         <TouchableOpacity style={[styles.iconButton, themed.iconButton]} onPress={() => navigation.goBack()}>
           <MaterialIcons name="arrow-back" size={22} color={colors.text} />

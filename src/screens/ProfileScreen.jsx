@@ -18,6 +18,8 @@ import { AuthContext } from '../context/AuthContext';
 import { PreferencesContext } from '../context/PreferencesContext';
 import * as api from '../api';
 import { PAYMENTS_ENABLED } from '../constants/config';
+import { AuroraGlow, HeaderIconButton } from '../components/ScreenChrome';
+import { avatarTone } from '../utils/avatarTone';
 import { openModerationMenu } from '../utils/moderation';
 
 function splitList(value) {
@@ -386,104 +388,100 @@ export default function ProfileScreen({ route, navigation }) {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      <AuroraGlow />
       <ScrollView contentContainerStyle={styles.content}>
-        {!isOwnProfile && navigation.canGoBack() && (
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()} accessibilityLabel="Geri">
-            <MaterialIcons name="arrow-back" size={22} color={colors.text} />
-          </TouchableOpacity>
-        )}
-        <View style={styles.headerCard}>
-          <TouchableOpacity style={styles.avatarWrap} onPress={handlePickAvatar} disabled={uploadingAvatar || !isOwnProfile}>
-            {profile?.avatar_url ? (
-              <Image source={{ uri: profile.avatar_url }} style={styles.avatarImage} />
-            ) : (
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>{displayName.slice(0, 1).toUpperCase()}</Text>
-              </View>
-            )}
-            {isOwnProfile && (
-              <View style={styles.cameraBadge}>
-                {uploadingAvatar ? <ActivityIndicator size="small" color="#ffffff" /> : <MaterialIcons name="photo-camera" size={14} color="#ffffff" />}
-              </View>
-            )}
-          </TouchableOpacity>
-          <View style={styles.headerInfo}>
-            <Text style={styles.name}>{displayName}</Text>
-            {isOwnProfile && <Text style={styles.email}>{profile?.email || user?.email}</Text>}
-            <Text style={styles.roleText}>{profile?.role_sub || profile?.role || 'DevFeed member'}</Text>
-          </View>
-          {isOwnProfile && (
-            <TouchableOpacity style={styles.settingsButton} onPress={() => navigation.navigate('Settings')}>
-              <MaterialIcons name="settings" size={20} color={colors.text} />
-            </TouchableOpacity>
+        <View style={styles.topBar}>
+          {!isOwnProfile && navigation.canGoBack() ? (
+            <HeaderIconButton icon="arrow-back" onPress={() => navigation.goBack()} label="Geri" />
+          ) : (
+            <Text style={[styles.topHandle, { color: colors.muted }]} numberOfLines={1}>
+              @{String(profile?.email || user?.email || displayName).split('@')[0]}
+            </Text>
+          )}
+          {isOwnProfile ? (
+            <HeaderIconButton icon="settings" onPress={() => navigation.navigate('Settings')} label="Tənzimləmələr" />
+          ) : (
+            <HeaderIconButton icon="more-horiz" onPress={handleProfileMore} label="Seçimlər" />
           )}
         </View>
 
-        <View style={styles.statsRow}>
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{profile?.posts ?? myPosts.length}</Text>
-            <Text style={styles.statLabel}>Paylaşım</Text>
-          </View>
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{profile?.followers_count ?? 0}</Text>
-            <Text style={styles.statLabel}>İzləyici</Text>
-          </View>
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{profile?.following_count ?? 0}</Text>
-            <Text style={styles.statLabel}>İzlənən</Text>
+        <View style={styles.hero}>
+          <TouchableOpacity style={styles.avatarRing} onPress={handlePickAvatar} disabled={uploadingAvatar || !isOwnProfile} accessibilityLabel={isOwnProfile ? 'Profil şəklini dəyiş' : displayName}>
+            <View style={[styles.avatarRingInner, { borderColor: colors.background }]}>
+              {profile?.avatar_url ? (
+                <Image source={{ uri: profile.avatar_url }} style={styles.avatarImage} />
+              ) : (
+                <View style={[styles.avatar, { backgroundColor: avatarTone(displayName).bg }]}>
+                  <Text style={[styles.avatarText, { color: avatarTone(displayName).fg }]}>{displayName.slice(0, 1).toUpperCase()}</Text>
+                </View>
+              )}
+            </View>
+            {isOwnProfile && (
+              <View style={[styles.cameraBadge, { borderColor: colors.background }]}>
+                {uploadingAvatar ? <ActivityIndicator size="small" color="#1A0A02" /> : <MaterialIcons name="photo-camera" size={13} color="#1A0A02" />}
+              </View>
+            )}
+          </TouchableOpacity>
+          <View style={styles.statsRow}>
+            {[
+              [profile?.posts ?? myPosts.length, 'Paylaşım'],
+              [profile?.followers_count ?? 0, 'İzləyici'],
+              [profile?.following_count ?? 0, 'İzlənən'],
+            ].map(([value, label]) => (
+              <View key={label} style={styles.statItem}>
+                <Text style={[styles.statValue, { color: colors.text }]}>{value}</Text>
+                <Text style={[styles.statLabel, { color: colors.muted }]}>{label}</Text>
+              </View>
+            ))}
           </View>
         </View>
+
+        <Text style={[styles.name, { color: colors.text }]}>{displayName}</Text>
+        <Text style={[styles.roleText, { color: colors.accentText }]}>{profile?.role_sub || profile?.role || 'DevFeed üzvü'}</Text>
+        <Text style={[styles.bioText, { color: profile?.bio ? colors.text : colors.muted }]}>
+          {profile?.bio || (isOwnProfile ? 'Özün haqqında qısa bio əlavə et.' : 'Hələ bio yazılmayıb.')}
+        </Text>
+        {stack.length > 0 && (
+          <View style={styles.tagRow}>
+            {stack.map((item) => (
+              <View key={item} style={[styles.tagItem, { backgroundColor: colors.surfaceStrong, borderColor: colors.border }]}>
+                <Text style={[styles.tagText, { color: colors.text }]}>{item}</Text>
+              </View>
+            ))}
+          </View>
+        )}
 
         <View style={styles.actionRow}>
-          <TouchableOpacity style={[styles.actionButton, !isOwnProfile && styles.hiddenAction]} onPress={() => setEditOpen(true)} disabled={!isOwnProfile}>
-            <MaterialIcons name="edit" size={18} color="#ffffff" />
-            <Text style={styles.actionButtonText}>Profili düzəlt</Text>
-          </TouchableOpacity>
-          {!isOwnProfile && (
-            <TouchableOpacity style={styles.actionButton} onPress={handleToggleFollow}>
-              <MaterialIcons name={profile?.following_by_me ? 'person-remove' : 'person-add'} size={18} color="#ffffff" />
-              <Text style={styles.actionButtonText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.78}>
-                {profile?.following_by_me ? 'İzlənilir' : 'İzlə'}
-              </Text>
+          {isOwnProfile ? (
+            <TouchableOpacity style={[styles.pillButton, { borderColor: colors.border, backgroundColor: colors.surface }]} onPress={() => setEditOpen(true)}>
+              <MaterialIcons name="edit" size={17} color={colors.text} />
+              <Text style={[styles.pillButtonText, { color: colors.text }]}>Profili düzəlt</Text>
             </TouchableOpacity>
-          )}
-          {!isOwnProfile && (
-            <TouchableOpacity style={[styles.actionButton, styles.messageButton]} onPress={handleMessage}>
-              <MaterialIcons name="send" size={18} color="#ffffff" />
-              <Text style={styles.actionButtonText} numberOfLines={1}>Mesaj</Text>
-            </TouchableOpacity>
+          ) : (
+            <>
+              <TouchableOpacity
+                style={[
+                  styles.pillButton,
+                  profile?.following_by_me
+                    ? { borderColor: colors.border, backgroundColor: colors.surface }
+                    : { borderColor: colors.primary, backgroundColor: colors.primary },
+                ]}
+                onPress={handleToggleFollow}
+              >
+                <Text style={[styles.pillButtonText, { color: profile?.following_by_me ? colors.text : colors.onPrimary }]}>
+                  {profile?.following_by_me ? 'İzlənilir' : 'İzlə'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.pillButton, { borderColor: colors.border, backgroundColor: colors.surface }]} onPress={handleMessage}>
+                <Text style={[styles.pillButtonText, { color: colors.text }]}>Mesaj</Text>
+              </TouchableOpacity>
+            </>
           )}
           {PAYMENTS_ENABLED && (
-            <TouchableOpacity style={[styles.actionButton, styles.supportButton]} onPress={() => setSupportOpen(true)}>
-              <MaterialIcons name="local-cafe" size={18} color="#111827" />
-              <Text style={styles.supportButtonText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82}>Dəstək ol</Text>
+            <TouchableOpacity style={[styles.pillButton, { borderColor: colors.border, backgroundColor: colors.surface }]} onPress={() => setSupportOpen(true)}>
+              <MaterialIcons name="local-cafe" size={17} color={colors.text} />
+              <Text style={[styles.pillButtonText, { color: colors.text }]}>Dəstək ol</Text>
             </TouchableOpacity>
-          )}
-          {!isOwnProfile && (
-            <TouchableOpacity style={[styles.actionButton, styles.moreAction]} onPress={handleProfileMore}>
-              <MaterialIcons name="more-horiz" size={18} color={colors.text} />
-              <Text style={styles.moreActionText} numberOfLines={1}>Seçimlər</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Bio</Text>
-          <Text style={styles.bodyText}>{profile?.bio || (isOwnProfile ? 'Qısa bio əlavə et.' : 'Hələ bio yazılmayıb.')}</Text>
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Stack</Text>
-          {stack.length > 0 ? (
-            <View style={styles.tagRow}>
-              {stack.map((item) => (
-                <View key={item} style={styles.tagItem}>
-                  <Text style={styles.tagText}>{item}</Text>
-                </View>
-              ))}
-            </View>
-          ) : (
-            <Text style={styles.bodyText}>{isOwnProfile ? 'Bacarıqlarını əlavə et.' : 'Hələ əlavə edilməyib.'}</Text>
           )}
         </View>
 
@@ -542,12 +540,61 @@ export default function ProfileScreen({ route, navigation }) {
 
 function createStyles(colors) {
   return StyleSheet.create({
+    topBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 12,
+    },
+    topHandle: {
+      fontSize: 14,
+      fontWeight: '700',
+      flex: 1,
+      marginRight: 12,
+    },
+    hero: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    avatarRing: {
+      width: 88,
+      height: 88,
+      borderRadius: 44,
+      padding: 3,
+      backgroundColor: colors.primary,
+    },
+    avatarRingInner: {
+      flex: 1,
+      borderRadius: 41,
+      borderWidth: 3,
+      overflow: 'hidden',
+    },
+    bioText: {
+      fontSize: 14,
+      lineHeight: 21,
+      marginTop: 8,
+    },
+    pillButton: {
+      flex: 1,
+      height: 44,
+      borderRadius: 22,
+      borderWidth: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+    },
+    pillButtonText: {
+      fontSize: 14,
+      fontWeight: '800',
+    },
     container: {
       flex: 1,
       backgroundColor: colors.background,
     },
     content: {
-      padding: 16,
+      paddingHorizontal: 16,
+      paddingTop: 8,
       paddingBottom: 150,
     },
     center: {
@@ -570,10 +617,9 @@ function createStyles(colors) {
       marginRight: 14,
     },
     avatar: {
-      width: 70,
-      height: 70,
-      borderRadius: 35,
-      backgroundColor: colors.primary,
+      width: '100%',
+      height: '100%',
+      borderRadius: 40,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -586,10 +632,9 @@ function createStyles(colors) {
       justifyContent: 'center',
     },
     avatarImage: {
-      width: 70,
-      height: 70,
-      borderRadius: 35,
-      backgroundColor: colors.surfaceStrong,
+      width: '100%',
+      height: '100%',
+      borderRadius: 40,
     },
     avatarImageLarge: {
       width: 82,
@@ -598,9 +643,8 @@ function createStyles(colors) {
       backgroundColor: colors.surfaceStrong,
     },
     avatarText: {
-      color: '#ffffff',
-      fontSize: 26,
-      fontWeight: '900',
+      fontSize: 30,
+      fontWeight: '800',
     },
     cameraBadge: {
       position: 'absolute',
@@ -609,9 +653,8 @@ function createStyles(colors) {
       width: 28,
       height: 28,
       borderRadius: 14,
+      borderWidth: 3,
       backgroundColor: colors.primary,
-      borderColor: colors.surface,
-      borderWidth: 2,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -641,53 +684,43 @@ function createStyles(colors) {
       marginLeft: 10,
     },
     name: {
-      color: colors.text,
-      fontSize: 19,
-      fontWeight: '900',
-      marginBottom: 4,
+      fontSize: 20,
+      fontWeight: '800',
+      letterSpacing: -0.3,
+      marginTop: 14,
     },
     email: {
       color: colors.muted,
       fontSize: 13,
     },
     roleText: {
-      color: colors.primary,
-      fontSize: 12,
-      fontWeight: '800',
-      marginTop: 6,
+      fontSize: 13,
+      fontWeight: '700',
+      marginTop: 3,
     },
     statsRow: {
+      flex: 1,
       flexDirection: 'row',
-      backgroundColor: colors.surface,
-      borderRadius: 12,
-      borderColor: colors.border,
-      borderWidth: 1,
-      marginBottom: 12,
-      overflow: 'hidden',
+      marginLeft: 16,
     },
     statItem: {
       flex: 1,
       alignItems: 'center',
-      paddingVertical: 12,
-      borderRightColor: colors.border,
-      borderRightWidth: 1,
     },
     statValue: {
-      color: colors.text,
       fontSize: 18,
-      fontWeight: '900',
+      fontWeight: '800',
     },
     statLabel: {
-      color: colors.muted,
-      fontSize: 11,
-      marginTop: 3,
-      fontWeight: '800',
+      fontSize: 12,
+      fontWeight: '600',
+      marginTop: 2,
     },
     actionRow: {
       flexDirection: 'row',
-      flexWrap: 'wrap',
-      marginBottom: 12,
-      marginHorizontal: -4,
+      gap: 8,
+      marginTop: 16,
+      marginBottom: 18,
     },
     actionButton: {
       flexGrow: 1,
@@ -738,10 +771,10 @@ function createStyles(colors) {
     },
     card: {
       backgroundColor: colors.surface,
-      borderRadius: 12,
-      padding: 16,
       borderColor: colors.border,
       borderWidth: 1,
+      borderRadius: 22,
+      padding: 14,
       marginBottom: 12,
     },
     sectionTitle: {
@@ -769,21 +802,18 @@ function createStyles(colors) {
     tagRow: {
       flexDirection: 'row',
       flexWrap: 'wrap',
+      gap: 6,
+      marginTop: 12,
     },
     tagItem: {
-      backgroundColor: colors.primarySoft,
-      borderColor: colors.border,
-      borderWidth: 1,
-      marginRight: 8,
-      marginBottom: 8,
-      borderRadius: 7,
-      paddingVertical: 7,
       paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 8,
+      borderWidth: 1,
     },
     tagText: {
-      color: colors.primary,
       fontSize: 12,
-      fontWeight: '800',
+      fontWeight: '600',
     },
     postCard: {
       backgroundColor: colors.background,

@@ -21,6 +21,8 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { AuthContext } from '../context/AuthContext';
 import { PreferencesContext } from '../context/PreferencesContext';
 import * as api from '../api';
+import { avatarTone } from '../utils/avatarTone';
+import { AuroraGlow, HeaderIconButton, ScreenHeader } from '../components/ScreenChrome';
 import { openModerationMenu } from '../utils/moderation';
 
 function formatTime(value) {
@@ -175,9 +177,10 @@ function InviteModal({ visible, inviting, roomName, onClose, onInvite, members =
 function MessageAvatar({ name, uri }) {
   const letter = String(name || 'U').slice(0, 1).toUpperCase();
   if (uri) return <Image source={{ uri }} style={styles.messageAvatarImage} />;
+  const tone = avatarTone(name);
   return (
-    <View style={styles.messageAvatar}>
-      <Text style={styles.messageAvatarText}>{letter}</Text>
+    <View style={[styles.messageAvatar, { backgroundColor: tone.bg }]}>
+      <Text style={[styles.messageAvatarText, { color: tone.fg }]}>{letter}</Text>
     </View>
   );
 }
@@ -399,29 +402,15 @@ export default function PublicChatScreen({ route, navigation }) {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 72 : 0}
       >
-      <View style={[styles.header, themed.header]}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            accessibilityLabel="Geri"
-            style={{ width: 40, height: 40, borderRadius: 20, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', marginRight: 12 }}
-          >
-            <MaterialIcons name="arrow-back" size={21} color={colors.text} />
-          </TouchableOpacity>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.title, themed.title]}>{t.publicChat}</Text>
-            <Text style={[styles.subtitle, themed.subtitle]}>{selectedRoomTitle} · {members.length || selectedRoom?.member_count || 0} üzv</Text>
-          </View>
-        </View>
-        <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.plusButton} onPress={() => setInviteModalOpen(true)} disabled={!selectedRoomId}>
-            <MaterialIcons name="group-add" size={22} color="#ffffff" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.plusButton} onPress={() => setRoomModalOpen(true)}>
-            <MaterialIcons name="add" size={24} color="#ffffff" />
-          </TouchableOpacity>
-        </View>
-      </View>
+      <AuroraGlow height={220} />
+      <ScreenHeader
+        title={t.publicChat}
+        subtitle={`${selectedRoomTitle} · ${members.length || selectedRoom?.member_count || 0} üzv`}
+        onBack={navigation.canGoBack() ? () => navigation.goBack() : undefined}
+      >
+        <HeaderIconButton icon="group-add" onPress={() => setInviteModalOpen(true)} label="Otağa dəvət et" disabled={!selectedRoomId} />
+        <HeaderIconButton icon="add" onPress={() => setRoomModalOpen(true)} label="Yeni otaq" />
+      </ScreenHeader>
 
       <View style={[styles.roomsBar, themed.roomsBar]}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -551,7 +540,7 @@ const styles = StyleSheet.create({
     minWidth: 112,
     borderColor: '#2A3040',
     borderWidth: 1,
-    borderRadius: 10,
+    borderRadius: 16,
     paddingHorizontal: 12,
     paddingVertical: 9,
     marginRight: 8,
@@ -575,7 +564,7 @@ const styles = StyleSheet.create({
     marginTop: 3,
   },
   roomMetaActive: {
-    color: '#a5b4fc',
+    color: '#FF9A5C',
   },
   messageLoader: {
     flex: 1,
@@ -622,14 +611,14 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   senderNameMine: {
-    color: '#c7d2fe',
+    color: 'rgba(26,10,2,0.7)',
   },
   messageText: {
     color: '#F1F4FA',
     lineHeight: 20,
   },
   messageTextMine: {
-    color: '#ffffff',
+    color: '#1A0A02',
   },
   messageFooter: {
     flexDirection: 'row',
@@ -642,7 +631,7 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   messageTimeMine: {
-    color: '#c7d2fe',
+    color: 'rgba(26,10,2,0.6)',
   },
   messageAvatar: {
     width: 30,
@@ -661,9 +650,8 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   messageAvatarText: {
-    color: '#ffffff',
-    fontSize: 11,
-    fontWeight: '900',
+    fontSize: 12,
+    fontWeight: '800',
   },
   emptyText: {
     color: '#8790A6',
@@ -693,7 +681,7 @@ const styles = StyleSheet.create({
   sendButton: {
     width: 44,
     height: 44,
-    borderRadius: 12,
+    borderRadius: 22,
     backgroundColor: '#FF7A2F',
     alignItems: 'center',
     justifyContent: 'center',
