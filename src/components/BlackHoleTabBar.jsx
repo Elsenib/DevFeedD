@@ -18,7 +18,7 @@ const MUTED = '#A9AFBF';
 // Slots across the bar; index 2 is the black hole (create action).
 const SLOT_FRACTIONS = [0.135, 0.315, 0.5, 0.685, 0.865];
 const TABS = [
-  { slot: 0, route: 'Feed', label: 'Lent', icon: 'home' },
+  { slot: 0, route: 'Feed', label: 'DevFeed', icon: 'home' },
   { slot: 1, route: 'Explore', label: 'Kəşf', icon: 'search' },
   { slot: 3, route: 'Notifications', label: 'Bildirişlər', icon: 'bell' },
   { slot: 4, route: 'Profile', label: 'Profil', icon: 'user' },

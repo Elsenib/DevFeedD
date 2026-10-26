@@ -12,7 +12,7 @@ export const LANGUAGES = {
     language: 'Dil',
     editProfile: 'Profili düzəlt',
     signOut: 'Çıxış',
-    feed: 'Feed',
+    feed: 'DevFeed',
     feedSubtitle: 'Kod, deploy, media və iş elanları',
     explore: 'Kəşf',
     exploreSubtitle: 'İstifadəçiləri və paylaşımları tap',
