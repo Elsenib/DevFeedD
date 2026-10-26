@@ -16,6 +16,7 @@ const reportsRoutes = require('./routes/reports');
 const legalRoutes = require('./routes/legal');
 const resumesRoutes = require('./routes/resumes');
 const aiRoutes = require('./routes/ai');
+const adminRoutes = require('./routes/admin');
 
 dotenv.config();
 
@@ -56,6 +57,7 @@ app.use('/users', usersRoutes);
 app.use('/notifications', notificationsRoutes);
 app.use('/reports', reportsRoutes);
 app.use('/ai', aiRoutes);
+app.use('/admin', adminRoutes);
 app.use('/resumes', resumesRoutes);
 app.use('/', legalRoutes);
 
@@ -366,6 +368,14 @@ const createSchema = async () => {
         status TEXT NOT NULL DEFAULT 'OPEN',
         created_at TIMESTAMPTZ DEFAULT NOW()
       );
+    `);
+
+    await client.query(`
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS banned_at TIMESTAMPTZ;
+      ALTER TABLE content_reports
+        ADD COLUMN IF NOT EXISTS resolution TEXT,
+        ADD COLUMN IF NOT EXISTS resolved_at TIMESTAMPTZ,
+        ADD COLUMN IF NOT EXISTS resolved_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
     `);
 
     await client.query(`

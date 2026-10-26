@@ -22,6 +22,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { ResizeMode, Video } from 'expo-av';
 import * as WebBrowser from 'expo-web-browser';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useIsFocused, useNavigation } from '@react-navigation/native';
 import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { AuthContext } from '../context/AuthContext';
@@ -905,9 +906,15 @@ export default function FeedScreen({ navigation, route }) {
     () => (feedTab === 'all' ? normalizedPosts : normalizedPosts.filter((post) => post.type === feedTab)),
     [normalizedPosts, feedTab]
   );
+  // "N yeni paylaşım" counts other people's posts newer than the newest post
+  // the previous load showed, so it clears once you have seen them.
+  const seenKey = `devfeed.feedSeen.${user?.id || 'guest'}`;
+  const [seenAt, setSeenAt] = useState(null);
   const freshCount = useMemo(
-    () => normalizedPosts.filter((post) => Date.now() - new Date(post.createdAt).getTime() < 86400000).length,
-    [normalizedPosts]
+    () => (seenAt === null ? 0 : normalizedPosts.filter(
+      (post) => new Date(post.createdAt).getTime() > seenAt && String(post.user_id || post.userId) !== String(user?.id)
+    ).length),
+    [normalizedPosts, seenAt, user?.id]
   );
   const [activeVideoId, setActiveVideoId] = useState(null);
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 }).current;
@@ -924,6 +931,10 @@ export default function FeedScreen({ navigation, route }) {
     try {
       const data = await api.fetchPosts({ limit: PAGE_SIZE, offset: 0 });
       const rows = Array.isArray(data) ? data : [];
+      const stored = Number(await AsyncStorage.getItem(seenKey).catch(() => null)) || 0;
+      const newest = Math.max(stored, ...rows.map((row) => new Date(row.created_at).getTime() || 0));
+      setSeenAt(stored || newest);
+      AsyncStorage.setItem(seenKey, String(newest)).catch(() => {});
       setPosts(rows);
       setHasMore(rows.length === PAGE_SIZE);
     } catch (error) {
@@ -932,7 +943,7 @@ export default function FeedScreen({ navigation, route }) {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [seenKey]);
 
   // Next page when the list nears its end; ids already shown are skipped so
   // posts created meanwhile (which shift offsets) don't appear twice.
@@ -1135,7 +1146,7 @@ export default function FeedScreen({ navigation, route }) {
         <View style={styles.greetingText}>
           <Text style={[styles.greetingHello, themed.subtitle]}>Salam, {String(user?.name || '').split(' ')[0] || 'dost'}</Text>
           <Text style={[styles.greetingTitle, themed.title]} numberOfLines={1}>
-            {freshCount ? `${freshCount} yeni paylaşım` : 'Lent'}
+            {freshCount ? `${freshCount} yeni paylaşım` : 'Yeni paylaşım yoxdur'}
           </Text>
         </View>
         <TouchableOpacity style={styles.aiButton} onPress={() => navigation.navigate('Assistant')} accessibilityLabel="DevFeed AI">

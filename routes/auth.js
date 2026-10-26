@@ -422,7 +422,7 @@ router.post('/login', loginLimiter, async (req, res) => {
 
   try {
     const result = await db.query(
-      'SELECT id, name, email, role, role_sub, skills, languages, bio, website, avatar_url, activity_visible, email_verified, password_hash FROM users WHERE email = $1',
+      'SELECT id, name, email, role, role_sub, skills, languages, bio, website, avatar_url, activity_visible, email_verified, password_hash, banned_at FROM users WHERE email = $1',
       [normalizedEmail]
     );
     const user = result.rows[0];
@@ -434,9 +434,13 @@ router.post('/login', loginLimiter, async (req, res) => {
     if (!valid) {
       return res.status(401).json({ message: 'Invalid credentials.' });
     }
+    if (user.banned_at) {
+      return res.status(403).json({ message: 'Hesabınız qaydaları pozduğu üçün bloklanıb.', banned: true });
+    }
 
     const token = makeToken(user);
     delete user.password_hash;
+    delete user.banned_at;
     res.json({ token, user });
   } catch (error) {
     console.error(error);
