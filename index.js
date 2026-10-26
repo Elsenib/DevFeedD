@@ -15,6 +15,7 @@ const notificationsRoutes = require('./routes/notifications');
 const reportsRoutes = require('./routes/reports');
 const legalRoutes = require('./routes/legal');
 const resumesRoutes = require('./routes/resumes');
+const aiRoutes = require('./routes/ai');
 
 dotenv.config();
 
@@ -54,6 +55,7 @@ if (process.env.PAYMENTS_ENABLED === 'true') {
 app.use('/users', usersRoutes);
 app.use('/notifications', notificationsRoutes);
 app.use('/reports', reportsRoutes);
+app.use('/ai', aiRoutes);
 app.use('/resumes', resumesRoutes);
 app.use('/', legalRoutes);
 
@@ -363,6 +365,15 @@ const createSchema = async () => {
         details TEXT,
         status TEXT NOT NULL DEFAULT 'OPEN',
         created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS ai_usage (
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        day DATE NOT NULL,
+        count INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (user_id, day)
       );
     `);
 

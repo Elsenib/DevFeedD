@@ -21,6 +21,8 @@ import ChatScreen from './src/screens/ChatScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import VideoPlayerScreen from './src/screens/VideoPlayerScreen';
+import FollowListScreen from './src/screens/FollowListScreen';
+import AssistantScreen from './src/screens/AssistantScreen';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -250,6 +252,8 @@ export default function App() {
                   <Stack.Screen name="Chat" component={ChatScreen} />
                   <Stack.Screen name="UserProfile" component={ProfileScreen} />
                   <Stack.Screen name="Settings" component={SettingsScreen} />
+                  <Stack.Screen name="FollowList" component={FollowListScreen} />
+                  <Stack.Screen name="Assistant" component={AssistantScreen} />
                   <Stack.Screen name="VideoPlayer" component={VideoPlayerScreen} options={{ animation: 'fade', contentStyle: { backgroundColor: '#000' } }} />
                 </>
               )}

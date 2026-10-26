@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, useCallback, useEffect, useMemo, useState } from 'react';
+import { LANGUAGE_PICKER_ENABLED } from '../constants/config';
 
 const STORAGE_KEY = 'devfeed.preferences';
 
@@ -157,7 +158,7 @@ export function PreferencesProvider({ children }) {
     const restore = async () => {
       const saved = await loadPreferences();
       if (saved.themeMode && THEME_MODES[saved.themeMode]) setThemeModeState(saved.themeMode);
-      if (saved.language && LANGUAGES[saved.language]) setLanguageState(saved.language);
+      if (LANGUAGE_PICKER_ENABLED && saved.language && LANGUAGES[saved.language]) setLanguageState(saved.language);
       setReady(true);
     };
     restore();

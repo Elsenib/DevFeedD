@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -21,6 +21,7 @@ import { PAYMENTS_ENABLED } from '../constants/config';
 import { AuroraGlow, HeaderIconButton } from '../components/ScreenChrome';
 import Avatar from '../components/Avatar';
 import { openModerationMenu } from '../utils/moderation';
+import { PostCard, normalizePost } from './FeedScreen';
 
 function splitList(value) {
   if (Array.isArray(value)) return value.filter(Boolean);
@@ -29,15 +30,6 @@ function splitList(value) {
     .split(',')
     .map((item) => item.trim())
     .filter(Boolean);
-}
-
-function postTypeLabel(type) {
-  const value = String(type || 'TEXT').toUpperCase();
-  if (value === 'GIT') return 'Git';
-  if (value === 'DEPLOY') return 'Deploy';
-  if (value === 'MEDIA') return 'Media';
-  if (value === 'JOB') return 'İş elanı';
-  return 'Post';
 }
 
 function EditProfileModal({ visible, profile, colors, saving, onClose, onSave, onPickAvatar }) {
@@ -229,6 +221,9 @@ export default function ProfileScreen({ route, navigation }) {
   const [activityHidden, setActivityHidden] = useState(false);
   const targetUserId = route?.params?.userId;
   const isOwnProfile = !targetUserId || String(targetUserId) === String(user?.id);
+  const scrollRef = useRef(null);
+  const [postsY, setPostsY] = useState(0);
+  const posts = useMemo(() => myPosts.map(normalizePost), [myPosts]);
 
   const loadProfile = useCallback(async () => {
     setLoading(true);
@@ -365,6 +360,39 @@ export default function ProfileScreen({ route, navigation }) {
     });
   };
 
+  // Optimistic like/bookmark on the profile's own copy of the posts.
+  const patchPost = (postId, patch) => {
+    setMyPosts((prev) => prev.map((item) => (String(item.id) === String(postId) ? { ...item, ...patch(item) } : item)));
+  };
+
+  const handleLike = async (post) => {
+    const next = !post.likedByMe;
+    patchPost(post.id, (item) => ({ liked_by_me: next, like_count: Math.max(0, Number(item.like_count || 0) + (next ? 1 : -1)) }));
+    try {
+      const result = next ? await api.toggleLike(post.id) : await api.unlikePost(post.id);
+      patchPost(post.id, (item) => ({ liked_by_me: result.liked ?? next, like_count: result.like_count ?? item.like_count }));
+    } catch (error) {
+      loadProfile();
+    }
+  };
+
+  const handleBookmark = async (post) => {
+    const next = !post.bookmarkedByMe;
+    patchPost(post.id, (item) => ({ bookmarked_by_me: next, bookmark_count: Math.max(0, Number(item.bookmark_count || 0) + (next ? 1 : -1)) }));
+    try {
+      const result = next ? await api.bookmarkPost(post.id) : await api.removeBookmark(post.id);
+      patchPost(post.id, (item) => ({ bookmarked_by_me: result.bookmarked ?? next, bookmark_count: result.bookmark_count ?? item.bookmark_count }));
+    } catch (error) {
+      loadProfile();
+    }
+  };
+
+  const openFollowList = (mode) => {
+    const id = profile?.id || targetUserId || user?.id;
+    if (!id) return;
+    navigation.navigate('FollowList', { userId: id, mode, name: displayName });
+  };
+
   const handleMessage = async () => {
     if (!profile?.id) return;
     try {
@@ -389,7 +417,7 @@ export default function ProfileScreen({ route, navigation }) {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <AuroraGlow />
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView ref={scrollRef} contentContainerStyle={styles.content}>
         <View style={styles.topBar}>
           {!isOwnProfile && navigation.canGoBack() ? (
             <HeaderIconButton icon="arrow-back" onPress={() => navigation.goBack()} label="Geri" />
@@ -418,14 +446,14 @@ export default function ProfileScreen({ route, navigation }) {
           </TouchableOpacity>
           <View style={styles.statsRow}>
             {[
-              [profile?.posts ?? myPosts.length, 'Paylaşım'],
-              [profile?.followers_count ?? 0, 'İzləyici'],
-              [profile?.following_count ?? 0, 'İzlənən'],
-            ].map(([value, label]) => (
-              <View key={label} style={styles.statItem}>
+              [profile?.posts ?? myPosts.length, 'Paylaşım', () => scrollRef.current?.scrollTo({ y: postsY, animated: true })],
+              [profile?.followers_count ?? 0, 'İzləyici', () => openFollowList('followers')],
+              [profile?.following_count ?? 0, 'İzlənən', () => openFollowList('following')],
+            ].map(([value, label, onPress]) => (
+              <TouchableOpacity key={label} style={styles.statItem} onPress={onPress} accessibilityRole="button" accessibilityLabel={`${value} ${label}`}>
                 <Text style={[styles.statValue, { color: colors.text }]}>{value}</Text>
                 <Text style={[styles.statLabel, { color: colors.muted }]}>{label}</Text>
-              </View>
+              </TouchableOpacity>
             ))}
           </View>
         </View>
@@ -486,26 +514,30 @@ export default function ProfileScreen({ route, navigation }) {
           </View>
         )}
 
-        <View style={styles.card}>
+        <View onLayout={(event) => setPostsY(event.nativeEvent.layout.y)}>
           <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionTitle}>Paylaşımlar</Text>
-            <Text style={styles.countText}>{myPosts.length}</Text>
+            <Text style={styles.countText}>{posts.length}</Text>
           </View>
           {activityHidden ? (
-            <Text style={styles.bodyText}>Bu istifadəçi fəaliyyətini gizlədib.</Text>
-          ) : myPosts.length > 0 ? (
-            myPosts.map((post) => (
-              <TouchableOpacity key={post.id} style={styles.postCard} onPress={() => navigation.navigate('PostDetail', { post })}>
-                <View style={styles.postTopRow}>
-                  <Text style={styles.postType}>{postTypeLabel(post.post_type)}</Text>
-                  <Text style={styles.postMeta}>{Number(post.like_count || 0)} bəyənmə</Text>
-                </View>
-                <Text style={styles.postTitle} numberOfLines={2}>{post.caption || post.title || post.body}</Text>
-                {!!post.body && <Text style={styles.postBody} numberOfLines={2}>{post.body}</Text>}
-              </TouchableOpacity>
+            <View style={styles.card}>
+              <Text style={styles.bodyText}>Bu istifadəçi fəaliyyətini gizlədib.</Text>
+            </View>
+          ) : posts.length > 0 ? (
+            posts.map((post) => (
+              <PostCard
+                key={post.id}
+                post={post}
+                onPress={(item) => navigation.navigate('PostDetail', { post: item })}
+                onLike={handleLike}
+                onBookmark={handleBookmark}
+                onApplyJob={(item) => navigation.navigate('PostDetail', { post: item })}
+              />
             ))
           ) : (
-            <Text style={styles.bodyText}>Hələ paylaşım yoxdur.</Text>
+            <View style={styles.card}>
+              <Text style={styles.bodyText}>Hələ paylaşım yoxdur.</Text>
+            </View>
           )}
         </View>
       </ScrollView>
@@ -808,40 +840,6 @@ function createStyles(colors) {
     tagText: {
       fontSize: 12,
       fontWeight: '600',
-    },
-    postCard: {
-      backgroundColor: colors.background,
-      borderColor: colors.border,
-      borderWidth: 1,
-      borderRadius: 10,
-      padding: 12,
-      marginBottom: 10,
-    },
-    postTopRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: 7,
-    },
-    postType: {
-      color: colors.primary,
-      fontSize: 11,
-      fontWeight: '900',
-      textTransform: 'uppercase',
-    },
-    postMeta: {
-      color: colors.muted,
-      fontSize: 11,
-    },
-    postTitle: {
-      color: colors.text,
-      fontWeight: '900',
-      marginBottom: 5,
-    },
-    postBody: {
-      color: colors.muted,
-      lineHeight: 18,
-      fontSize: 12,
     },
     modalOverlay: {
       flex: 1,

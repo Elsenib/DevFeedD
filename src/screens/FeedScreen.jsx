@@ -41,6 +41,7 @@ const POST_TYPES = [
 ];
 
 const PAGE_SIZE = 20;
+const AI_ICON = require('../../assets/ai-assistant.png');
 
 const FEED_TABS = [
   { id: 'all', label: 'Sizin üçün' },
@@ -59,7 +60,7 @@ function parseMetadata(metadata) {
   }
 }
 
-function normalizePost(row) {
+export function normalizePost(row) {
   const metadata = parseMetadata(row.metadata);
   const type = String(row.post_type || row.type || 'TEXT').toUpperCase();
   return {
@@ -400,7 +401,7 @@ function JobPayload({ post, onApplyJob }) {
         style={styles.jobApplyButton}
         onPress={(event) => {
           event?.stopPropagation?.();
-          onApplyJob(post);
+          onApplyJob?.(post);
         }}
       >
         <Text style={styles.jobApplyText}>Müraciət et</Text>
@@ -417,7 +418,7 @@ function PostPayload({ post, onApplyJob, active }) {
   return null;
 }
 
-function PostCard({ post, onPress, onAuthorPress, onLike, onBookmark, onApplyJob, onMore, active }) {
+export function PostCard({ post, onPress, onAuthorPress, onLike, onBookmark, onApplyJob, onMore, active }) {
   const { theme } = useContext(PreferencesContext);
   const colors = theme.colors;
   const themed = useMemo(() => ({
@@ -1137,8 +1138,8 @@ export default function FeedScreen({ navigation, route }) {
             {freshCount ? `${freshCount} yeni paylaşım` : 'Lent'}
           </Text>
         </View>
-        <TouchableOpacity style={[styles.plusButton, themed.headerIconButton]} onPress={() => navigation.navigate('Explore')} accessibilityLabel="Axtarış">
-          <MaterialIcons name="search" size={21} color={colors.text} />
+        <TouchableOpacity style={styles.aiButton} onPress={() => navigation.navigate('Assistant')} accessibilityLabel="DevFeed AI">
+          <Image source={AI_ICON} style={styles.aiButtonIcon} />
         </TouchableOpacity>
         <TouchableOpacity style={[styles.plusButton, themed.headerIconButton, styles.headerButtonGap]} onPress={() => navigation.navigate('Messages')} accessibilityLabel="Mesajlar">
           <MaterialIcons name="chat-bubble-outline" size={20} color={colors.text} />
@@ -1222,6 +1223,16 @@ export default function FeedScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
+  aiButton: {
+    width: 48,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  aiButtonIcon: {
+    width: 48,
+    height: 48,
+  },
   container: {
     flex: 1,
     backgroundColor: '#06080F',

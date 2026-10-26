@@ -122,6 +122,35 @@ router.delete('/:id/follow', auth, async (req, res) => {
   }
 });
 
+// GET /users/:id/followers and /users/:id/following: people on either side of
+// a follow, minus anyone blocked with the viewer.
+function followListRoute(kind) {
+  const [matchColumn, userColumn] = kind === 'followers' ? ['following_id', 'follower_id'] : ['follower_id', 'following_id'];
+  return async (req, res) => {
+    const userId = parseInt(req.params.id, 10);
+    if (!userId) return res.status(400).json({ message: 'İstifadəçi id-si yanlışdır.' });
+    try {
+      const result = await db.query(
+        `SELECT u.id, u.name, u.role, u.role_sub, u.avatar_url,
+           EXISTS(SELECT 1 FROM follows WHERE follower_id = $2 AND following_id = u.id) AS following_by_me
+         FROM follows f
+         JOIN users u ON u.id = f.${userColumn}
+         WHERE f.${matchColumn} = $1 AND ${notBlockedSql('$2', 'u.id')}
+         ORDER BY f.created_at DESC
+         LIMIT 200`,
+        [userId, req.user.id]
+      );
+      res.json(result.rows);
+    } catch (error) {
+      console.error(`GET /users/:id/${kind} error:`, error);
+      res.status(500).json({ message: 'Siyahı yüklənmədi.' });
+    }
+  };
+}
+
+router.get('/:id/followers', auth, followListRoute('followers'));
+router.get('/:id/following', auth, followListRoute('following'));
+
 router.get('/blocked', auth, async (req, res) => {
   try {
     const result = await db.query(

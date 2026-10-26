@@ -4,7 +4,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AuthContext } from '../context/AuthContext';
 import { LANGUAGES, PreferencesContext, THEME_MODES } from '../context/PreferencesContext';
-import { API_BASE_URL } from '../constants/config';
+import { API_BASE_URL, LANGUAGE_PICKER_ENABLED } from '../constants/config';
 import * as api from '../api';
 import appConfig from '../../app.json';
 import { AuroraGlow, ScreenHeader } from '../components/ScreenChrome';
@@ -152,25 +152,29 @@ export default function SettingsScreen({ navigation }) {
         </View>
       </View>
 
-      <Text style={styles.sectionTitle}>{t.language}</Text>
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>App dili</Text>
-        <View style={styles.languageList}>
-          {Object.entries(LANGUAGES).map(([key, item]) => {
-            const active = key === language;
-            return (
-              <TouchableOpacity
-                key={key}
-                style={[styles.languageItem, active && styles.languageItemActive]}
-                onPress={() => setLanguage(key)}
-              >
-                <Text style={[styles.languageText, active && styles.languageTextActive]}>{item.label}</Text>
-                {active && <MaterialIcons name="check" size={18} color={colors.primary} />}
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      </View>
+      {LANGUAGE_PICKER_ENABLED && (
+        <>
+          <Text style={styles.sectionTitle}>{t.language}</Text>
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>App dili</Text>
+            <View style={styles.languageList}>
+              {Object.entries(LANGUAGES).map(([key, item]) => {
+                const active = key === language;
+                return (
+                  <TouchableOpacity
+                    key={key}
+                    style={[styles.languageItem, active && styles.languageItemActive]}
+                    onPress={() => setLanguage(key)}
+                  >
+                    <Text style={[styles.languageText, active && styles.languageTextActive]}>{item.label}</Text>
+                    {active && <MaterialIcons name="check" size={18} color={colors.primary} />}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        </>
+      )}
 
       <Text style={styles.sectionTitle}>Bloklanmış istifadəçilər</Text>
       <View style={styles.card}>

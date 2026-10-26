@@ -147,6 +147,7 @@ export default function MessagesScreen({ navigation }) {
   }), [colors]);
   const [conversations, setConversations] = useState([]);
   const [applications, setApplications] = useState([]);
+  const [rooms, setRooms] = useState([]);
   const [activeTab, setActiveTab] = useState('chats');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -155,12 +156,14 @@ export default function MessagesScreen({ navigation }) {
 
   const loadConversations = useCallback(async () => {
     try {
-      const [conversationData, applicationData] = await Promise.all([
+      const [conversationData, applicationData, roomData] = await Promise.all([
         api.fetchConversations(),
         api.fetchJobApplicationInbox().catch(() => []),
+        api.fetchChatRooms().catch(() => []),
       ]);
       setConversations(Array.isArray(conversationData) ? conversationData : []);
       setApplications(Array.isArray(applicationData) ? applicationData : []);
+      setRooms(Array.isArray(roomData) ? roomData : []);
     } catch (error) {
       Alert.alert('Mesaj xətası', error.response?.data?.message || error.message);
     } finally {
@@ -232,6 +235,38 @@ export default function MessagesScreen({ navigation }) {
     </TouchableOpacity>
   );
 
+  const renderRoom = ({ item }) => (
+    <TouchableOpacity
+      style={[styles.chatRow, { borderBottomColor: colors.border }]}
+      onPress={() => navigation.navigate('PublicChat', { roomId: item.id })}
+    >
+      <View style={[styles.roomIcon, { backgroundColor: colors.primarySoft }]}>
+        <MaterialIcons name="tag" size={22} color={colors.primary} />
+      </View>
+      <View style={styles.chatBody}>
+        <View style={styles.chatTopRow}>
+          <Text style={[styles.chatTitle, themed.text]} numberOfLines={1}>{item.name}</Text>
+          <Text style={[styles.chatTime, themed.muted]}>{item.member_count || 0} üzv</Text>
+        </View>
+        <Text style={[styles.chatLast, themed.muted]} numberOfLines={1}>{item.last_message || item.description || 'Hələ mesaj yoxdur'}</Text>
+      </View>
+    </TouchableOpacity>
+  );
+
+  const assistantRow = (
+    <TouchableOpacity style={[styles.chatRow, { borderBottomColor: colors.border }]} onPress={() => navigation.navigate('Assistant')}>
+      <Image source={AI_ICON} style={styles.aiIcon} />
+      <View style={styles.chatBody}>
+        <View style={styles.chatTopRow}>
+          <Text style={[styles.chatTitle, themed.text]}>DevFeed AI</Text>
+          <Text style={[styles.aiBadge, { color: colors.primary }]}>AI</Text>
+        </View>
+        <Text style={[styles.chatLast, themed.muted]} numberOfLines={1}>Kod, CV və paylaşım mətnində kömək edir</Text>
+      </View>
+    </TouchableOpacity>
+  );
+
+
   const renderApplication = ({ item }) => (
     <View style={[styles.applicationCard, themed.card]}>
       <View style={styles.applicationTop}>
@@ -256,6 +291,13 @@ export default function MessagesScreen({ navigation }) {
     </View>
   );
 
+  const LISTS = {
+    chats: { data: conversations, render: renderConversation, empty: 'Hələ söhbət yoxdur. Yuxarıdakı ✎ düyməsi ilə yeni söhbət başlat.' },
+    rooms: { data: rooms, render: renderRoom, empty: 'Hələ otaq yoxdur.' },
+    applications: { data: applications, render: renderApplication, empty: 'Hələ iş müraciəti yoxdur.' },
+  };
+  const list = LISTS[activeTab];
+
   if (loading) {
     return (
       <View style={styles.center}>
@@ -268,12 +310,11 @@ export default function MessagesScreen({ navigation }) {
     <SafeAreaView style={[styles.container, themed.container]} edges={['top']}>
       <AuroraGlow />
       <ScreenHeader title={t.messages} subtitle={t.messagesSubtitle} onBack={() => navigation.goBack()}>
-        <HeaderIconButton icon="forum" onPress={() => navigation.navigate('PublicChat')} label="Ümumi chat otaqları" />
         <HeaderIconButton icon="edit" onPress={() => setModalOpen(true)} label="Yeni söhbət" />
       </ScreenHeader>
 
       <View style={styles.tabs} accessibilityRole="tablist">
-        {[['chats', t.chats], ['applications', t.applications]].map(([id, label]) => {
+        {[['chats', t.chats], ['rooms', 'Otaqlar'], ['applications', t.applications]].map(([id, label]) => {
           const selected = activeTab === id;
           return (
             <TouchableOpacity key={id} style={styles.tabButton} onPress={() => setActiveTab(id)} accessibilityRole="tab" accessibilityState={{ selected }}>
@@ -285,16 +326,13 @@ export default function MessagesScreen({ navigation }) {
       </View>
 
       <FlatList
-        data={activeTab === 'chats' ? conversations : applications}
+        data={list.data}
         keyExtractor={(item) => item.id?.toString() ?? `${activeTab}-${Math.random()}`}
         contentContainerStyle={styles.listContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />}
-        renderItem={activeTab === 'chats' ? renderConversation : renderApplication}
-        ListEmptyComponent={
-          <Text style={[styles.emptyText, themed.emptyText]}>
-            {activeTab === 'chats' ? 'Hələ söhbət yoxdur. Yuxarıdakı ✎ düyməsi ilə yeni söhbət başlat.' : 'Hələ iş müraciəti yoxdur.'}
-          </Text>
-        }
+        renderItem={list.render}
+        ListHeaderComponent={activeTab === 'chats' ? assistantRow : null}
+        ListEmptyComponent={<Text style={[styles.emptyText, themed.emptyText]}>{list.empty}</Text>}
       />
 
       <NewConversationModal
@@ -307,7 +345,24 @@ export default function MessagesScreen({ navigation }) {
   );
 }
 
+const AI_ICON = require('../../assets/ai-assistant.png');
+
 const styles = StyleSheet.create({
+  roomIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  aiIcon: {
+    width: 48,
+    height: 48,
+  },
+  aiBadge: {
+    fontSize: 11,
+    fontWeight: '900',
+  },
   container: {
     flex: 1,
     backgroundColor: '#06080F',

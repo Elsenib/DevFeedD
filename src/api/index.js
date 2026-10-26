@@ -190,6 +190,16 @@ export async function unfollowUser(userId) {
   return response.data;
 }
 
+export async function fetchFollowers(userId) {
+  const response = await api.get(`/users/${userId}/followers`);
+  return response.data;
+}
+
+export async function fetchFollowing(userId) {
+  const response = await api.get(`/users/${userId}/following`);
+  return response.data;
+}
+
 export async function fetchConversations() {
   const response = await api.get('/conversations');
   return response.data;
@@ -305,6 +315,16 @@ export async function reportContent({ targetType, targetId, reason, details = ''
   return response.data;
 }
 
+export async function fetchAiStatus() {
+  const response = await api.get('/ai/status');
+  return response.data;
+}
+
+export async function askAi(messages) {
+  const response = await api.post('/ai/chat', { messages }, { timeout: 120000 });
+  return response.data;
+}
+
 export default {
   setToken,
   login,
@@ -361,4 +381,8 @@ export default {
   unblockUser,
   fetchBlockedUsers,
   reportContent,
+  fetchFollowers,
+  fetchFollowing,
+  fetchAiStatus,
+  askAi,
 };
