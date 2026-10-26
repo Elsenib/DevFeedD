@@ -1,14 +1,16 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useContext, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, SafeAreaView, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
+import { useFonts } from 'expo-font';
+import { FONT_ASSETS, applyGlobalFont } from './src/theme/fonts';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import { AuthContext } from './src/context/AuthContext';
 import { AppAlertProvider } from './src/context/AppAlertContext';
-import { PreferencesProvider } from './src/context/PreferencesContext';
+import { PreferencesContext, PreferencesProvider } from './src/context/PreferencesContext';
 import * as api from './src/api';
 import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
@@ -18,6 +20,7 @@ import PostDetailScreen from './src/screens/PostDetailScreen';
 import ChatScreen from './src/screens/ChatScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
+import VideoPlayerScreen from './src/screens/VideoPlayerScreen';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -51,15 +54,23 @@ function friendlyOAuthError(provider, value) {
   const message = decodeURIComponent(String(value || ''));
   const providerName = provider === 'github' ? 'GitHub' : 'Google';
   if (message === 'access_denied') {
-    return `${providerName} girişinə icazə verilmədi. OAuth consent screen test mərhələsindədirsə, bu email test users siyahısına əlavə olunmalıdır.`;
+    return `${providerName} ilə girişə icazə verilmədi.`;
   }
   if (/redirect_uri_mismatch/i.test(message)) {
-    return `${providerName} callback URL uyğun deyil. Provider console-da backend callback URL-i dəqiq əlavə olunmalıdır.`;
+    return `${providerName} ilə giriş hazırda işləmir. Bir az sonra yenidən cəhd edin.`;
   }
   return message || `${providerName} girişi tamamlanmadı.`;
 }
 
+applyGlobalFont();
+
+function ThemedStatusBar() {
+  const { themeMode } = useContext(PreferencesContext);
+  return <StatusBar style={themeMode === 'light' ? 'dark' : 'light'} />;
+}
+
 export default function App() {
+  const [fontsLoaded, fontError] = useFonts(FONT_ASSETS);
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -129,7 +140,7 @@ export default function App() {
         const result = await WebBrowser.openAuthSessionAsync(started.authUrl, redirectUri);
 
         if (result.type !== 'success' || !result.url) {
-          throw new Error('OAuth penceresi tamamlanmadi.');
+          throw new Error('Giriş pəncərəsi bağlandı.');
         }
 
         const oauthError = getOAuthParam(result.url, 'error');
@@ -139,7 +150,7 @@ export default function App() {
 
         const sessionId = getOAuthParam(result.url, 'sessionId');
         if (!sessionId) {
-          throw new Error('OAuth sessiyasi alinmadi.');
+          throw new Error('Giriş tamamlanmadı. Yenidən cəhd edin.');
         }
 
         const data = await api.completeOAuth(sessionId);
@@ -187,10 +198,10 @@ export default function App() {
     [token, user]
   );
 
-  if (loading) {
+  if (loading || (!fontsLoaded && !fontError)) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#7c3aed" />
+        <ActivityIndicator size="large" color="#FF7A2F" />
       </SafeAreaView>
     );
   }
@@ -202,7 +213,7 @@ export default function App() {
       <AppAlertProvider>
         <AuthContext.Provider value={authContext}>
           <NavigationContainer>
-            <StatusBar style="light" />
+            <ThemedStatusBar />
             <Stack.Navigator screenOptions={{ headerShown: false }}>
               {!user ? (
                 <>
@@ -218,6 +229,7 @@ export default function App() {
                   <Stack.Screen name="Chat" component={ChatScreen} />
                   <Stack.Screen name="UserProfile" component={ProfileScreen} />
                   <Stack.Screen name="Settings" component={SettingsScreen} />
+                  <Stack.Screen name="VideoPlayer" component={VideoPlayerScreen} options={{ animation: 'fade', contentStyle: { backgroundColor: '#000' } }} />
                 </>
               )}
             </Stack.Navigator>
@@ -233,6 +245,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#020617',
+    backgroundColor: '#06080F',
   },
 });

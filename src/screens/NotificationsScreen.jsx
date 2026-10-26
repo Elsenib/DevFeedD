@@ -18,16 +18,16 @@ import * as api from '../api';
 
 function iconFor(type) {
   if (type === 'post_like') return { name: 'favorite', color: '#f85149' };
-  if (type === 'post_comment') return { name: 'chat-bubble', color: '#58a6ff' };
+  if (type === 'post_comment') return { name: 'chat-bubble', color: '#FF9A5C' };
   if (type === 'comment_reply') return { name: 'reply', color: '#38bdf8' };
   if (type === 'mention') return { name: 'alternate-email', color: '#a78bfa' };
   if (type === 'post_bookmark') return { name: 'bookmark', color: '#fbbf24' };
   if (type === 'follow') return { name: 'person-add', color: '#3fb950' };
-  if (type === 'message') return { name: 'mail', color: '#818cf8' };
+  if (type === 'message') return { name: 'mail', color: '#FF9A5C' };
   if (type === 'chat_invite') return { name: 'group-add', color: '#22c55e' };
   if (type === 'chat_mention') return { name: 'alternate-email', color: '#22d3ee' };
   if (type === 'job_application') return { name: 'work', color: '#f59e0b' };
-  return { name: 'notifications', color: '#6366f1' };
+  return { name: 'notifications', color: '#FF7A2F' };
 }
 
 function formatTime(value) {
@@ -187,25 +187,25 @@ export default function NotificationsScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0d1117',
+    backgroundColor: '#06080F',
   },
   header: {
     paddingHorizontal: 18,
     paddingTop: 18,
     paddingBottom: 14,
-    borderBottomColor: '#21262d',
+    borderBottomColor: '#1F2433',
     borderBottomWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
   title: {
-    color: '#e6edf3',
+    color: '#F1F4FA',
     fontSize: 22,
     fontWeight: '900',
   },
   subtitle: {
-    color: '#8b949e',
+    color: '#8790A6',
     fontSize: 12,
     marginTop: 3,
   },
@@ -213,8 +213,8 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#161b22',
-    borderColor: '#21262d',
+    backgroundColor: '#10131D',
+    borderColor: '#1F2433',
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
@@ -226,11 +226,11 @@ const styles = StyleSheet.create({
   },
   listContent: {
     padding: 14,
-    paddingBottom: 100,
+    paddingBottom: 150,
   },
   card: {
-    backgroundColor: '#161b22',
-    borderColor: '#21262d',
+    backgroundColor: '#10131D',
+    borderColor: '#1F2433',
     borderWidth: 1,
     borderRadius: 12,
     padding: 14,
@@ -238,14 +238,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   cardUnread: {
-    borderColor: '#6366f1',
+    borderColor: '#FF7A2F',
     backgroundColor: '#111827',
   },
   avatar: {
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: '#6366f1',
+    backgroundColor: '#FF7A2F',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -253,7 +253,7 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: '#21262d',
+    backgroundColor: '#1F2433',
   },
   avatarText: {
     color: '#ffffff',
@@ -269,7 +269,7 @@ const styles = StyleSheet.create({
   },
   text: {
     flex: 1,
-    color: '#e6edf3',
+    color: '#F1F4FA',
     lineHeight: 20,
     fontWeight: '700',
   },
@@ -282,12 +282,12 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
   time: {
-    color: '#8b949e',
+    color: '#8790A6',
     fontSize: 11,
     marginTop: 6,
   },
   emptyText: {
-    color: '#8b949e',
+    color: '#8790A6',
     textAlign: 'center',
     marginTop: 24,
   },

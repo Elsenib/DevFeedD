@@ -80,7 +80,7 @@ export default function JobApplicationModal({ visible, post, submitting, onClose
                 <Text style={styles.subtitle} numberOfLines={2}>{title}</Text>
               </View>
               <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-                <MaterialIcons name="close" size={22} color="#8b949e" />
+                <MaterialIcons name="close" size={22} color="#8790A6" />
               </TouchableOpacity>
             </View>
 
@@ -107,7 +107,7 @@ export default function JobApplicationModal({ visible, post, submitting, onClose
 
             <Text style={styles.label}>CV PDF *</Text>
             <TouchableOpacity style={styles.resumeButton} onPress={handlePickResume}>
-              <MaterialIcons name={resume ? 'picture-as-pdf' : 'upload-file'} size={20} color={resume ? '#f87171' : '#58a6ff'} />
+              <MaterialIcons name={resume ? 'picture-as-pdf' : 'upload-file'} size={20} color={resume ? '#f87171' : '#FF9A5C'} />
               <View style={styles.resumeTextBlock}>
                 <Text style={styles.resumeTitle}>{resume?.name || 'PDF CV seç'}</Text>
                 <Text style={styles.resumeMeta}>Maksimum 8 MB, yalnız PDF</Text>
@@ -135,10 +135,10 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   sheet: {
-    backgroundColor: '#161b22',
+    backgroundColor: '#10131D',
     borderTopLeftRadius: 18,
     borderTopRightRadius: 18,
-    borderColor: '#21262d',
+    borderColor: '#1F2433',
     borderWidth: 1,
     padding: 18,
     maxHeight: '92%',
@@ -152,12 +152,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   title: {
-    color: '#e6edf3',
+    color: '#F1F4FA',
     fontSize: 18,
     fontWeight: '900',
   },
   subtitle: {
-    color: '#8b949e',
+    color: '#8790A6',
     fontSize: 12,
     marginTop: 4,
   },
@@ -169,17 +169,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   label: {
-    color: '#8b949e',
+    color: '#8790A6',
     fontSize: 11,
     fontWeight: '900',
     marginBottom: 6,
   },
   input: {
-    backgroundColor: '#0d1117',
-    borderColor: '#30363d',
+    backgroundColor: '#06080F',
+    borderColor: '#2A3040',
     borderWidth: 1,
     borderRadius: 10,
-    color: '#e6edf3',
+    color: '#F1F4FA',
     paddingHorizontal: 12,
     paddingVertical: 11,
     marginBottom: 12,
@@ -188,8 +188,8 @@ const styles = StyleSheet.create({
     minHeight: 100,
   },
   resumeButton: {
-    backgroundColor: '#0d1117',
-    borderColor: '#30363d',
+    backgroundColor: '#06080F',
+    borderColor: '#2A3040',
     borderWidth: 1,
     borderRadius: 10,
     padding: 12,
@@ -202,11 +202,11 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
   resumeTitle: {
-    color: '#e6edf3',
+    color: '#F1F4FA',
     fontWeight: '900',
   },
   resumeMeta: {
-    color: '#8b949e',
+    color: '#8790A6',
     fontSize: 11,
     marginTop: 3,
   },

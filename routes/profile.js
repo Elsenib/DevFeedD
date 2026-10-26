@@ -54,7 +54,7 @@ router.get('/', auth, async (req, res) => {
     if (!user) return res.status(404).json({ message: 'User not found' });
 
     const counts = await getProfileCounts(req.user.id, req.user.id);
-    const stack = (user.skills && user.skills.length) ? user.skills : (user.languages && user.languages.length ? user.languages : ['React Native', 'Node.js', 'PostgreSQL']);
+    const stack = (user.skills && user.skills.length) ? user.skills : (user.languages && user.languages.length ? user.languages : []);
     res.json({
       ...user,
       stack,
@@ -166,14 +166,14 @@ router.get('/:id', optionalAuth, async (req, res) => {
 
     const viewerId = req.user?.id || 0;
     const result = await db.query(
-      'SELECT id, name, email, bio, role, role_sub, skills, languages, website, avatar_url, activity_visible, email_verified FROM users WHERE id = $1',
+      'SELECT id, name, bio, role, role_sub, skills, languages, website, avatar_url, activity_visible FROM users WHERE id = $1',
       [userId]
     );
     const user = result.rows[0];
     if (!user) return res.status(404).json({ message: 'User not found' });
 
     const counts = await getProfileCounts(userId, viewerId);
-    const stack = (user.skills && user.skills.length) ? user.skills : (user.languages && user.languages.length ? user.languages : ['React Native', 'Node.js', 'PostgreSQL']);
+    const stack = (user.skills && user.skills.length) ? user.skills : (user.languages && user.languages.length ? user.languages : []);
     res.json({
       ...user,
       stack,

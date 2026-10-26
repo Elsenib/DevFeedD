@@ -257,8 +257,8 @@ export default function ProfileScreen({ route, navigation }) {
     }
   }, [isOwnProfile, route?.params?.openEdit]);
 
-  const displayName = profile?.name || user?.name || user?.email || 'İstifadəçi';
-  const stack = profile?.stack || profile?.skills || ['React Native', 'Node.js', 'PostgreSQL'];
+  const displayName = profile?.name || (isOwnProfile ? user?.name || user?.email : null) || 'İstifadəçi';
+  const stack = Array.isArray(profile?.stack) ? profile.stack : (Array.isArray(profile?.skills) ? profile.skills : []);
 
   const handleSaveProfile = async (payload) => {
     setSaving(true);
@@ -387,6 +387,11 @@ export default function ProfileScreen({ route, navigation }) {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView contentContainerStyle={styles.content}>
+        {!isOwnProfile && navigation.canGoBack() && (
+          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()} accessibilityLabel="Geri">
+            <MaterialIcons name="arrow-back" size={22} color={colors.text} />
+          </TouchableOpacity>
+        )}
         <View style={styles.headerCard}>
           <TouchableOpacity style={styles.avatarWrap} onPress={handlePickAvatar} disabled={uploadingAvatar || !isOwnProfile}>
             {profile?.avatar_url ? (
@@ -404,7 +409,7 @@ export default function ProfileScreen({ route, navigation }) {
           </TouchableOpacity>
           <View style={styles.headerInfo}>
             <Text style={styles.name}>{displayName}</Text>
-            <Text style={styles.email}>{profile?.email || user?.email}</Text>
+            {isOwnProfile && <Text style={styles.email}>{profile?.email || user?.email}</Text>}
             <Text style={styles.roleText}>{profile?.role_sub || profile?.role || 'DevFeed member'}</Text>
           </View>
           {isOwnProfile && (
@@ -438,7 +443,7 @@ export default function ProfileScreen({ route, navigation }) {
             <TouchableOpacity style={styles.actionButton} onPress={handleToggleFollow}>
               <MaterialIcons name={profile?.following_by_me ? 'person-remove' : 'person-add'} size={18} color="#ffffff" />
               <Text style={styles.actionButtonText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.78}>
-                {profile?.following_by_me ? 'İzləmədən çıx' : 'İzlə'}
+                {profile?.following_by_me ? 'İzlənilir' : 'İzlə'}
               </Text>
             </TouchableOpacity>
           )}
@@ -464,18 +469,22 @@ export default function ProfileScreen({ route, navigation }) {
 
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Bio</Text>
-          <Text style={styles.bodyText}>{profile?.bio || 'Qısa bio əlavə et.'}</Text>
+          <Text style={styles.bodyText}>{profile?.bio || (isOwnProfile ? 'Qısa bio əlavə et.' : 'Hələ bio yazılmayıb.')}</Text>
         </View>
 
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Stack</Text>
-          <View style={styles.tagRow}>
-            {stack.map((item) => (
-              <View key={item} style={styles.tagItem}>
-                <Text style={styles.tagText}>{item}</Text>
-              </View>
-            ))}
-          </View>
+          {stack.length > 0 ? (
+            <View style={styles.tagRow}>
+              {stack.map((item) => (
+                <View key={item} style={styles.tagItem}>
+                  <Text style={styles.tagText}>{item}</Text>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <Text style={styles.bodyText}>{isOwnProfile ? 'Bacarıqlarını əlavə et.' : 'Hələ əlavə edilməyib.'}</Text>
+          )}
         </View>
 
         {PAYMENTS_ENABLED && (
@@ -539,7 +548,7 @@ function createStyles(colors) {
     },
     content: {
       padding: 16,
-      paddingBottom: 100,
+      paddingBottom: 150,
     },
     center: {
       flex: 1,
@@ -608,6 +617,17 @@ function createStyles(colors) {
     },
     headerInfo: {
       flex: 1,
+    },
+    backButton: {
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      backgroundColor: colors.surfaceStrong,
+      borderColor: colors.border,
+      borderWidth: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 12,
     },
     settingsButton: {
       width: 38,

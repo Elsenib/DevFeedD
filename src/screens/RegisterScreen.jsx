@@ -15,7 +15,7 @@ export default function RegisterScreen({ navigation }) {
 
   const handleRegister = async () => {
     if (!name || !email || !password) {
-      Alert.alert('Xeta', 'Butun saheleri doldurun');
+      Alert.alert('Xəta', 'Bütün sahələri doldurun');
       return;
     }
     setLoading(true);
@@ -115,7 +115,7 @@ export default function RegisterScreen({ navigation }) {
             <TextInput
               value={email}
               onChangeText={setEmail}
-              placeholder="E-mail"
+              placeholder="E-poçt"
               placeholderTextColor="#94a3b8"
               keyboardType="email-address"
               autoCapitalize="none"
@@ -159,7 +159,7 @@ export default function RegisterScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#020617',
+    backgroundColor: '#06080F',
     justifyContent: 'center',
     paddingHorizontal: 24,
   },
@@ -192,7 +192,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   button: {
-    backgroundColor: '#7c3aed',
+    backgroundColor: '#FF7A2F',
     borderRadius: 14,
     paddingVertical: 14,
     alignItems: 'center',

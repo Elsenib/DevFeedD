@@ -11,14 +11,14 @@ export default function LoginScreen({ navigation }) {
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert('Xeta', 'E-mail ve sifreni daxil edin');
+      Alert.alert('Xəta', 'E-poçt və şifrəni daxil edin');
       return;
     }
     setLoading(true);
     try {
       await signIn({ email, password });
     } catch (error) {
-      Alert.alert('Daxil olma xetasi', error.response?.data?.message || error.message);
+      Alert.alert('Daxil olmaq alınmadı', error.response?.data?.message || error.message);
     } finally {
       setLoading(false);
     }
@@ -54,13 +54,13 @@ export default function LoginScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>DevFeed Mobile</Text>
-      <Text style={styles.subtitle}>Developerler ucun sosial platforma.</Text>
+      <Text style={styles.title}>DevFeed</Text>
+      <Text style={styles.subtitle}>Developerlər üçün sosial platforma.</Text>
       <View style={styles.formCard}>
         <TextInput
           value={email}
           onChangeText={setEmail}
-          placeholder="E-mail"
+          placeholder="E-poçt"
           placeholderTextColor="#94a3b8"
           keyboardType="email-address"
           autoCapitalize="none"
@@ -69,7 +69,7 @@ export default function LoginScreen({ navigation }) {
         <TextInput
           value={password}
           onChangeText={setPassword}
-          placeholder="Sifre"
+          placeholder="Şifrə"
           placeholderTextColor="#94a3b8"
           secureTextEntry
           style={styles.input}
@@ -80,15 +80,15 @@ export default function LoginScreen({ navigation }) {
 
         <View style={styles.dividerContainer}>
           <View style={styles.divider} />
-          <Text style={styles.dividerText}>ve ya</Text>
+          <Text style={styles.dividerText}>və ya</Text>
           <View style={styles.divider} />
         </View>
 
-        {renderSocialButton('github', 'GitHub ile davam et', 'GH')}
-        {renderSocialButton('google', 'Google ile davam et', 'G')}
+        {renderSocialButton('github', 'GitHub ilə davam et', 'GH')}
+        {renderSocialButton('google', 'Google ilə davam et', 'G')}
 
         <TouchableOpacity onPress={() => navigation.navigate('Register')}>
-          <Text style={styles.switchText}>Hesabin yoxdursa, qeydiyyatdan kec</Text>
+          <Text style={styles.switchText}>Hesabın yoxdursa, qeydiyyatdan keç</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -98,7 +98,7 @@ export default function LoginScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#020617',
+    backgroundColor: '#06080F',
     justifyContent: 'center',
     paddingHorizontal: 24,
   },
@@ -131,7 +131,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   button: {
-    backgroundColor: '#7c3aed',
+    backgroundColor: '#FF7A2F',
     borderRadius: 14,
     paddingVertical: 14,
     alignItems: 'center',

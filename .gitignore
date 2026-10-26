@@ -27,3 +27,4 @@ android/
 ios/
 eas-inspect/
 .git-broken/
+web-build/

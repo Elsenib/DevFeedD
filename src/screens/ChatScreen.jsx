@@ -171,7 +171,7 @@ export default function ChatScreen({ route, navigation }) {
         </TouchableOpacity>
         <View style={styles.headerText}>
           <Text style={[styles.title, themed.title]}>{screenTitle}</Text>
-          <Text style={[styles.subtitle, themed.subtitle]}>Direct message</Text>
+          <Text style={[styles.subtitle, themed.subtitle]}>Şəxsi mesaj</Text>
         </View>
         <TouchableOpacity style={[styles.iconButton, themed.iconButton]} onPress={loadConversation}>
           <MaterialIcons name="refresh" size={20} color={colors.muted} />
@@ -218,7 +218,7 @@ export default function ChatScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0d1117',
+    backgroundColor: '#06080F',
   },
   keyboard: {
     flex: 1,
@@ -227,13 +227,13 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#0d1117',
+    backgroundColor: '#06080F',
   },
   header: {
     paddingHorizontal: 14,
     paddingTop: 14,
     paddingBottom: 12,
-    borderBottomColor: '#21262d',
+    borderBottomColor: '#1F2433',
     borderBottomWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
@@ -242,8 +242,8 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: '#161b22',
-    borderColor: '#21262d',
+    backgroundColor: '#10131D',
+    borderColor: '#1F2433',
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
@@ -253,12 +253,12 @@ const styles = StyleSheet.create({
     marginHorizontal: 12,
   },
   title: {
-    color: '#e6edf3',
+    color: '#F1F4FA',
     fontSize: 17,
     fontWeight: '900',
   },
   subtitle: {
-    color: '#8b949e',
+    color: '#8790A6',
     fontSize: 12,
     marginTop: 2,
   },
@@ -278,8 +278,8 @@ const styles = StyleSheet.create({
   messageBubble: {
     minWidth: 104,
     maxWidth: '88%',
-    backgroundColor: '#161b22',
-    borderColor: '#21262d',
+    backgroundColor: '#10131D',
+    borderColor: '#1F2433',
     borderWidth: 1,
     borderRadius: 16,
     paddingHorizontal: 12,
@@ -287,14 +287,14 @@ const styles = StyleSheet.create({
   },
   messageBubbleMine: {
     backgroundColor: '#312e81',
-    borderColor: '#4f46e5',
+    borderColor: '#E8590C',
     borderBottomRightRadius: 4,
   },
   messageAvatar: {
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: '#6366f1',
+    backgroundColor: '#FF7A2F',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 8,
@@ -303,7 +303,7 @@ const styles = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: '#21262d',
+    backgroundColor: '#1F2433',
     marginRight: 8,
   },
   messageAvatarText: {
@@ -312,7 +312,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   senderName: {
-    color: '#8b949e',
+    color: '#8790A6',
     fontSize: 11,
     fontWeight: '800',
     marginBottom: 4,
@@ -321,7 +321,7 @@ const styles = StyleSheet.create({
     color: '#c7d2fe',
   },
   messageText: {
-    color: '#e6edf3',
+    color: '#F1F4FA',
     lineHeight: 20,
   },
   messageTextMine: {
@@ -341,25 +341,25 @@ const styles = StyleSheet.create({
     color: '#c7d2fe',
   },
   emptyText: {
-    color: '#8b949e',
+    color: '#8790A6',
     textAlign: 'center',
     marginTop: 24,
   },
   composer: {
-    borderTopColor: '#21262d',
+    borderTopColor: '#1F2433',
     borderTopWidth: 1,
     padding: 12,
-    backgroundColor: '#0d1117',
+    backgroundColor: '#06080F',
     flexDirection: 'row',
     alignItems: 'flex-end',
   },
   input: {
     flex: 1,
-    backgroundColor: '#161b22',
-    borderColor: '#30363d',
+    backgroundColor: '#10131D',
+    borderColor: '#2A3040',
     borderWidth: 1,
     borderRadius: 12,
-    color: '#e6edf3',
+    color: '#F1F4FA',
     minHeight: 44,
     maxHeight: 120,
     paddingHorizontal: 12,
@@ -369,12 +369,12 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 12,
-    backgroundColor: '#6366f1',
+    backgroundColor: '#FF7A2F',
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: 8,
   },
   disabledButton: {
-    backgroundColor: '#21262d',
+    backgroundColor: '#1F2433',
   },
 });

@@ -25,10 +25,10 @@ import { PAYMENTS_ENABLED } from '../constants/config';
 import { openModerationMenu } from '../utils/moderation';
 
 const POST_TYPES = {
-  TEXT: { label: 'POST', color: '#8b949e', icon: 'terminal' },
-  GIT: { label: 'GIT', color: '#58a6ff', icon: 'code' },
+  TEXT: { label: 'POST', color: '#8790A6', icon: 'notes' },
+  GIT: { label: 'GIT', color: '#FF9A5C', icon: 'code' },
   DEPLOY: { label: 'LIVE', color: '#3fb950', icon: 'public' },
-  MEDIA: { label: 'MEDIA', color: '#818cf8', icon: 'videocam' },
+  MEDIA: { label: 'MEDIA', color: '#FF9A5C', icon: 'videocam' },
   JOB: { label: 'IS', color: '#fbbf24', icon: 'work' },
 };
 
@@ -51,7 +51,7 @@ function normalizePost(row) {
     title: row?.title || row?.caption || 'Paylasim',
     caption: row?.caption || row?.title || row?.body || '',
     body: row?.body || row?.caption || row?.title || '',
-    authorName: row?.name || row?.user?.name || 'Istifadeci',
+    authorName: row?.name || row?.user?.name || 'İstifadəçi',
     authorRole: row?.role_sub || row?.role || 'DevFeed member',
     authorAvatar: row?.avatar_url || row?.user?.avatar_url || row?.authorAvatar || null,
     likeCount: Number(row?.like_count ?? row?.likes ?? 0),
@@ -64,9 +64,9 @@ function normalizePost(row) {
 }
 
 function formatDate(value) {
-  if (!value) return 'Indi';
+  if (!value) return 'İndi';
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'Indi';
+  if (Number.isNaN(date.getTime())) return 'İndi';
   return date.toLocaleDateString();
 }
 
@@ -207,7 +207,7 @@ function PayloadPreview({ post }) {
     return (
       <View style={[styles.gitBox, { backgroundColor: colors.surfaceStrong, borderColor: colors.border }]}>
         <View style={styles.payloadHeader}>
-          <MaterialIcons name="code" size={17} color="#58a6ff" />
+          <MaterialIcons name="code" size={17} color="#FF9A5C" />
           <Text style={[styles.gitRepo, { color: colors.text }]}>{metadata.repo || 'repo qeyd edilmeyib'}</Text>
           <Text style={[styles.payloadMuted, { color: colors.muted }]}>{metadata.branch || 'main'}</Text>
         </View>
@@ -275,7 +275,7 @@ function PayloadPreview({ post }) {
           <AutoVideo uri={mediaUrl} style={styles.mediaPreviewVideo} />
         ) : (
           <View style={styles.mediaPreviewIcon}>
-            <MaterialIcons name="play-circle-outline" size={42} color="#818cf8" />
+            <MaterialIcons name="play-circle-outline" size={42} color="#FF9A5C" />
           </View>
         )}
         <View style={[styles.mediaOverlay, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
@@ -333,7 +333,7 @@ function EditPostModal({ visible, post, saving, onClose, onSave }) {
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Postu redakte et</Text>
             <TouchableOpacity onPress={onClose}>
-              <MaterialIcons name="close" size={24} color="#8b949e" />
+              <MaterialIcons name="close" size={24} color="#8790A6" />
             </TouchableOpacity>
           </View>
           <Text style={styles.fieldLabel}>BASLIQ / CAPTION</Text>
@@ -395,12 +395,12 @@ function CommentComposer({ saving, replyTarget, colors, onCancelReply, onSubmit 
       <View style={styles.commentComposerBody}>
         {!!replyTarget && (
           <View style={[styles.replyingBar, themed.replyBar]}>
-            <MaterialIcons name="reply" size={15} color="#58a6ff" />
+            <MaterialIcons name="reply" size={15} color="#FF9A5C" />
             <Text style={styles.replyingText} numberOfLines={1}>
               {replyTarget.name || 'İstifadəçi'} şərhinə cavab
             </Text>
             <TouchableOpacity onPress={onCancelReply}>
-              <MaterialIcons name="close" size={16} color="#8b949e" />
+              <MaterialIcons name="close" size={16} color="#8790A6" />
             </TouchableOpacity>
           </View>
         )}
@@ -462,7 +462,7 @@ export default function PostDetailScreen({ route, navigation }) {
       setPost(normalizePost(freshPost));
       setComments(Array.isArray(freshComments) ? freshComments : []);
     } catch (error) {
-      Alert.alert('Post xetasi', error.response?.data?.message || error.response?.data?.error || error.message);
+      Alert.alert('Post yüklənmədi', error.response?.data?.message || error.response?.data?.error || error.message);
     } finally {
       setLoading(false);
     }
@@ -500,7 +500,7 @@ export default function PostDetailScreen({ route, navigation }) {
       setReplyTarget(null);
       return true;
     } catch (error) {
-      Alert.alert('Serh xetasi', error.response?.data?.message || error.response?.data?.error || error.message);
+      Alert.alert('Şərh alınmadı', error.response?.data?.message || error.response?.data?.error || error.message);
       return false;
     } finally {
       setSavingComment(false);
@@ -659,7 +659,7 @@ export default function PostDetailScreen({ route, navigation }) {
       }));
       setEditOpen(false);
     } catch (error) {
-      Alert.alert('Redakte xetasi', error.response?.data?.message || error.response?.data?.error || error.message);
+      Alert.alert('Redaktə alınmadı', error.response?.data?.message || error.response?.data?.error || error.message);
     } finally {
       setSavingEdit(false);
     }
@@ -676,7 +676,7 @@ export default function PostDetailScreen({ route, navigation }) {
             await api.deletePost(post.id);
             navigation.goBack();
           } catch (error) {
-            Alert.alert('Silme xetasi', error.response?.data?.message || error.response?.data?.error || error.message);
+            Alert.alert('Silmək alınmadı', error.response?.data?.message || error.response?.data?.error || error.message);
           }
         },
       },
@@ -693,7 +693,7 @@ export default function PostDetailScreen({ route, navigation }) {
         {isOwner ? (
           <View style={styles.ownerActions}>
             <TouchableOpacity style={[styles.iconButton, themed.iconButton]} onPress={() => setEditOpen(true)}>
-              <MaterialIcons name="edit" size={20} color="#58a6ff" />
+              <MaterialIcons name="edit" size={20} color="#FF9A5C" />
             </TouchableOpacity>
             <TouchableOpacity style={[styles.iconButton, themed.iconButton, styles.deleteButton]} onPress={handleDelete}>
               <MaterialIcons name="delete-outline" size={21} color="#f85149" />
@@ -781,15 +781,15 @@ export default function PostDetailScreen({ route, navigation }) {
 
         <View style={styles.metricsRow}>
           <TouchableOpacity style={styles.metricButton} onPress={handleLike}>
-            <MaterialIcons name={post.likedByMe ? 'favorite' : 'favorite-border'} size={18} color={post.likedByMe ? '#f85149' : '#8b949e'} />
+            <MaterialIcons name={post.likedByMe ? 'favorite' : 'favorite-border'} size={18} color={post.likedByMe ? '#f85149' : '#8790A6'} />
             <Text style={[styles.metricText, post.likedByMe && styles.likeTextActive]}>{post.likeCount}</Text>
           </TouchableOpacity>
           <View style={styles.metricButton}>
-            <MaterialIcons name="chat-bubble-outline" size={18} color="#8b949e" />
+            <MaterialIcons name="chat-bubble-outline" size={18} color="#8790A6" />
             <Text style={styles.metricText}>{post.commentCount || comments.length}</Text>
           </View>
           <TouchableOpacity style={styles.metricButton} onPress={handleBookmark}>
-            <MaterialIcons name={post.bookmarkedByMe ? 'bookmark' : 'bookmark-border'} size={18} color={post.bookmarkedByMe ? '#fbbf24' : '#8b949e'} />
+            <MaterialIcons name={post.bookmarkedByMe ? 'bookmark' : 'bookmark-border'} size={18} color={post.bookmarkedByMe ? '#fbbf24' : '#8790A6'} />
             <Text style={[styles.metricText, post.bookmarkedByMe && styles.bookmarkTextActive]}>{post.bookmarkCount}</Text>
           </TouchableOpacity>
         </View>
@@ -832,7 +832,7 @@ export default function PostDetailScreen({ route, navigation }) {
           <View style={[styles.commentCard, themed.commentCard]}>
             <AuthorAvatar name={item.name || item.user?.name || item.sender?.name} avatarUrl={item.avatar_url || item.user?.avatar_url || item.sender?.avatar_url} />
             <View style={styles.commentBody}>
-              <Text style={[styles.commentAuthor, themed.title]}>{item.name || item.user?.name || item.userEmail || 'Istifadeci'}</Text>
+              <Text style={[styles.commentAuthor, themed.title]}>{item.name || item.user?.name || item.userEmail || 'İstifadəçi'}</Text>
               {!!item.reply_to_name && (
                 <Text style={styles.replyMeta}>@{item.reply_to_name} cavab</Text>
               )}
@@ -846,7 +846,7 @@ export default function PostDetailScreen({ route, navigation }) {
                   name: item.name || item.user?.name || item.userEmail || 'İstifadəçi',
                 })}
               >
-                <MaterialIcons name="reply" size={14} color="#58a6ff" />
+                <MaterialIcons name="reply" size={14} color="#FF9A5C" />
                 <Text style={styles.replyButtonText}>Cavab ver</Text>
               </TouchableOpacity>
               {String(item.user_id) !== String(user?.id) && (
@@ -883,7 +883,7 @@ export default function PostDetailScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0d1117',
+    backgroundColor: '#06080F',
   },
   keyboard: {
     flex: 1,
@@ -892,7 +892,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#0d1117',
+    backgroundColor: '#06080F',
   },
   listContent: {
     paddingBottom: 40,
@@ -901,7 +901,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingTop: 14,
     paddingBottom: 12,
-    borderBottomColor: '#21262d',
+    borderBottomColor: '#1F2433',
     borderBottomWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
@@ -911,14 +911,14 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: '#161b22',
-    borderColor: '#21262d',
+    backgroundColor: '#10131D',
+    borderColor: '#1F2433',
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   screenTitle: {
-    color: '#e6edf3',
+    color: '#F1F4FA',
     fontSize: 17,
     fontWeight: '900',
   },
@@ -932,8 +932,8 @@ const styles = StyleSheet.create({
     width: 38,
   },
   card: {
-    backgroundColor: '#161b22',
-    borderColor: '#21262d',
+    backgroundColor: '#10131D',
+    borderColor: '#1F2433',
     borderWidth: 1,
     borderRadius: 12,
     margin: 14,
@@ -953,7 +953,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#6366f1',
+    backgroundColor: '#FF7A2F',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -966,19 +966,19 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#21262d',
+    backgroundColor: '#1F2433',
   },
   authorBlock: {
     flex: 1,
     marginLeft: 10,
   },
   postUser: {
-    color: '#e6edf3',
+    color: '#F1F4FA',
     fontWeight: '800',
     fontSize: 14,
   },
   postTime: {
-    color: '#8b949e',
+    color: '#8790A6',
     fontSize: 11,
     marginTop: 2,
   },
@@ -996,19 +996,19 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   postTitle: {
-    color: '#e6edf3',
+    color: '#F1F4FA',
     fontSize: 18,
     fontWeight: '900',
     marginBottom: 8,
   },
   postBody: {
-    color: '#c9d1d9',
+    color: '#DCE2EE',
     lineHeight: 22,
     fontSize: 14,
     marginBottom: 12,
   },
   inlineLink: {
-    color: '#58a6ff',
+    color: '#FF9A5C',
     fontWeight: '800',
     textDecorationLine: 'underline',
   },
@@ -1018,7 +1018,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   tagItem: {
-    color: '#58a6ff',
+    color: '#FF9A5C',
     fontSize: 12,
     marginRight: 8,
     marginBottom: 4,
@@ -1032,24 +1032,24 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
   payloadTitle: {
-    color: '#e6edf3',
+    color: '#F1F4FA',
     fontWeight: '800',
     fontSize: 13,
   },
   payloadMuted: {
-    color: '#8b949e',
+    color: '#8790A6',
     fontSize: 11,
     marginLeft: 8,
   },
   gitBox: {
-    backgroundColor: '#0d1117',
+    backgroundColor: '#06080F',
     borderRadius: 10,
     padding: 14,
-    borderColor: '#21262d',
+    borderColor: '#1F2433',
     borderWidth: 1,
   },
   gitRepo: {
-    color: '#58a6ff',
+    color: '#FF9A5C',
     fontWeight: '800',
     fontSize: 13,
     flex: 1,
@@ -1066,17 +1066,17 @@ const styles = StyleSheet.create({
     marginTop: 0,
   },
   commitRow: {
-    borderTopColor: '#21262d',
+    borderTopColor: '#1F2433',
     borderTopWidth: 1,
     paddingTop: 8,
     marginTop: 8,
   },
   commitHash: {
-    color: '#8b949e',
+    color: '#8790A6',
     fontSize: 10,
   },
   commitText: {
-    color: '#e6edf3',
+    color: '#F1F4FA',
     fontSize: 12,
     marginTop: 2,
   },
@@ -1129,7 +1129,7 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   livePreviewTitle: {
-    color: '#e6edf3',
+    color: '#F1F4FA',
     fontWeight: '900',
     marginTop: 6,
     fontSize: 13,
@@ -1171,12 +1171,12 @@ const styles = StyleSheet.create({
   mediaPreviewImage: {
     width: '100%',
     height: 190,
-    backgroundColor: '#0d1117',
+    backgroundColor: '#06080F',
   },
   mediaPreviewVideo: {
     width: '100%',
     height: 230,
-    backgroundColor: '#0d1117',
+    backgroundColor: '#06080F',
   },
   videoPausedOverlay: {
     position: 'absolute',
@@ -1200,7 +1200,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(21,17,38,0.95)',
   },
   mediaTitle: {
-    color: '#818cf8',
+    color: '#FF9A5C',
     fontWeight: '800',
   },
   mediaLink: {
@@ -1246,8 +1246,8 @@ const styles = StyleSheet.create({
   },
   applicationsBox: {
     marginTop: 12,
-    backgroundColor: '#0d1117',
-    borderColor: '#30363d',
+    backgroundColor: '#06080F',
+    borderColor: '#2A3040',
     borderWidth: 1,
     borderRadius: 10,
     padding: 12,
@@ -1259,7 +1259,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   applicationsTitle: {
-    color: '#e6edf3',
+    color: '#F1F4FA',
     fontWeight: '900',
   },
   applicationsCount: {
@@ -1283,7 +1283,7 @@ const styles = StyleSheet.create({
   applicationRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderTopColor: '#21262d',
+    borderTopColor: '#1F2433',
     borderTopWidth: 1,
     paddingTop: 10,
     marginTop: 10,
@@ -1292,16 +1292,16 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   applicationName: {
-    color: '#e6edf3',
+    color: '#F1F4FA',
     fontWeight: '900',
   },
   applicationMeta: {
-    color: '#8b949e',
+    color: '#8790A6',
     fontSize: 11,
     marginTop: 3,
   },
   applicationText: {
-    color: '#c9d1d9',
+    color: '#DCE2EE',
     fontSize: 12,
     lineHeight: 17,
     marginTop: 5,
@@ -1310,18 +1310,18 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#6366f1',
+    backgroundColor: '#FF7A2F',
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: 10,
   },
   applicationEmpty: {
-    color: '#8b949e',
+    color: '#8790A6',
     fontSize: 12,
   },
   metricsRow: {
     flexDirection: 'row',
-    borderTopColor: '#21262d',
+    borderTopColor: '#1F2433',
     borderTopWidth: 1,
     marginTop: 14,
     paddingTop: 12,
@@ -1332,7 +1332,7 @@ const styles = StyleSheet.create({
     marginRight: 20,
   },
   metricText: {
-    color: '#8b949e',
+    color: '#8790A6',
     fontSize: 12,
     marginLeft: 5,
   },
@@ -1343,8 +1343,8 @@ const styles = StyleSheet.create({
     color: '#fbbf24',
   },
   commentBox: {
-    backgroundColor: '#161b22',
-    borderColor: '#21262d',
+    backgroundColor: '#10131D',
+    borderColor: '#1F2433',
     borderWidth: 1,
     borderRadius: 12,
     marginHorizontal: 14,
@@ -1357,7 +1357,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   replyingBar: {
-    borderBottomColor: '#21262d',
+    borderBottomColor: '#1F2433',
     borderBottomWidth: 1,
     paddingHorizontal: 8,
     paddingBottom: 8,
@@ -1367,14 +1367,14 @@ const styles = StyleSheet.create({
   },
   replyingText: {
     flex: 1,
-    color: '#58a6ff',
+    color: '#FF9A5C',
     fontSize: 12,
     fontWeight: '800',
     marginLeft: 6,
   },
   commentInput: {
     flex: 1,
-    color: '#e6edf3',
+    color: '#F1F4FA',
     minHeight: 42,
     maxHeight: 120,
     paddingHorizontal: 8,
@@ -1384,12 +1384,12 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 10,
-    backgroundColor: '#6366f1',
+    backgroundColor: '#FF7A2F',
     alignItems: 'center',
     justifyContent: 'center',
   },
   sectionTitle: {
-    color: '#e6edf3',
+    color: '#F1F4FA',
     fontWeight: '900',
     fontSize: 15,
     marginHorizontal: 14,
@@ -1398,8 +1398,8 @@ const styles = StyleSheet.create({
   commentCard: {
     marginHorizontal: 14,
     marginBottom: 10,
-    backgroundColor: '#161b22',
-    borderColor: '#21262d',
+    backgroundColor: '#10131D',
+    borderColor: '#1F2433',
     borderWidth: 1,
     borderRadius: 12,
     padding: 12,
@@ -1410,16 +1410,16 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
   commentAuthor: {
-    color: '#e6edf3',
+    color: '#F1F4FA',
     fontWeight: '800',
     marginBottom: 4,
   },
   commentText: {
-    color: '#c9d1d9',
+    color: '#DCE2EE',
     lineHeight: 20,
   },
   replyMeta: {
-    color: '#58a6ff',
+    color: '#FF9A5C',
     fontSize: 11,
     fontWeight: '800',
     marginBottom: 3,
@@ -1438,13 +1438,13 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   replyButtonText: {
-    color: '#58a6ff',
+    color: '#FF9A5C',
     fontSize: 12,
     fontWeight: '800',
     marginLeft: 4,
   },
   emptyText: {
-    color: '#8b949e',
+    color: '#8790A6',
     textAlign: 'center',
     marginTop: 8,
   },
@@ -1454,10 +1454,10 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   editSheet: {
-    backgroundColor: '#161b22',
+    backgroundColor: '#10131D',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    borderColor: '#21262d',
+    borderColor: '#1F2433',
     borderWidth: 1,
     padding: 18,
   },
@@ -1468,23 +1468,23 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   modalTitle: {
-    color: '#e6edf3',
+    color: '#F1F4FA',
     fontSize: 17,
     fontWeight: '900',
   },
   fieldLabel: {
-    color: '#8b949e',
+    color: '#8790A6',
     fontSize: 11,
     fontWeight: '900',
     marginBottom: 6,
     marginTop: 6,
   },
   modalInput: {
-    backgroundColor: '#0d1117',
-    borderColor: '#30363d',
+    backgroundColor: '#06080F',
+    borderColor: '#2A3040',
     borderWidth: 1,
     borderRadius: 10,
-    color: '#e6edf3',
+    color: '#F1F4FA',
     paddingHorizontal: 12,
     paddingVertical: 11,
     marginBottom: 8,
@@ -1495,13 +1495,13 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     marginTop: 8,
-    backgroundColor: '#6366f1',
+    backgroundColor: '#FF7A2F',
     borderRadius: 10,
     paddingVertical: 13,
     alignItems: 'center',
   },
   disabledButton: {
-    backgroundColor: '#21262d',
+    backgroundColor: '#1F2433',
   },
   saveButtonText: {
     color: '#ffffff',

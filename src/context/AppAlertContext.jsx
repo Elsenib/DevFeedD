@@ -25,7 +25,7 @@ function iconFor(title, buttons) {
   if (text.includes('yeniləndi') || text.includes('qeydə') || text.includes('uğur')) {
     return { name: 'check-circle', color: '#3fb950' };
   }
-  return { name: 'info-outline', color: '#6366f1' };
+  return { name: 'info-outline', color: '#FF7A2F' };
 }
 
 export function AppAlertProvider({ children }) {

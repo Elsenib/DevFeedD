@@ -301,14 +301,24 @@ const createSchema = async () => {
       );
     `);
 
-    await client.query(`
-      INSERT INTO chat_rooms (name, description, created_by, is_public)
-      VALUES
-        ('Umumi', 'DevFeed umumi sohbet otaqi', NULL, true),
-        ('Kod Paylasimi', 'Kod, snippet ve texniki fikirler', NULL, true),
-        ('Is ve Karyera', 'Vakansiya, freelance ve karyera movzulari', NULL, true)
-      ON CONFLICT (name) DO NOTHING;
-    `);
+    const defaultRooms = [
+      ['Umumi', 'Ümumi', 'DevFeed ümumi söhbət otağı'],
+      ['Kod Paylasimi', 'Kod paylaşımı', 'Kod, snippet və texniki fikirlər'],
+      ['Is ve Karyera', 'İş və karyera', 'Vakansiya, freelance və karyera mövzuları'],
+    ];
+    for (const [legacyName, name, description] of defaultRooms) {
+      await client.query(
+        `UPDATE chat_rooms SET name = $2, description = $3
+         WHERE name = $1 AND NOT EXISTS (SELECT 1 FROM chat_rooms WHERE name = $2)`,
+        [legacyName, name, description]
+      );
+      await client.query(
+        `INSERT INTO chat_rooms (name, description, created_by, is_public)
+         VALUES ($1, $2, NULL, true)
+         ON CONFLICT (name) DO NOTHING`,
+        [name, description]
+      );
+    }
 
     await client.query(`
       CREATE TABLE IF NOT EXISTS support_payments (

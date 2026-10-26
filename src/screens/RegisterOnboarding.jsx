@@ -12,14 +12,14 @@ import {
 import { AuthContext } from '../context/AuthContext';
 
 const ROLES = [
-  { id: 'developer', label: 'Developer', desc: 'Kod yazir, layihe qurur' },
-  { id: 'designer', label: 'Designer', desc: 'UI/UX ve qrafik dizayn' },
+  { id: 'developer', label: 'Developer', desc: 'Kod yazır, layihə qurur' },
+  { id: 'designer', label: 'Designer', desc: 'UI/UX və qrafik dizayn' },
   { id: 'devops', label: 'DevOps / SRE', desc: 'Infrastructure, CI/CD, cloud' },
-  { id: 'hr', label: 'HR / Recruiter', desc: 'Istedad axtarir' },
-  { id: 'manager', label: 'Product Manager', desc: 'Mehsulu idare edir' },
-  { id: 'student', label: 'Telebe', desc: 'Oyrenir ve inkisaf edir' },
-  { id: 'founder', label: 'Founder / CTO', desc: 'Sirket ve komanda qurur' },
-  { id: 'data', label: 'Data / ML Eng.', desc: 'Data, analiz ve ML' },
+  { id: 'hr', label: 'HR / Recruiter', desc: 'İstedad axtarır' },
+  { id: 'manager', label: 'Product Manager', desc: 'Məhsulu idarə edir' },
+  { id: 'student', label: 'Tələbə', desc: 'Öyrənir və inkişaf edir' },
+  { id: 'founder', label: 'Founder / CTO', desc: 'Şirkət və komanda qurur' },
+  { id: 'data', label: 'Data / ML Eng.', desc: 'Data, analiz və ML' },
 ];
 
 const SUB_ROLES = {
@@ -66,15 +66,15 @@ export default function RegisterOnboardingScreen() {
 
   const handleContinue = () => {
     if (step === 0 && !selectedRole) {
-      Alert.alert('Xeta', 'Rolu secin');
+      Alert.alert('Xəta', 'Rolu seçin');
       return;
     }
     if (step === 1 && subRoles.length > 0 && !selectedSubRole) {
-      Alert.alert('Xeta', 'Alt rolu secin');
+      Alert.alert('Xəta', 'Alt rolu seçin');
       return;
     }
     if (step === 2 && selectedSkills.length === 0) {
-      Alert.alert('Xeta', 'En azi bir texnologiya secin');
+      Alert.alert('Xəta', 'Ən azı bir texnologiya seçin');
       return;
     }
     setStep((current) => Math.min(current + 1, 3));
@@ -82,7 +82,7 @@ export default function RegisterOnboardingScreen() {
 
   const handleComplete = async () => {
     if (!profileData.name.trim() || !profileData.bio.trim()) {
-      Alert.alert('Xeta', 'Ad ve bio sahesini doldurun');
+      Alert.alert('Xəta', 'Ad və bio sahəsini doldurun');
       return;
     }
 
@@ -98,7 +98,7 @@ export default function RegisterOnboardingScreen() {
         website: profileData.website.trim(),
       });
     } catch (error) {
-      Alert.alert('Xeta', error.response?.data?.message || error.message || 'Profil tamamlanmadi');
+      Alert.alert('Xəta', error.response?.data?.message || error.message || 'Profil tamamlanmadı');
     } finally {
       setLoading(false);
     }
@@ -106,8 +106,8 @@ export default function RegisterOnboardingScreen() {
 
   const renderRoleStep = () => (
     <>
-      <Text style={styles.title}>Rolunu sec</Text>
-      <Text style={styles.subtitle}>Feed ve profil bu melumatlara gore qurulacaq.</Text>
+      <Text style={styles.title}>Rolunu seç</Text>
+      <Text style={styles.subtitle}>Feed və profil bu məlumatlara görə qurulacaq.</Text>
       <View style={styles.grid}>
         {ROLES.map((role) => {
           const active = selectedRole === role.id;
@@ -131,8 +131,8 @@ export default function RegisterOnboardingScreen() {
 
   const renderSubRoleStep = () => (
     <>
-      <Text style={styles.title}>Daha deqiq sec</Text>
-      <Text style={styles.subtitle}>Saheni sec, sonra texnologiyalara keceyik.</Text>
+      <Text style={styles.title}>Daha dəqiq seç</Text>
+      <Text style={styles.subtitle}>Sahəni seç, sonra texnologiyalara keçək.</Text>
       <View style={styles.list}>
         {subRoles.map((subRole) => {
           const active = selectedSubRole === subRole;
@@ -152,8 +152,8 @@ export default function RegisterOnboardingScreen() {
 
   const renderSkillsStep = () => (
     <>
-      <Text style={styles.title}>Stack ve diller</Text>
-      <Text style={styles.subtitle}>En azi bir texnologiya sec.</Text>
+      <Text style={styles.title}>Stack və dillər</Text>
+      <Text style={styles.subtitle}>Ən azı bir texnologiya seç.</Text>
       <Text style={styles.sectionTitle}>Texnologiyalar</Text>
       <View style={styles.chipWrap}>
         {availableSkills.map((skill) => {
@@ -169,7 +169,7 @@ export default function RegisterOnboardingScreen() {
           );
         })}
       </View>
-      <Text style={styles.sectionTitle}>Diller</Text>
+      <Text style={styles.sectionTitle}>Dillər</Text>
       <View style={styles.chipWrap}>
         {LANGUAGES.map((language) => {
           const active = selectedLanguages.includes(language);
@@ -190,7 +190,7 @@ export default function RegisterOnboardingScreen() {
   const renderProfileStep = () => (
     <>
       <Text style={styles.title}>Profili tamamla</Text>
-      <Text style={styles.subtitle}>Ad, bio ve isteye bagli sayt melumati.</Text>
+      <Text style={styles.subtitle}>Ad, bio və istəyə bağlı sayt.</Text>
       <TextInput
         style={styles.input}
         value={profileData.name}
@@ -202,7 +202,7 @@ export default function RegisterOnboardingScreen() {
         style={[styles.input, styles.textArea]}
         value={profileData.bio}
         onChangeText={(bio) => setProfileData((prev) => ({ ...prev, bio }))}
-        placeholder="Ozun haqqinda qisa melumat"
+        placeholder="Özün haqqında qısa məlumat"
         placeholderTextColor="#64748b"
         multiline
         numberOfLines={4}
@@ -236,7 +236,7 @@ export default function RegisterOnboardingScreen() {
       <View style={styles.footer}>
         {step === 0 ? (
           <TouchableOpacity style={styles.secondaryButton} onPress={signOut}>
-            <Text style={styles.secondaryButtonText}>Cixis</Text>
+            <Text style={styles.secondaryButtonText}>Çıxış</Text>
           </TouchableOpacity>
         ) : (
           <TouchableOpacity style={styles.secondaryButton} onPress={() => setStep((current) => current - 1)}>
@@ -265,7 +265,7 @@ export default function RegisterOnboardingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#020617',
+    backgroundColor: '#06080F',
   },
   content: {
     padding: 24,
@@ -285,7 +285,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 4,
   },
   progressDotActive: {
-    backgroundColor: '#7c3aed',
+    backgroundColor: '#FF7A2F',
   },
   title: {
     color: '#e2e8f0',
@@ -327,7 +327,7 @@ const styles = StyleSheet.create({
   },
   cardActive: {
     backgroundColor: '#1f1445',
-    borderColor: '#7c3aed',
+    borderColor: '#FF7A2F',
   },
   cardTitle: {
     color: '#e2e8f0',
@@ -362,8 +362,8 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   chipActive: {
-    backgroundColor: '#7c3aed',
-    borderColor: '#7c3aed',
+    backgroundColor: '#FF7A2F',
+    borderColor: '#FF7A2F',
   },
   chipText: {
     color: '#94a3b8',
@@ -396,7 +396,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     padding: 16,
     paddingBottom: 28,
-    backgroundColor: '#020617',
+    backgroundColor: '#06080F',
     borderTopColor: '#111827',
     borderTopWidth: 1,
   },
@@ -415,7 +415,7 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     flex: 2,
-    backgroundColor: '#7c3aed',
+    backgroundColor: '#FF7A2F',
     borderRadius: 14,
     paddingVertical: 14,
     alignItems: 'center',

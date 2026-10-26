@@ -160,7 +160,7 @@ router.post('/:id/messages', auth, async (req, res) => {
     return res.status(400).json({ message: 'Message text is required' });
   }
   if (containsIllegalWords(text)) {
-    return res.status(400).json({ message: 'Mesajınızda yasa dışı içerik var.' });
+    return res.status(400).json({ message: 'Mesajda qadağan olunmuş məzmun var.' });
   }
 
   try {

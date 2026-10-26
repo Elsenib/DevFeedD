@@ -52,7 +52,7 @@ function NewConversationModal({ visible, creating, onClose, onCreate }) {
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Yeni söhbət</Text>
             <TouchableOpacity onPress={onClose}>
-              <MaterialIcons name="close" size={24} color="#8b949e" />
+              <MaterialIcons name="close" size={24} color="#8790A6" />
             </TouchableOpacity>
           </View>
           <Text style={styles.fieldLabel}>İSTİFADƏÇİ EMAILİ</Text>
@@ -210,7 +210,7 @@ export default function MessagesScreen({ navigation }) {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#6366f1" />
+        <ActivityIndicator size="large" color="#FF7A2F" />
       </View>
     );
   }
@@ -218,13 +218,27 @@ export default function MessagesScreen({ navigation }) {
   return (
     <SafeAreaView style={[styles.container, themed.container]} edges={['top']}>
       <View style={[styles.header, themed.header]}>
-        <View>
-          <Text style={[styles.title, themed.title]}>{t.messages}</Text>
-          <Text style={[styles.subtitle, themed.subtitle]}>{t.messagesSubtitle}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            accessibilityLabel="Geri"
+            style={{ width: 40, height: 40, borderRadius: 20, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', marginRight: 12 }}
+          >
+            <MaterialIcons name="arrow-back" size={21} color={colors.text} />
+          </TouchableOpacity>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.title, themed.title]}>{t.messages}</Text>
+            <Text style={[styles.subtitle, themed.subtitle]}>{t.messagesSubtitle}</Text>
+          </View>
         </View>
-        <TouchableOpacity style={styles.plusButton} onPress={() => setModalOpen(true)}>
-          <MaterialIcons name="add" size={24} color="#ffffff" />
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <TouchableOpacity style={styles.plusButton} onPress={() => navigation.navigate('PublicChat')} accessibilityLabel="Ümumi chat otaqları">
+            <MaterialIcons name="forum" size={21} color="#ffffff" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.plusButton} onPress={() => setModalOpen(true)} accessibilityLabel="Yeni söhbət">
+            <MaterialIcons name="add" size={24} color="#ffffff" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.tabs}>
@@ -268,31 +282,31 @@ export default function MessagesScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0d1117',
+    backgroundColor: '#06080F',
   },
   center: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#0d1117',
+    backgroundColor: '#06080F',
   },
   header: {
     paddingHorizontal: 18,
     paddingTop: 18,
     paddingBottom: 14,
-    borderBottomColor: '#21262d',
+    borderBottomColor: '#1F2433',
     borderBottomWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
   title: {
-    color: '#e6edf3',
+    color: '#F1F4FA',
     fontSize: 22,
     fontWeight: '900',
   },
   subtitle: {
-    color: '#8b949e',
+    color: '#8790A6',
     fontSize: 12,
     marginTop: 3,
   },
@@ -300,32 +314,32 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: '#6366f1',
+    backgroundColor: '#FF7A2F',
     alignItems: 'center',
     justifyContent: 'center',
   },
   tabs: {
     flexDirection: 'row',
     padding: 10,
-    borderBottomColor: '#21262d',
+    borderBottomColor: '#1F2433',
     borderBottomWidth: 1,
   },
   tabButton: {
     flex: 1,
-    borderColor: '#30363d',
+    borderColor: '#2A3040',
     borderWidth: 1,
     borderRadius: 10,
     paddingVertical: 10,
     alignItems: 'center',
     marginHorizontal: 4,
-    backgroundColor: '#161b22',
+    backgroundColor: '#10131D',
   },
   tabButtonActive: {
     backgroundColor: '#312e81',
-    borderColor: '#6366f1',
+    borderColor: '#FF7A2F',
   },
   tabText: {
-    color: '#8b949e',
+    color: '#8790A6',
     fontWeight: '900',
   },
   tabTextActive: {
@@ -336,8 +350,8 @@ const styles = StyleSheet.create({
     paddingBottom: 90,
   },
   chatCard: {
-    backgroundColor: '#161b22',
-    borderColor: '#21262d',
+    backgroundColor: '#10131D',
+    borderColor: '#1F2433',
     borderWidth: 1,
     borderRadius: 12,
     padding: 14,
@@ -349,7 +363,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#6366f1',
+    backgroundColor: '#FF7A2F',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -361,7 +375,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#21262d',
+    backgroundColor: '#1F2433',
   },
   chatBody: {
     flex: 1,
@@ -374,12 +388,12 @@ const styles = StyleSheet.create({
   },
   chatTitle: {
     flex: 1,
-    color: '#e6edf3',
+    color: '#F1F4FA',
     fontWeight: '800',
     fontSize: 14,
   },
   chatLast: {
-    color: '#8b949e',
+    color: '#8790A6',
     fontSize: 13,
   },
   chatTime: {
@@ -388,8 +402,8 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   applicationCard: {
-    backgroundColor: '#161b22',
-    borderColor: '#21262d',
+    backgroundColor: '#10131D',
+    borderColor: '#1F2433',
     borderWidth: 1,
     borderRadius: 12,
     padding: 14,
@@ -406,7 +420,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   applicationLetter: {
-    color: '#c9d1d9',
+    color: '#DCE2EE',
     fontSize: 13,
     lineHeight: 19,
     marginTop: 12,
@@ -417,7 +431,7 @@ const styles = StyleSheet.create({
   },
   resumeButton: {
     flex: 1,
-    borderColor: '#30363d',
+    borderColor: '#2A3040',
     borderWidth: 1,
     borderRadius: 9,
     paddingVertical: 10,
@@ -427,12 +441,12 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   resumeButtonText: {
-    color: '#e6edf3',
+    color: '#F1F4FA',
     fontWeight: '800',
     marginLeft: 6,
   },
   replyButton: {
-    backgroundColor: '#6366f1',
+    backgroundColor: '#FF7A2F',
     borderRadius: 9,
     paddingVertical: 10,
     paddingHorizontal: 12,
@@ -445,7 +459,7 @@ const styles = StyleSheet.create({
     marginLeft: 6,
   },
   emptyText: {
-    color: '#8b949e',
+    color: '#8790A6',
     textAlign: 'center',
     marginTop: 24,
   },
@@ -455,10 +469,10 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   newChatSheet: {
-    backgroundColor: '#161b22',
+    backgroundColor: '#10131D',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    borderColor: '#21262d',
+    borderColor: '#1F2433',
     borderWidth: 1,
     padding: 18,
   },
@@ -469,34 +483,34 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   modalTitle: {
-    color: '#e6edf3',
+    color: '#F1F4FA',
     fontSize: 17,
     fontWeight: '900',
   },
   fieldLabel: {
-    color: '#8b949e',
+    color: '#8790A6',
     fontSize: 11,
     fontWeight: '900',
     marginBottom: 6,
   },
   emailInput: {
-    backgroundColor: '#0d1117',
-    borderColor: '#30363d',
+    backgroundColor: '#06080F',
+    borderColor: '#2A3040',
     borderWidth: 1,
     borderRadius: 10,
-    color: '#e6edf3',
+    color: '#F1F4FA',
     paddingHorizontal: 12,
     paddingVertical: 11,
     marginBottom: 12,
   },
   createButton: {
-    backgroundColor: '#6366f1',
+    backgroundColor: '#FF7A2F',
     borderRadius: 10,
     paddingVertical: 13,
     alignItems: 'center',
   },
   disabledButton: {
-    backgroundColor: '#21262d',
+    backgroundColor: '#1F2433',
   },
   createButtonText: {
     color: '#ffffff',

@@ -21,6 +21,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { ResizeMode, Video } from 'expo-av';
+import * as WebBrowser from 'expo-web-browser';
+import { useIsFocused, useNavigation } from '@react-navigation/native';
+import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { AuthContext } from '../context/AuthContext';
 import { PreferencesContext } from '../context/PreferencesContext';
 import JobApplicationModal from '../components/JobApplicationModal';
@@ -28,14 +31,19 @@ import * as api from '../api';
 import { openModerationMenu } from '../utils/moderation';
 
 const POST_TYPES = [
-  { id: 'TEXT', label: 'Post', icon: 'terminal', color: '#8b949e' },
-  { id: 'GIT', label: 'Git', icon: 'code', color: '#58a6ff' },
+  { id: 'TEXT', label: 'Post', icon: 'notes', color: '#8790A6' },
+  { id: 'GIT', label: 'Git', icon: 'code', color: '#FF9A5C' },
   { id: 'DEPLOY', label: 'Live', icon: 'public', color: '#3fb950' },
-  { id: 'MEDIA', label: 'Media', icon: 'videocam', color: '#818cf8' },
+  { id: 'MEDIA', label: 'Media', icon: 'videocam', color: '#FF9A5C' },
   { id: 'JOB', label: 'İş', icon: 'work', color: '#fbbf24' },
 ];
 
-const TRENDING = ['#reactnative', '#golang', '#kubernetes', '#ai'];
+const FEED_TABS = [
+  { id: 'all', label: 'Sizin üçün' },
+  { id: 'MEDIA', label: 'Videolar' },
+  { id: 'DEPLOY', label: 'Demolar' },
+  { id: 'JOB', label: 'İş' },
+];
 
 function parseMetadata(metadata) {
   if (!metadata) return {};
@@ -54,10 +62,10 @@ function normalizePost(row) {
     ...row,
     type,
     metadata,
-    authorName: row.name || row.user?.name || row.userEmail || 'Istifadeci',
+    authorName: row.name || row.user?.name || row.userEmail || 'İstifadəçi',
     authorRole: row.role_sub || row.role || 'DevFeed member',
     authorAvatar: row.avatar_url || row.user?.avatar_url || row.authorAvatar || null,
-    caption: row.caption || row.title || row.body || 'Yeni paylasim',
+    caption: row.caption || row.title || row.body || 'Yeni paylaşım',
     body: row.body || row.caption || row.title || '',
     likeCount: Number(row.like_count ?? row.likes ?? 0),
     commentCount: Number(row.comment_count ?? row.comments?.length ?? row.comments ?? 0),
@@ -70,9 +78,14 @@ function normalizePost(row) {
 }
 
 function formatTime(value) {
-  if (!value) return 'Indi';
+  if (!value) return 'indi';
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'Indi';
+  if (Number.isNaN(date.getTime())) return 'indi';
+  const minutes = Math.floor((Date.now() - date.getTime()) / 60000);
+  if (minutes < 1) return 'indi';
+  if (minutes < 60) return `${minutes} dəq`;
+  if (minutes < 60 * 24) return `${Math.floor(minutes / 60)} saat`;
+  if (minutes < 60 * 24 * 7) return `${Math.floor(minutes / 1440)} gün`;
   return date.toLocaleDateString();
 }
 
@@ -153,58 +166,75 @@ function LinkifiedText({ text, style, linkStyle, numberOfLines }) {
   );
 }
 
-function AutoVideo({ uri, style }) {
-  const videoRef = useRef(null);
-  const [playing, setPlaying] = useState(true);
+function formatClock(ms) {
+  const total = Math.max(0, Math.floor((ms || 0) / 1000));
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
+}
 
-  useEffect(() => {
-    setPlaying(true);
-  }, [uri]);
-
-  const toggle = async () => {
-    const nextPlaying = !playing;
-    setPlaying(nextPlaying);
-    try {
-      if (nextPlaying) {
-        await videoRef.current?.playAsync();
-      } else {
-        await videoRef.current?.pauseAsync();
-      }
-    } catch (error) {
-      // Playback can fail while the native view is still attaching.
-    }
-  };
+// Feed video: 4:5 preview that plays muted while it is on screen and opens
+// the full-screen 9:16 player on tap.
+function FeedVideo({ uri, post, active }) {
+  const navigation = useNavigation();
+  const isFocused = useIsFocused();
+  const [muted, setMuted] = useState(true);
+  const [status, setStatus] = useState({ isLoaded: false });
+  const shouldPlay = !!active && isFocused;
+  const duration = status.isLoaded ? status.durationMillis || 0 : 0;
+  const position = status.isLoaded ? status.positionMillis || 0 : 0;
+  const progress = duration ? Math.min(1, position / duration) : 0;
 
   return (
-    <TouchableOpacity activeOpacity={0.92} onPress={toggle}>
+    <Pressable
+      style={styles.feedVideo}
+      onPress={(event) => {
+        event?.stopPropagation?.();
+        navigation.navigate('VideoPlayer', { uri, authorName: post.authorName, caption: post.caption });
+      }}
+      accessibilityLabel="Videonu tam ekranda aç"
+    >
       <Video
-        ref={videoRef}
         source={{ uri }}
-        style={style}
+        style={StyleSheet.absoluteFill}
+        videoStyle={styles.videoFill}
         resizeMode={ResizeMode.COVER}
-        shouldPlay={playing}
+        shouldPlay={shouldPlay}
+        isMuted={muted}
         isLooping
-        useNativeControls={false}
-        onLoad={() => {
-          if (playing) videoRef.current?.playAsync?.().catch(() => null);
-        }}
+        progressUpdateIntervalMillis={250}
+        onPlaybackStatusUpdate={setStatus}
       />
-      {!playing && (
-        <View style={styles.videoPausedOverlay}>
-          <MaterialIcons name="play-arrow" size={34} color="#ffffff" />
+      {!!duration && (
+        <View style={styles.videoTimePill} pointerEvents="none">
+          <MaterialIcons name={shouldPlay ? 'play-arrow' : 'pause'} size={13} color="#ffffff" />
+          <Text style={styles.videoTimeText}>{formatClock(duration - position)}</Text>
         </View>
       )}
-    </TouchableOpacity>
+      <Pressable
+        style={styles.videoMuteButton}
+        hitSlop={10}
+        onPress={(event) => {
+          event?.stopPropagation?.();
+          setMuted((value) => !value);
+        }}
+        accessibilityLabel={muted ? 'Səsi aç' : 'Səsi bağla'}
+      >
+        <MaterialIcons name={muted ? 'volume-off' : 'volume-up'} size={17} color="#ffffff" />
+      </Pressable>
+      <View style={styles.videoProgressTrack} pointerEvents="none">
+        <View style={[styles.videoProgressFill, { width: `${progress * 100}%` }]} />
+      </View>
+    </Pressable>
   );
 }
 
-function AuthorAvatar({ name, avatarUrl }) {
+function AuthorAvatar({ name, avatarUrl, size }) {
   const letter = String(name || 'U').slice(0, 1).toUpperCase();
+  const sized = size ? { width: size, height: size, borderRadius: size / 2 } : null;
   if (avatarUrl) {
-    return <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />;
+    return <Image source={{ uri: avatarUrl }} style={[styles.avatarImage, sized]} />;
   }
   return (
-    <View style={styles.avatar}>
+    <View style={[styles.avatar, sized]}>
       <Text style={styles.avatarText}>{letter}</Text>
     </View>
   );
@@ -219,7 +249,7 @@ function GitPayload({ post }) {
   return (
     <View style={[styles.gitBox, { backgroundColor: colors.surfaceStrong, borderColor: colors.border }]}>
       <View style={styles.payloadHeader}>
-        <MaterialIcons name="code" size={16} color="#58a6ff" />
+        <MaterialIcons name="code" size={16} color="#FF9A5C" />
         <Text style={[styles.gitRepo, { color: colors.text }]}>{metadata.repo || 'repo qeyd edilmeyib'}</Text>
         <Text style={[styles.payloadMuted, { color: colors.muted }]}>{metadata.branch || 'main'}</Text>
       </View>
@@ -261,76 +291,94 @@ function DeployPayload({ post }) {
   const deployUrl = normalizeExternalUrl(metadata.url || metadata.link || metadata.deployUrl);
   const host = hostFromUrl(deployUrl);
   const serviceName = metadata.service || inferLiveService(deployUrl);
+  const repoUrl = normalizeExternalUrl(metadata.repoUrl)
+    || (/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/.test(String(metadata.repo || '')) ? `https://github.com/${metadata.repo}` : '');
+  const previewImage = metadata.previewImage || metadata.ogImage || metadata.image;
+  const title = metadata.title || host || 'Demo';
+
+  const openDemo = (event) => {
+    event?.stopPropagation?.();
+    if (!deployUrl) return;
+    WebBrowser.openBrowserAsync(deployUrl, { toolbarColor: '#06080F', controlsColor: '#FF7A2F' }).catch(() => openExternalUrl(deployUrl));
+  };
+
   return (
-    <View style={[styles.deployBox, { backgroundColor: colors.surfaceStrong, borderColor: colors.border }]}>
-      <View style={styles.payloadHeader}>
-        <MaterialIcons name="public" size={18} color="#3fb950" />
-        <View style={styles.payloadBody}>
-          <Text style={[styles.payloadTitle, { color: colors.text }]}>{serviceName} -> {metadata.env || 'Production'}</Text>
-          <Text style={styles.deployText}>{host || 'Live link əlavə edilməyib'}</Text>
+    <View style={[styles.demoCard, { backgroundColor: colors.surfaceStrong, borderColor: colors.border }]}>
+      <Pressable style={styles.demoPreview} onPress={openDemo} disabled={!deployUrl} accessibilityLabel={`Demonu aç: ${host}`}>
+        {previewImage ? (
+          <Image source={{ uri: previewImage }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+        ) : (
+          <View style={styles.demoPlaceholder}>
+            <Svg width="100%" height="100%" style={StyleSheet.absoluteFill} pointerEvents="none">
+              <Defs>
+                <RadialGradient id="demoGlow" cx="85%" cy="0%" rx="60%" ry="80%">
+                  <Stop offset="0" stopColor="#FF7A2F" stopOpacity="0.35" />
+                  <Stop offset="1" stopColor="#FF7A2F" stopOpacity="0" />
+                </RadialGradient>
+              </Defs>
+              <Rect width="100%" height="100%" fill="url(#demoGlow)" />
+            </Svg>
+            <Text style={styles.demoHost} numberOfLines={2}>{host || 'Demo linki yoxdur'}</Text>
+            <Text style={styles.demoHint}>Önizləmə üçün toxun</Text>
+          </View>
+        )}
+        {!!host && (
+          <View style={styles.demoUrlPill}>
+            <MaterialIcons name="lock" size={12} color="#DCE2EE" />
+            <Text style={styles.demoUrlText} numberOfLines={1}>{host}</Text>
+          </View>
+        )}
+        <View style={styles.demoServicePill}>
+          <View style={styles.demoDot} />
+          <Text style={styles.demoServiceText}>{serviceName}</Text>
         </View>
-        <Text style={styles.liveBadge}>LIVE</Text>
+      </Pressable>
+      <View style={styles.demoFooter}>
+        <View style={styles.demoFooterText}>
+          <Text style={[styles.demoTitle, { color: colors.text }]} numberOfLines={1}>{title}</Text>
+          <Text style={[styles.demoMeta, { color: colors.muted }]} numberOfLines={1}>
+            {metadata.env || 'Production'}{metadata.stack ? ` · ${metadata.stack}` : ''}
+          </Text>
+        </View>
+        {!!repoUrl && (
+          <Pressable
+            style={[styles.demoCodeButton, { borderColor: colors.border }]}
+            onPress={(event) => {
+              event?.stopPropagation?.();
+              openExternalUrl(repoUrl);
+            }}
+            accessibilityLabel="Mənbə kodu"
+          >
+            <MaterialIcons name="code" size={19} color={colors.text} />
+          </Pressable>
+        )}
+        {!!deployUrl && (
+          <Pressable style={styles.demoOpenButton} onPress={openDemo}>
+            <MaterialIcons name="play-arrow" size={17} color="#1A0A02" />
+            <Text style={styles.demoOpenText}>Demonu aç</Text>
+          </Pressable>
+        )}
       </View>
-      {!!deployUrl && (
-        <TouchableOpacity
-          style={styles.livePreviewFrame}
-          activeOpacity={0.86}
-          onPress={(event) => {
-            event?.stopPropagation?.();
-            openExternalUrl(deployUrl);
-          }}
-        >
-          <View style={styles.livePreviewBar}>
-            <View style={[styles.liveDot, { backgroundColor: '#f87171' }]} />
-            <View style={[styles.liveDot, { backgroundColor: '#fbbf24' }]} />
-            <View style={[styles.liveDot, { backgroundColor: '#34d399' }]} />
-            <Text style={styles.livePreviewUrl} numberOfLines={1}>{host}</Text>
-          </View>
-          <View style={styles.livePreviewBody}>
-            <MaterialIcons name="language" size={28} color="#86efac" />
-            <Text style={styles.livePreviewTitle} numberOfLines={1}>{host}</Text>
-            <Text style={styles.livePreviewHint}>Vercel/Netlify layihə linkinə keç</Text>
-          </View>
-        </TouchableOpacity>
-      )}
     </View>
   );
 }
 
-function MediaPayload({ post }) {
+function MediaPayload({ post, active }) {
   const { theme } = useContext(PreferencesContext);
   const colors = theme.colors;
   const { metadata } = post;
   const mediaUrl = metadata.mediaUrl || metadata.url;
   const mediaType = metadata.mediaType || (String(metadata.mimeType || '').startsWith('image/') ? 'image' : 'video');
+
+  if (mediaType === 'video' && mediaUrl) return <FeedVideo uri={mediaUrl} post={post} active={active} />;
+  if (mediaType === 'image' && mediaUrl) {
+    return <Image source={{ uri: mediaUrl }} style={[styles.feedImage, { backgroundColor: colors.surfaceStrong }]} resizeMode="cover" />;
+  }
   return (
-    <TouchableOpacity
-      style={[styles.mediaBox, { backgroundColor: colors.surfaceStrong, borderColor: colors.border }]}
-      activeOpacity={mediaUrl ? 0.82 : 1}
-      onPress={(event) => {
-        event?.stopPropagation?.();
-        if (mediaType !== 'video') openExternalUrl(mediaUrl);
-      }}
-      disabled={!mediaUrl}
-    >
-      {mediaType === 'image' && mediaUrl ? (
-        <Image source={{ uri: mediaUrl }} style={styles.mediaPreviewImage} />
-      ) : mediaType === 'video' && mediaUrl ? (
-        <AutoVideo uri={mediaUrl} style={styles.mediaPreviewVideo} />
-      ) : (
-        <View style={styles.mediaPreviewIcon}>
-          <MaterialIcons name="play-circle-outline" size={46} color="#c4b5fd" />
-        </View>
-      )}
-      <View style={[styles.mediaOverlay, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
-        <Text style={styles.mediaTitle}>{metadata.title || 'Media paylaşım'}</Text>
-        {(mediaType !== 'video' || !mediaUrl) && (
-          <Text style={styles.mediaLink} numberOfLines={1}>
-            {mediaUrl ? 'Açmaq üçün toxun' : 'Media əlavə edilməyib'}
-          </Text>
-        )}
-      </View>
-    </TouchableOpacity>
+    <View style={[styles.feedImage, styles.mediaMissing, { backgroundColor: colors.surfaceStrong }]}>
+      <MaterialIcons name="play-circle-outline" size={44} color={colors.muted} />
+      <Text style={[styles.demoMeta, { color: colors.muted }]}>Media əlavə edilməyib</Text>
+    </View>
   );
 }
 
@@ -338,7 +386,7 @@ function JobPayload({ post, onApplyJob }) {
   const { theme } = useContext(PreferencesContext);
   const colors = theme.colors;
   const metadata = post.metadata || {};
-  const requirements = metadata.requirements || [];
+  const requirements = Array.isArray(metadata.requirements) ? metadata.requirements : [];
   return (
     <View style={[styles.jobBox, { backgroundColor: colors.surfaceStrong, borderColor: colors.border }]}>
       <View style={styles.jobHeaderRow}>
@@ -360,21 +408,21 @@ function JobPayload({ post, onApplyJob }) {
           onApplyJob(post);
         }}
       >
-        <Text style={styles.jobApplyText}>Muraciet et</Text>
+        <Text style={styles.jobApplyText}>Müraciət et</Text>
       </TouchableOpacity>
     </View>
   );
 }
 
-function PostPayload({ post, onApplyJob }) {
+function PostPayload({ post, onApplyJob, active }) {
   if (post.type === 'GIT') return <GitPayload post={post} />;
   if (post.type === 'DEPLOY') return <DeployPayload post={post} />;
-  if (post.type === 'MEDIA') return <MediaPayload post={post} />;
+  if (post.type === 'MEDIA') return <MediaPayload post={post} active={active} />;
   if (post.type === 'JOB') return <JobPayload post={post} onApplyJob={onApplyJob} />;
   return null;
 }
 
-function PostCard({ post, onPress, onAuthorPress, onLike, onBookmark, onApplyJob, onMore }) {
+function PostCard({ post, onPress, onAuthorPress, onLike, onBookmark, onApplyJob, onMore, active }) {
   const { theme } = useContext(PreferencesContext);
   const colors = theme.colors;
   const themed = useMemo(() => ({
@@ -396,12 +444,15 @@ function PostCard({ post, onPress, onAuthorPress, onLike, onBookmark, onApplyJob
           <AuthorAvatar name={post.authorName} avatarUrl={post.authorAvatar} />
           <View style={styles.authorBlock}>
             <Text style={[styles.postUser, themed.text]}>{post.authorName}</Text>
-            <Text style={[styles.postTime, themed.muted]}>{post.authorRole} - {formatTime(post.createdAt)}</Text>
+            <Text style={[styles.postTime, themed.muted]} numberOfLines={1}>{post.authorRole} · {formatTime(post.createdAt)}</Text>
           </View>
         </TouchableOpacity>
-        <View style={[styles.typeBadge, { borderColor: kind.color, backgroundColor: `${kind.color}18` }]}>
-          <Text style={[styles.typeBadgeText, { color: kind.color }]}>{kind.label.toUpperCase()}</Text>
-        </View>
+        {post.type !== 'TEXT' && (
+          <View style={[styles.typeBadge, { backgroundColor: `${kind.color}1F` }]}>
+            <View style={[styles.typeDot, { backgroundColor: kind.color }]} />
+            <Text style={[styles.typeBadgeText, { color: kind.color }]}>{kind.label}</Text>
+          </View>
+        )}
         {onMore && (
           <TouchableOpacity
             style={styles.moreButton}
@@ -425,7 +476,7 @@ function PostCard({ post, onPress, onAuthorPress, onLike, onBookmark, onApplyJob
         </View>
       )}
 
-      <PostPayload post={post} onApplyJob={onApplyJob} />
+      <PostPayload post={post} onApplyJob={onApplyJob} active={active} />
 
       <View style={styles.postFooter}>
         <TouchableOpacity
@@ -435,11 +486,11 @@ function PostCard({ post, onPress, onAuthorPress, onLike, onBookmark, onApplyJob
             onLike(post);
           }}
         >
-          <MaterialIcons name={post.likedByMe ? 'favorite' : 'favorite-border'} size={18} color={post.likedByMe ? '#f85149' : '#8b949e'} />
+          <MaterialIcons name={post.likedByMe ? 'favorite' : 'favorite-border'} size={18} color={post.likedByMe ? '#f85149' : '#8790A6'} />
           <Text style={[styles.metaText, themed.muted, post.likedByMe && styles.likeTextActive]}>{post.likeCount}</Text>
         </TouchableOpacity>
         <View style={styles.actionButton}>
-          <MaterialIcons name="chat-bubble-outline" size={18} color="#8b949e" />
+          <MaterialIcons name="chat-bubble-outline" size={18} color="#8790A6" />
           <Text style={[styles.metaText, themed.muted]}>{post.commentCount}</Text>
         </View>
         <TouchableOpacity
@@ -449,7 +500,7 @@ function PostCard({ post, onPress, onAuthorPress, onLike, onBookmark, onApplyJob
             onBookmark(post);
           }}
         >
-          <MaterialIcons name={post.bookmarkedByMe ? 'bookmark' : 'bookmark-border'} size={18} color={post.bookmarkedByMe ? '#fbbf24' : '#8b949e'} />
+          <MaterialIcons name={post.bookmarkedByMe ? 'bookmark' : 'bookmark-border'} size={18} color={post.bookmarkedByMe ? '#fbbf24' : '#8790A6'} />
           <Text style={[styles.metaText, themed.muted, post.bookmarkedByMe && styles.bookmarkTextActive]}>{post.bookmarkCount}</Text>
         </TouchableOpacity>
       </View>
@@ -772,7 +823,7 @@ function ComposeModal({ visible, onClose, onSubmit, submitting }) {
                     style={[styles.typeTab, active && { borderColor: item.color, backgroundColor: `${item.color}18` }]}
                     onPress={() => setType(item.id)}
                   >
-                    <MaterialIcons name={item.icon} size={15} color={active ? item.color : '#8b949e'} />
+                    <MaterialIcons name={item.icon} size={15} color={active ? item.color : '#8790A6'} />
                     <Text style={[styles.typeTabText, active && { color: item.color }]}>{item.label}</Text>
                   </TouchableOpacity>
                 );
@@ -807,7 +858,7 @@ function ComposeModal({ visible, onClose, onSubmit, submitting }) {
               <Text style={[styles.publicInfoText, themed.muted]}>Hamıya açıq</Text>
             </View>
             <TouchableOpacity
-              style={[styles.submitButton, { backgroundColor: canSubmit ? activeType.color : '#21262d' }]}
+              style={[styles.submitButton, { backgroundColor: canSubmit ? activeType.color : '#1F2433' }]}
               onPress={handleSubmit}
               disabled={!canSubmit || working}
             >
@@ -824,9 +875,9 @@ function ComposeModal({ visible, onClose, onSubmit, submitting }) {
   );
 }
 
-export default function FeedScreen({ navigation }) {
+export default function FeedScreen({ navigation, route }) {
   const { user } = useContext(AuthContext);
-  const { theme, t } = useContext(PreferencesContext);
+  const { theme, themeMode } = useContext(PreferencesContext);
   const colors = theme.colors;
   const themed = useMemo(() => ({
     container: { backgroundColor: colors.background },
@@ -836,6 +887,7 @@ export default function FeedScreen({ navigation }) {
     quickComposer: { backgroundColor: colors.surface, borderColor: colors.border },
     quickComposerText: { color: colors.muted },
     emptyText: { color: colors.muted },
+    headerIconButton: { backgroundColor: colors.surface, borderColor: colors.border },
   }), [colors]);
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -846,13 +898,29 @@ export default function FeedScreen({ navigation }) {
   const [applyingJob, setApplyingJob] = useState(false);
 
   const normalizedPosts = useMemo(() => posts.map(normalizePost), [posts]);
+  const [feedTab, setFeedTab] = useState('all');
+  const visiblePosts = useMemo(
+    () => (feedTab === 'all' ? normalizedPosts : normalizedPosts.filter((post) => post.type === feedTab)),
+    [normalizedPosts, feedTab]
+  );
+  const freshCount = useMemo(
+    () => normalizedPosts.filter((post) => Date.now() - new Date(post.createdAt).getTime() < 86400000).length,
+    [normalizedPosts]
+  );
+  const [activeVideoId, setActiveVideoId] = useState(null);
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 }).current;
+  // Only the first video post that is mostly on screen plays.
+  const onViewableItemsChanged = useRef(({ viewableItems }) => {
+    const video = viewableItems.find((entry) => entry.item?.type === 'MEDIA');
+    setActiveVideoId(video ? video.item.id : null);
+  }).current;
 
   const loadPosts = useCallback(async () => {
     try {
       const data = await api.fetchPosts();
       setPosts(Array.isArray(data) ? data : []);
     } catch (error) {
-      Alert.alert('Feed xetasi', error.response?.data?.message || error.message);
+      Alert.alert('Feed yüklənmədi', error.response?.data?.message || error.message);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -862,6 +930,11 @@ export default function FeedScreen({ navigation }) {
   useEffect(() => {
     loadPosts();
   }, [loadPosts]);
+
+  // The tab bar's black hole button opens the composer through this param.
+  useEffect(() => {
+    if (route?.params?.compose) setComposeOpen(true);
+  }, [route?.params?.compose]);
 
   const handleCreatePost = async (payload) => {
     setPosting(true);
@@ -884,7 +957,7 @@ export default function FeedScreen({ navigation }) {
       ]);
       setComposeOpen(false);
     } catch (error) {
-      Alert.alert('Paylasim xetasi', error.response?.data?.error || error.response?.data?.message || error.message);
+      Alert.alert('Paylaşım alınmadı', error.response?.data?.error || error.response?.data?.message || error.message);
     } finally {
       setPosting(false);
     }
@@ -1009,17 +1082,59 @@ export default function FeedScreen({ navigation }) {
 
   return (
     <SafeAreaView style={[styles.container, themed.container]} edges={['top']}>
-      <View style={[styles.header, themed.header]}>
-        <View>
-          <View style={styles.brandRow}>
-            <MaterialIcons name="terminal" size={22} color="#6366f1" />
-            <Text style={[styles.brandText, themed.title]}>dev<Text style={styles.brandAccent}>feed</Text></Text>
+      <View pointerEvents="none" style={styles.aurora}>
+        <Svg width="100%" height="100%">
+          <Defs>
+            <RadialGradient id="feedGlowA" cx="20%" cy="0%" rx="70%" ry="60%">
+              <Stop offset="0" stopColor="#FF7A2F" stopOpacity={themeMode === 'light' ? 0.14 : 0.22} />
+              <Stop offset="1" stopColor="#FF7A2F" stopOpacity="0" />
+            </RadialGradient>
+            <RadialGradient id="feedGlowB" cx="95%" cy="0%" rx="55%" ry="50%">
+              <Stop offset="0" stopColor="#FF3D5A" stopOpacity={themeMode === 'light' ? 0.1 : 0.18} />
+              <Stop offset="1" stopColor="#FF3D5A" stopOpacity="0" />
+            </RadialGradient>
+          </Defs>
+          <Rect width="100%" height="100%" fill="url(#feedGlowA)" />
+          <Rect width="100%" height="100%" fill="url(#feedGlowB)" />
+        </Svg>
+      </View>
+
+      <View style={styles.header}>
+        <View style={styles.greetingAvatarRing}>
+          <View style={[styles.greetingAvatarInner, { borderColor: colors.background }]}>
+            <AuthorAvatar name={user?.name || user?.email || 'U'} avatarUrl={user?.avatar_url || user?.avatarUrl} size={36} />
           </View>
-          <Text style={[styles.headerSubtitle, themed.subtitle]}>{t.feedSubtitle}</Text>
         </View>
-        <TouchableOpacity style={styles.plusButton} onPress={() => setComposeOpen(true)}>
-          <MaterialIcons name="add" size={24} color="#ffffff" />
+        <View style={styles.greetingText}>
+          <Text style={[styles.greetingHello, themed.subtitle]}>Salam, {String(user?.name || '').split(' ')[0] || 'dost'}</Text>
+          <Text style={[styles.greetingTitle, themed.title]} numberOfLines={1}>
+            {freshCount ? `${freshCount} yeni paylaşım` : 'Lent'}
+          </Text>
+        </View>
+        <TouchableOpacity style={[styles.plusButton, themed.headerIconButton]} onPress={() => navigation.navigate('Explore')} accessibilityLabel="Axtarış">
+          <MaterialIcons name="search" size={21} color={colors.text} />
         </TouchableOpacity>
+        <TouchableOpacity style={[styles.plusButton, themed.headerIconButton, styles.headerButtonGap]} onPress={() => navigation.navigate('Messages')} accessibilityLabel="Mesajlar">
+          <MaterialIcons name="chat-bubble-outline" size={20} color={colors.text} />
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.feedTabs} accessibilityRole="tablist">
+        {FEED_TABS.map((tab) => {
+          const selected = feedTab === tab.id;
+          return (
+            <Pressable
+              key={tab.id}
+              onPress={() => setFeedTab(tab.id)}
+              accessibilityRole="tab"
+              accessibilityState={{ selected }}
+              style={styles.feedTab}
+            >
+              <Text style={[styles.feedTabText, { color: selected ? colors.text : colors.muted, fontWeight: selected ? '800' : '600' }]}>{tab.label}</Text>
+              <View style={[styles.feedTabBar, { backgroundColor: selected ? colors.primary : 'transparent' }]} />
+            </Pressable>
+          );
+        })}
       </View>
 
       {loading ? (
@@ -1028,7 +1143,9 @@ export default function FeedScreen({ navigation }) {
         </View>
       ) : (
         <FlatList
-          data={normalizedPosts}
+          data={visiblePosts}
+          viewabilityConfig={viewabilityConfig}
+          onViewableItemsChanged={onViewableItemsChanged}
           keyExtractor={(item) => item.id?.toString() ?? Math.random().toString()}
           renderItem={({ item }) => (
             <PostCard
@@ -1039,6 +1156,7 @@ export default function FeedScreen({ navigation }) {
               onBookmark={handleBookmark}
               onApplyJob={handleApplyJob}
               onMore={String(item.user_id || item.userId) === String(user?.id) ? undefined : handlePostMore}
+              active={item.id === activeVideoId}
             />
           )}
           contentContainerStyle={styles.listContent}
@@ -1048,19 +1166,12 @@ export default function FeedScreen({ navigation }) {
               <TouchableOpacity style={[styles.quickComposer, themed.quickComposer]} onPress={() => setComposeOpen(true)}>
                 <AuthorAvatar name={user?.name || user?.email || 'U'} avatarUrl={user?.avatar_url || user?.avatarUrl} />
                 <Text style={[styles.quickComposerText, themed.quickComposerText]}>Nə paylaşmaq istəyirsən?</Text>
-                <MaterialIcons name="send" size={18} color="#6366f1" />
+                <MaterialIcons name="add-circle" size={22} color={colors.primary} />
               </TouchableOpacity>
 
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.trendingRow}>
-                {TRENDING.map((tag) => (
-                  <View key={tag} style={styles.trendingChip}>
-                    <Text style={styles.trendingText}>{tag}</Text>
-                  </View>
-                ))}
-              </ScrollView>
             </View>
           }
-          ListEmptyComponent={<Text style={[styles.emptyText, themed.emptyText]}>Hələ paylaşım yoxdur. İlk postu sən yaz.</Text>}
+          ListEmptyComponent={<Text style={[styles.emptyText, themed.emptyText]}>{feedTab === 'all' ? 'Hələ paylaşım yoxdur. İlk postu sən yaz.' : 'Bu bölmədə hələ paylaşım yoxdur.'}</Text>}
         />
       )}
 
@@ -1084,42 +1195,38 @@ export default function FeedScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0d1117',
+    backgroundColor: '#06080F',
   },
   header: {
-    paddingHorizontal: 18,
-    paddingTop: 18,
-    paddingBottom: 14,
-    borderBottomColor: '#21262d',
-    borderBottomWidth: 1,
-    backgroundColor: '#0d1117',
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 6,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
   },
   brandRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   brandText: {
-    color: '#e6edf3',
+    color: '#F1F4FA',
     fontSize: 22,
     fontWeight: '900',
     marginLeft: 8,
   },
   brandAccent: {
-    color: '#6366f1',
+    color: '#FF7A2F',
   },
   headerSubtitle: {
-    color: '#8b949e',
+    color: '#8790A6',
     fontSize: 12,
     marginTop: 3,
   },
   plusButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: '#6366f1',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1130,12 +1237,12 @@ const styles = StyleSheet.create({
   },
   listContent: {
     padding: 14,
-    paddingBottom: 100,
+    paddingBottom: 150,
   },
   quickComposer: {
-    backgroundColor: '#161b22',
+    backgroundColor: '#10131D',
     borderRadius: 14,
-    borderColor: '#21262d',
+    borderColor: '#1F2433',
     borderWidth: 1,
     padding: 14,
     marginBottom: 12,
@@ -1143,7 +1250,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   quickComposerText: {
-    color: '#8b949e',
+    color: '#8790A6',
     flex: 1,
     marginLeft: 10,
     fontSize: 13,
@@ -1152,8 +1259,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   trendingChip: {
-    backgroundColor: '#161b22',
-    borderColor: '#30363d',
+    backgroundColor: '#10131D',
+    borderColor: '#2A3040',
     borderWidth: 1,
     borderRadius: 16,
     paddingHorizontal: 12,
@@ -1161,17 +1268,17 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   trendingText: {
-    color: '#58a6ff',
+    color: '#FF9A5C',
     fontSize: 12,
     fontWeight: '700',
   },
   postCard: {
-    backgroundColor: '#161b22',
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 12,
+    backgroundColor: '#10131D',
+    borderRadius: 24,
+    padding: 14,
+    marginBottom: 14,
     borderWidth: 1,
-    borderColor: '#21262d',
+    borderColor: '#1F2433',
   },
   postHeader: {
     flexDirection: 'row',
@@ -1187,12 +1294,12 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: '#6366f1',
+    backgroundColor: '#FF7A2F',
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarText: {
-    color: '#ffffff',
+    color: '#1A0A02',
     fontSize: 15,
     fontWeight: '900',
   },
@@ -1200,19 +1307,19 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: '#21262d',
+    backgroundColor: '#1F2433',
   },
   authorBlock: {
     flex: 1,
     marginLeft: 10,
   },
   postUser: {
-    color: '#e6edf3',
+    color: '#F1F4FA',
     fontWeight: '800',
     fontSize: 14,
   },
   postTime: {
-    color: '#8b949e',
+    color: '#8790A6',
     fontSize: 11,
     marginTop: 2,
   },
@@ -1221,14 +1328,21 @@ const styles = StyleSheet.create({
     padding: 2,
   },
   typeBadge: {
-    borderWidth: 1,
-    borderRadius: 6,
-    paddingHorizontal: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 999,
+    paddingHorizontal: 9,
     paddingVertical: 4,
   },
+  typeDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 5,
+  },
   typeBadgeText: {
-    fontSize: 10,
-    fontWeight: '900',
+    fontSize: 11,
+    fontWeight: '700',
   },
   likeTextActive: {
     color: '#fca5a5',
@@ -1237,13 +1351,13 @@ const styles = StyleSheet.create({
     color: '#fbbf24',
   },
   postCaption: {
-    color: '#c9d1d9',
+    color: '#DCE2EE',
     lineHeight: 21,
     marginBottom: 10,
     fontSize: 14,
   },
   inlineLink: {
-    color: '#58a6ff',
+    color: '#FF9A5C',
     fontWeight: '800',
     textDecorationLine: 'underline',
   },
@@ -1253,16 +1367,16 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   tagItem: {
-    color: '#58a6ff',
+    color: '#FF9A5C',
     fontSize: 12,
     marginRight: 8,
     marginBottom: 4,
   },
   gitBox: {
-    backgroundColor: '#0d1117',
+    backgroundColor: '#06080F',
     borderRadius: 10,
     padding: 14,
-    borderColor: '#21262d',
+    borderColor: '#1F2433',
     borderWidth: 1,
     marginTop: 4,
   },
@@ -1316,7 +1430,7 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   livePreviewTitle: {
-    color: '#e6edf3',
+    color: '#F1F4FA',
     fontWeight: '900',
     marginTop: 6,
     fontSize: 13,
@@ -1338,12 +1452,12 @@ const styles = StyleSheet.create({
   mediaPreviewImage: {
     width: '100%',
     height: 180,
-    backgroundColor: '#0d1117',
+    backgroundColor: '#06080F',
   },
   mediaPreviewVideo: {
     width: '100%',
     height: 220,
-    backgroundColor: '#0d1117',
+    backgroundColor: '#06080F',
   },
   videoPausedOverlay: {
     position: 'absolute',
@@ -1408,17 +1522,17 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
   payloadTitle: {
-    color: '#e6edf3',
+    color: '#F1F4FA',
     fontWeight: '800',
     fontSize: 13,
   },
   payloadMuted: {
-    color: '#8b949e',
+    color: '#8790A6',
     fontSize: 11,
     marginLeft: 8,
   },
   gitRepo: {
-    color: '#58a6ff',
+    color: '#FF9A5C',
     fontWeight: '800',
     fontSize: 13,
     flex: 1,
@@ -1435,17 +1549,17 @@ const styles = StyleSheet.create({
     marginTop: 0,
   },
   commitRow: {
-    borderTopColor: '#21262d',
+    borderTopColor: '#1F2433',
     borderTopWidth: 1,
     paddingTop: 8,
     marginTop: 8,
   },
   commitHash: {
-    color: '#8b949e',
+    color: '#8790A6',
     fontSize: 10,
   },
   commitText: {
-    color: '#e6edf3',
+    color: '#F1F4FA',
     fontSize: 12,
     marginTop: 2,
   },
@@ -1479,7 +1593,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   mediaTitle: {
-    color: '#818cf8',
+    color: '#FF9A5C',
     fontWeight: '800',
     marginTop: 8,
     marginBottom: 4,
@@ -1532,7 +1646,7 @@ const styles = StyleSheet.create({
     marginRight: 18,
   },
   metaText: {
-    color: '#8b949e',
+    color: '#8790A6',
     fontSize: 12,
     marginLeft: 5,
   },
@@ -1547,10 +1661,10 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   composeSheet: {
-    backgroundColor: '#161b22',
+    backgroundColor: '#10131D',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    borderColor: '#21262d',
+    borderColor: '#1F2433',
     borderWidth: 1,
     padding: 18,
     maxHeight: '92%',
@@ -1562,7 +1676,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   modalTitle: {
-    color: '#e6edf3',
+    color: '#F1F4FA',
     fontSize: 17,
     fontWeight: '900',
   },
@@ -1578,7 +1692,7 @@ const styles = StyleSheet.create({
   typeTab: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderColor: '#30363d',
+    borderColor: '#2A3040',
     borderWidth: 1,
     borderRadius: 18,
     paddingHorizontal: 11,
@@ -1586,17 +1700,17 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   typeTabText: {
-    color: '#8b949e',
+    color: '#8790A6',
     fontSize: 12,
     fontWeight: '800',
     marginLeft: 5,
   },
   captionInput: {
-    backgroundColor: '#0d1117',
-    borderColor: '#30363d',
+    backgroundColor: '#06080F',
+    borderColor: '#2A3040',
     borderWidth: 1,
     borderRadius: 12,
-    color: '#e6edf3',
+    color: '#F1F4FA',
     minHeight: 104,
     padding: 12,
     textAlignVertical: 'top',
@@ -1604,32 +1718,32 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   extraBox: {
-    backgroundColor: '#0d1117',
-    borderColor: '#21262d',
+    backgroundColor: '#06080F',
+    borderColor: '#1F2433',
     borderWidth: 1,
     borderRadius: 12,
     padding: 12,
     marginBottom: 12,
   },
   fieldLabel: {
-    color: '#8b949e',
+    color: '#8790A6',
     fontSize: 11,
     fontWeight: '900',
     marginBottom: 6,
     marginTop: 4,
   },
   modalInput: {
-    backgroundColor: '#161b22',
-    borderColor: '#30363d',
+    backgroundColor: '#10131D',
+    borderColor: '#2A3040',
     borderWidth: 1,
     borderRadius: 9,
-    color: '#e6edf3',
+    color: '#F1F4FA',
     paddingHorizontal: 11,
     paddingVertical: 10,
     marginBottom: 8,
   },
   mediaPickerButton: {
-    backgroundColor: '#161b22',
+    backgroundColor: '#10131D',
     borderColor: '#312e81',
     borderWidth: 1,
     borderRadius: 10,
@@ -1643,11 +1757,11 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
   mediaPickerTitle: {
-    color: '#e6edf3',
+    color: '#F1F4FA',
     fontWeight: '900',
   },
   mediaPickerMeta: {
-    color: '#8b949e',
+    color: '#8790A6',
     fontSize: 11,
     marginTop: 3,
   },
@@ -1657,11 +1771,11 @@ const styles = StyleSheet.create({
   },
   inlineInput: {
     flex: 1,
-    backgroundColor: '#161b22',
-    borderColor: '#30363d',
+    backgroundColor: '#10131D',
+    borderColor: '#2A3040',
     borderWidth: 1,
     borderRadius: 9,
-    color: '#e6edf3',
+    color: '#F1F4FA',
     paddingHorizontal: 11,
     paddingVertical: 10,
   },
@@ -1669,33 +1783,33 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 9,
-    backgroundColor: '#21262d',
+    backgroundColor: '#1F2433',
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: 8,
   },
   addSmallButtonText: {
-    color: '#e6edf3',
+    color: '#F1F4FA',
     fontSize: 18,
     fontWeight: '900',
   },
   removeChip: {
-    borderColor: '#30363d',
+    borderColor: '#2A3040',
     borderWidth: 1,
     borderRadius: 14,
     paddingHorizontal: 9,
     paddingVertical: 5,
     marginRight: 6,
     marginBottom: 8,
-    backgroundColor: '#161b22',
+    backgroundColor: '#10131D',
   },
   removeChipText: {
-    color: '#58a6ff',
+    color: '#FF9A5C',
     fontSize: 12,
     fontWeight: '700',
   },
   modalFooter: {
-    borderTopColor: '#21262d',
+    borderTopColor: '#1F2433',
     borderTopWidth: 1,
     paddingTop: 14,
     flexDirection: 'row',
@@ -1707,7 +1821,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   publicInfoText: {
-    color: '#8b949e',
+    color: '#8790A6',
     fontSize: 12,
     marginLeft: 5,
   },
@@ -1721,5 +1835,244 @@ const styles = StyleSheet.create({
   submitButtonText: {
     color: '#ffffff',
     fontWeight: '900',
+  },
+  aurora: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    height: 320,
+  },
+  greetingAvatarRing: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    padding: 2,
+    backgroundColor: '#FF7A2F',
+  },
+  greetingAvatarInner: {
+    flex: 1,
+    borderRadius: 20,
+    borderWidth: 2,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  greetingText: {
+    flex: 1,
+    marginLeft: 12,
+    marginRight: 8,
+  },
+  greetingHello: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  greetingTitle: {
+    fontSize: 19,
+    fontWeight: '800',
+    letterSpacing: -0.4,
+  },
+  headerButtonGap: {
+    marginLeft: 8,
+  },
+  feedTabs: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    marginTop: 10,
+    marginBottom: 4,
+  },
+  feedTab: {
+    marginRight: 22,
+    paddingTop: 6,
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  feedTabText: {
+    fontSize: 15,
+  },
+  feedTabBar: {
+    alignSelf: 'center',
+    width: 22,
+    height: 3,
+    borderRadius: 2,
+    marginTop: 8,
+  },
+  videoFill: {
+    width: '100%',
+    height: '100%',
+  },
+  feedVideo: {
+    width: '100%',
+    aspectRatio: 4 / 5,
+    borderRadius: 18,
+    overflow: 'hidden',
+    backgroundColor: '#000000',
+    marginTop: 4,
+  },
+  videoTimePill: {
+    position: 'absolute',
+    left: 10,
+    bottom: 12,
+    height: 26,
+    paddingHorizontal: 9,
+    borderRadius: 13,
+    backgroundColor: 'rgba(6,8,15,0.6)',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  videoTimeText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '700',
+    marginLeft: 3,
+  },
+  videoMuteButton: {
+    position: 'absolute',
+    right: 10,
+    bottom: 10,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(6,8,15,0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  videoProgressTrack: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 3,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+  },
+  videoProgressFill: {
+    height: 3,
+    backgroundColor: '#FF7A2F',
+  },
+  feedImage: {
+    width: '100%',
+    aspectRatio: 4 / 5,
+    borderRadius: 18,
+    marginTop: 4,
+  },
+  mediaMissing: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  demoCard: {
+    borderRadius: 20,
+    borderWidth: 1,
+    overflow: 'hidden',
+    marginTop: 4,
+  },
+  demoPreview: {
+    height: 176,
+    backgroundColor: '#0B0F1C',
+    overflow: 'hidden',
+  },
+  demoPlaceholder: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    padding: 16,
+  },
+  demoHost: {
+    color: '#F1F4FA',
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: -0.6,
+  },
+  demoHint: {
+    color: '#8790A6',
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  demoUrlPill: {
+    position: 'absolute',
+    left: 10,
+    top: 10,
+    maxWidth: '62%',
+    height: 26,
+    paddingHorizontal: 10,
+    borderRadius: 13,
+    backgroundColor: 'rgba(6,8,15,0.7)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  demoUrlText: {
+    color: '#DCE2EE',
+    fontSize: 11,
+    fontWeight: '700',
+    marginLeft: 5,
+    flexShrink: 1,
+  },
+  demoServicePill: {
+    position: 'absolute',
+    right: 10,
+    top: 10,
+    height: 26,
+    paddingHorizontal: 10,
+    borderRadius: 13,
+    backgroundColor: 'rgba(6,8,15,0.7)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,122,47,0.3)',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  demoDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#FF7A2F',
+    marginRight: 6,
+  },
+  demoServiceText: {
+    color: '#FFB07A',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  demoFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+  },
+  demoFooterText: {
+    flex: 1,
+    minWidth: 0,
+    marginRight: 8,
+  },
+  demoTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  demoMeta: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  demoCodeButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+  },
+  demoOpenButton: {
+    height: 44,
+    paddingHorizontal: 16,
+    borderRadius: 22,
+    backgroundColor: '#FF7A2F',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  demoOpenText: {
+    color: '#1A0A02',
+    fontSize: 14,
+    fontWeight: '800',
+    marginLeft: 4,
   },
 });

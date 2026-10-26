@@ -49,7 +49,7 @@ function RoomModal({ visible, creating, onClose, onCreate }) {
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Yeni public chat</Text>
             <TouchableOpacity onPress={onClose}>
-              <MaterialIcons name="close" size={24} color="#8b949e" />
+              <MaterialIcons name="close" size={24} color="#8790A6" />
             </TouchableOpacity>
           </View>
           <Text style={styles.fieldLabel}>OTAQ ADI</Text>
@@ -125,7 +125,7 @@ function InviteModal({ visible, inviting, roomName, onClose, onInvite, members =
               <Text style={styles.modalSubtitle}>{roomName || 'Chat otağı'}</Text>
             </View>
             <TouchableOpacity onPress={onClose}>
-              <MaterialIcons name="close" size={24} color="#8b949e" />
+              <MaterialIcons name="close" size={24} color="#8790A6" />
             </TouchableOpacity>
           </View>
           <Text style={styles.fieldLabel}>ISTIFADECI AXTAR</Text>
@@ -138,7 +138,7 @@ function InviteModal({ visible, inviting, roomName, onClose, onInvite, members =
             autoCapitalize="none"
           />
           {searching ? (
-            <ActivityIndicator color="#6366f1" style={styles.inviteLoader} />
+            <ActivityIndicator color="#FF7A2F" style={styles.inviteLoader} />
           ) : (
             <ScrollView style={styles.inviteResults} keyboardShouldPersistTaps="handled">
               {results.map((item) => (
@@ -153,7 +153,7 @@ function InviteModal({ visible, inviting, roomName, onClose, onInvite, members =
                     <Text style={styles.inviteUserName}>{item.name || item.email}</Text>
                     <Text style={styles.inviteUserMeta}>{item.role_sub || item.role || item.email}</Text>
                   </View>
-                  <MaterialIcons name="add-circle" size={22} color="#6366f1" />
+                  <MaterialIcons name="add-circle" size={22} color="#FF7A2F" />
                 </TouchableOpacity>
               ))}
               {!results.length && <Text style={styles.inviteEmpty}>Devet ucun istifadeci tapilmadi.</Text>}
@@ -182,7 +182,7 @@ function MessageAvatar({ name, uri }) {
   );
 }
 
-export default function PublicChatScreen({ route }) {
+export default function PublicChatScreen({ route, navigation }) {
   const { user } = useContext(AuthContext);
   const { theme, t } = useContext(PreferencesContext);
   const colors = theme.colors;
@@ -227,7 +227,7 @@ export default function PublicChatScreen({ route }) {
       setRooms(nextRooms);
       setSelectedRoom((current) => current || nextRooms[0] || null);
     } catch (error) {
-      Alert.alert('Chat xetasi', error.response?.data?.message || error.message);
+      Alert.alert('Chat yüklənmədi', error.response?.data?.message || error.message);
     } finally {
       setLoadingRooms(false);
       setRefreshing(false);
@@ -241,7 +241,7 @@ export default function PublicChatScreen({ route }) {
       const data = await api.fetchChatMessages(selectedRoomId);
       setMessages(Array.isArray(data) ? data : []);
     } catch (error) {
-      Alert.alert('Mesaj xetasi', error.response?.data?.message || error.message);
+      Alert.alert('Mesaj alınmadı', error.response?.data?.message || error.message);
     } finally {
       setLoadingMessages(false);
     }
@@ -283,7 +283,7 @@ export default function PublicChatScreen({ route }) {
         await api.joinChatRoom(room.id);
         setRooms((prev) => prev.map((item) => (item.id === room.id ? { ...item, joined: true } : item)));
       } catch (error) {
-        Alert.alert('Otaq xetasi', error.response?.data?.message || error.message);
+        Alert.alert('Otaq xətası', error.response?.data?.message || error.message);
       }
     }
   };
@@ -302,7 +302,7 @@ export default function PublicChatScreen({ route }) {
       setSelectedRoom(room);
       setRoomModalOpen(false);
     } catch (error) {
-      Alert.alert('Otaq xetasi', error.response?.data?.message || error.message);
+      Alert.alert('Otaq xətası', error.response?.data?.message || error.message);
     } finally {
       setCreatingRoom(false);
     }
@@ -310,7 +310,7 @@ export default function PublicChatScreen({ route }) {
 
   const handleInvite = async ({ userId, name }) => {
     if (!selectedRoomId) return;
-    const email = name || 'Istifadeci';
+    const email = name || 'İstifadəçi';
     setInviting(true);
     try {
       await api.inviteToChatRoom(selectedRoomId, { userId });
@@ -341,7 +341,7 @@ export default function PublicChatScreen({ route }) {
       );
       setText('');
     } catch (error) {
-      Alert.alert('Mesaj xetasi', error.response?.data?.message || error.message);
+      Alert.alert('Mesaj alınmadı', error.response?.data?.message || error.message);
     } finally {
       setSending(false);
     }
@@ -400,9 +400,18 @@ export default function PublicChatScreen({ route }) {
         keyboardVerticalOffset={Platform.OS === 'ios' ? 72 : 0}
       >
       <View style={[styles.header, themed.header]}>
-        <View>
-          <Text style={[styles.title, themed.title]}>{t.publicChat}</Text>
-          <Text style={[styles.subtitle, themed.subtitle]}>{selectedRoomTitle} · {members.length || selectedRoom?.member_count || 0} üzv</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            accessibilityLabel="Geri"
+            style={{ width: 40, height: 40, borderRadius: 20, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', marginRight: 12 }}
+          >
+            <MaterialIcons name="arrow-back" size={21} color={colors.text} />
+          </TouchableOpacity>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.title, themed.title]}>{t.publicChat}</Text>
+            <Text style={[styles.subtitle, themed.subtitle]}>{selectedRoomTitle} · {members.length || selectedRoom?.member_count || 0} üzv</Text>
+          </View>
         </View>
         <View style={styles.headerActions}>
           <TouchableOpacity style={styles.plusButton} onPress={() => setInviteModalOpen(true)} disabled={!selectedRoomId}>
@@ -488,7 +497,7 @@ export default function PublicChatScreen({ route }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0d1117',
+    backgroundColor: '#06080F',
   },
   keyboard: {
     flex: 1,
@@ -497,25 +506,25 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#0d1117',
+    backgroundColor: '#06080F',
   },
   header: {
     paddingHorizontal: 18,
     paddingTop: 18,
     paddingBottom: 14,
-    borderBottomColor: '#21262d',
+    borderBottomColor: '#1F2433',
     borderBottomWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
   title: {
-    color: '#e6edf3',
+    color: '#F1F4FA',
     fontSize: 22,
     fontWeight: '900',
   },
   subtitle: {
-    color: '#8b949e',
+    color: '#8790A6',
     fontSize: 12,
     marginTop: 3,
   },
@@ -523,7 +532,7 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: '#6366f1',
+    backgroundColor: '#FF7A2F',
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: 8,
@@ -533,27 +542,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   roomsBar: {
-    borderBottomColor: '#21262d',
+    borderBottomColor: '#1F2433',
     borderBottomWidth: 1,
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
   roomChip: {
     minWidth: 112,
-    borderColor: '#30363d',
+    borderColor: '#2A3040',
     borderWidth: 1,
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 9,
     marginRight: 8,
-    backgroundColor: '#161b22',
+    backgroundColor: '#10131D',
   },
   roomChipActive: {
-    borderColor: '#6366f1',
-    backgroundColor: '#1e1b4b',
+    borderColor: '#FF7A2F',
+    backgroundColor: '#2A160C',
   },
   roomName: {
-    color: '#8b949e',
+    color: '#8790A6',
     fontWeight: '800',
     fontSize: 12,
   },
@@ -589,8 +598,8 @@ const styles = StyleSheet.create({
   messageBubble: {
     minWidth: 104,
     maxWidth: '88%',
-    backgroundColor: '#161b22',
-    borderColor: '#21262d',
+    backgroundColor: '#10131D',
+    borderColor: '#1F2433',
     borderWidth: 1,
     borderRadius: 16,
     paddingHorizontal: 12,
@@ -598,16 +607,16 @@ const styles = StyleSheet.create({
   },
   messageBubbleMine: {
     backgroundColor: '#312e81',
-    borderColor: '#4f46e5',
+    borderColor: '#E8590C',
   },
   senderName: {
-    color: '#8b949e',
+    color: '#8790A6',
     fontSize: 11,
     fontWeight: '800',
     marginBottom: 4,
   },
   senderRole: {
-    color: '#58a6ff',
+    color: '#FF9A5C',
     fontSize: 10,
     fontWeight: '800',
     marginBottom: 5,
@@ -616,7 +625,7 @@ const styles = StyleSheet.create({
     color: '#c7d2fe',
   },
   messageText: {
-    color: '#e6edf3',
+    color: '#F1F4FA',
     lineHeight: 20,
   },
   messageTextMine: {
@@ -639,7 +648,7 @@ const styles = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: '#6366f1',
+    backgroundColor: '#FF7A2F',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 8,
@@ -648,7 +657,7 @@ const styles = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: '#21262d',
+    backgroundColor: '#1F2433',
     marginRight: 8,
   },
   messageAvatarText: {
@@ -657,25 +666,25 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   emptyText: {
-    color: '#8b949e',
+    color: '#8790A6',
     textAlign: 'center',
     marginTop: 24,
   },
   composer: {
-    borderTopColor: '#21262d',
+    borderTopColor: '#1F2433',
     borderTopWidth: 1,
     padding: 12,
-    backgroundColor: '#0d1117',
+    backgroundColor: '#06080F',
     flexDirection: 'row',
     alignItems: 'flex-end',
   },
   input: {
     flex: 1,
-    backgroundColor: '#161b22',
-    borderColor: '#30363d',
+    backgroundColor: '#10131D',
+    borderColor: '#2A3040',
     borderWidth: 1,
     borderRadius: 12,
-    color: '#e6edf3',
+    color: '#F1F4FA',
     minHeight: 44,
     maxHeight: 120,
     paddingHorizontal: 12,
@@ -685,13 +694,13 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 12,
-    backgroundColor: '#6366f1',
+    backgroundColor: '#FF7A2F',
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: 8,
   },
   disabledButton: {
-    backgroundColor: '#21262d',
+    backgroundColor: '#1F2433',
   },
   modalOverlay: {
     flex: 1,
@@ -699,10 +708,10 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   roomSheet: {
-    backgroundColor: '#161b22',
+    backgroundColor: '#10131D',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    borderColor: '#21262d',
+    borderColor: '#1F2433',
     borderWidth: 1,
     padding: 18,
   },
@@ -713,28 +722,28 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   modalTitle: {
-    color: '#e6edf3',
+    color: '#F1F4FA',
     fontSize: 17,
     fontWeight: '900',
   },
   modalSubtitle: {
-    color: '#8b949e',
+    color: '#8790A6',
     fontSize: 12,
     marginTop: 3,
   },
   fieldLabel: {
-    color: '#8b949e',
+    color: '#8790A6',
     fontSize: 11,
     fontWeight: '900',
     marginBottom: 6,
     marginTop: 4,
   },
   modalInput: {
-    backgroundColor: '#0d1117',
-    borderColor: '#30363d',
+    backgroundColor: '#06080F',
+    borderColor: '#2A3040',
     borderWidth: 1,
     borderRadius: 10,
-    color: '#e6edf3',
+    color: '#F1F4FA',
     paddingHorizontal: 12,
     paddingVertical: 11,
     marginBottom: 8,
@@ -749,35 +758,35 @@ const styles = StyleSheet.create({
   inviteUserRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderColor: '#30363d',
+    borderColor: '#2A3040',
     borderWidth: 1,
     borderRadius: 12,
     padding: 10,
     marginBottom: 8,
-    backgroundColor: '#0d1117',
+    backgroundColor: '#06080F',
   },
   inviteUserBody: {
     flex: 1,
     marginLeft: 10,
   },
   inviteUserName: {
-    color: '#e6edf3',
+    color: '#F1F4FA',
     fontWeight: '900',
     fontSize: 13,
   },
   inviteUserMeta: {
-    color: '#8b949e',
+    color: '#8790A6',
     fontSize: 11,
     marginTop: 3,
   },
   inviteEmpty: {
-    color: '#8b949e',
+    color: '#8790A6',
     textAlign: 'center',
     paddingVertical: 16,
   },
   createButton: {
     marginTop: 8,
-    backgroundColor: '#6366f1',
+    backgroundColor: '#FF7A2F',
     borderRadius: 10,
     paddingVertical: 13,
     alignItems: 'center',

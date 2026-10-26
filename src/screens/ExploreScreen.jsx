@@ -195,11 +195,11 @@ export default function ExploreScreen({ navigation }) {
 
       <View style={styles.tabs}>
         <TouchableOpacity style={[styles.tab, themed.tab, activeTab === 'users' && styles.tabActive, activeTab === 'users' && themed.tabActive]} onPress={() => setActiveTab('users')}>
-          <MaterialIcons name="people" size={18} color={activeTab === 'users' ? '#ffffff' : '#8b949e'} />
+          <MaterialIcons name="people" size={18} color={activeTab === 'users' ? '#ffffff' : '#8790A6'} />
           <Text style={[styles.tabText, activeTab === 'users' && styles.tabTextActive]}>İstifadəçilər</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[styles.tab, themed.tab, activeTab === 'posts' && styles.tabActive, activeTab === 'posts' && themed.tabActive]} onPress={() => setActiveTab('posts')}>
-          <MaterialIcons name="dynamic-feed" size={18} color={activeTab === 'posts' ? '#ffffff' : '#8b949e'} />
+          <MaterialIcons name="dynamic-feed" size={18} color={activeTab === 'posts' ? '#ffffff' : '#8790A6'} />
           <Text style={[styles.tabText, activeTab === 'posts' && styles.tabTextActive]}>Postlar</Text>
         </TouchableOpacity>
       </View>
@@ -225,29 +225,29 @@ export default function ExploreScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0d1117',
+    backgroundColor: '#06080F',
   },
   header: {
     paddingHorizontal: 18,
     paddingTop: 18,
     paddingBottom: 12,
-    borderBottomColor: '#21262d',
+    borderBottomColor: '#1F2433',
     borderBottomWidth: 1,
   },
   title: {
-    color: '#e6edf3',
+    color: '#F1F4FA',
     fontSize: 22,
     fontWeight: '900',
   },
   subtitle: {
-    color: '#8b949e',
+    color: '#8790A6',
     fontSize: 12,
     marginTop: 3,
   },
   searchRow: {
     margin: 14,
-    backgroundColor: '#161b22',
-    borderColor: '#30363d',
+    backgroundColor: '#10131D',
+    borderColor: '#2A3040',
     borderWidth: 1,
     borderRadius: 12,
     minHeight: 46,
@@ -257,7 +257,7 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    color: '#e6edf3',
+    color: '#F1F4FA',
     marginLeft: 8,
   },
   tabs: {
@@ -267,7 +267,7 @@ const styles = StyleSheet.create({
   },
   tab: {
     flex: 1,
-    borderColor: '#30363d',
+    borderColor: '#2A3040',
     borderWidth: 1,
     borderRadius: 10,
     paddingVertical: 10,
@@ -275,14 +275,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
-    backgroundColor: '#161b22',
+    backgroundColor: '#10131D',
   },
   tabActive: {
-    backgroundColor: '#6366f1',
-    borderColor: '#6366f1',
+    backgroundColor: '#FF7A2F',
+    borderColor: '#FF7A2F',
   },
   tabText: {
-    color: '#8b949e',
+    color: '#8790A6',
     fontWeight: '900',
     marginLeft: 6,
     fontSize: 12,
@@ -297,11 +297,11 @@ const styles = StyleSheet.create({
   },
   listContent: {
     padding: 14,
-    paddingBottom: 100,
+    paddingBottom: 150,
   },
   resultCard: {
-    backgroundColor: '#161b22',
-    borderColor: '#21262d',
+    backgroundColor: '#10131D',
+    borderColor: '#1F2433',
     borderWidth: 1,
     borderRadius: 12,
     padding: 14,
@@ -310,12 +310,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   avatar: {
-    backgroundColor: '#6366f1',
+    backgroundColor: '#FF7A2F',
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarImage: {
-    backgroundColor: '#21262d',
+    backgroundColor: '#1F2433',
   },
   avatarText: {
     color: '#ffffff',
@@ -326,12 +326,12 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
   resultTitle: {
-    color: '#e6edf3',
+    color: '#F1F4FA',
     fontWeight: '900',
     fontSize: 14,
   },
   resultSubtitle: {
-    color: '#8b949e',
+    color: '#8790A6',
     marginTop: 4,
     lineHeight: 18,
     fontSize: 12,
@@ -345,7 +345,7 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: '#6366f1',
+    backgroundColor: '#FF7A2F',
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: 10,
@@ -359,13 +359,13 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   typeBadge: {
-    color: '#58a6ff',
+    color: '#FF9A5C',
     fontSize: 11,
     fontWeight: '900',
     marginRight: 8,
   },
   emptyText: {
-    color: '#8b949e',
+    color: '#8790A6',
     textAlign: 'center',
     marginTop: 24,
   },
