@@ -8,6 +8,7 @@ const BAR_TOP = 26;
 const BAR_HEIGHT = 74;
 const NAV_HEIGHT = BAR_TOP + BAR_HEIGHT;
 const RADIUS = 30;
+const EDGE = 1.5;
 const BUMP_HEIGHT = 17;
 const BUMP_SIGMA = 19;
 const SIDE_GAP = 12;
@@ -27,22 +28,25 @@ const TABS = [
 // Bar outline whose top edge is lifted by a Gaussian bump centred on `cx`,
 // so only the part of the rim above the active tab bends upward.
 function buildBarPath(width, cx, amplitude) {
+  // Keep the outline EDGE px inside the SVG so its stroke is not clipped at the sides.
+  const left = EDGE;
+  const right = width - EDGE;
   const base = BAR_TOP;
-  const bottom = NAV_HEIGHT;
+  const bottom = NAV_HEIGHT - EDGE;
   const r = RADIUS;
   const lift = (x) => amplitude * Math.exp(-((x - cx) * (x - cx)) / (2 * BUMP_SIGMA * BUMP_SIGMA));
   const points = [];
   for (let a = 180; a <= 270; a += 10) {
     const t = (a * Math.PI) / 180;
-    points.push([r + r * Math.cos(t), base + r + r * Math.sin(t)]);
+    points.push([left + r + r * Math.cos(t), base + r + r * Math.sin(t)]);
   }
-  for (let x = r + 4; x < width - r; x += 4) points.push([x, base]);
+  for (let x = left + r + 4; x < right - r; x += 4) points.push([x, base]);
   for (let a = 270; a <= 360; a += 10) {
     const t = (a * Math.PI) / 180;
-    points.push([width - r + r * Math.cos(t), base + r + r * Math.sin(t)]);
+    points.push([right - r + r * Math.cos(t), base + r + r * Math.sin(t)]);
   }
   const top = points.map(([x, y]) => `${x.toFixed(1)} ${(y - lift(x)).toFixed(1)}`).join(' L');
-  return `M${top} A${r} ${r} 0 0 1 ${width - r} ${bottom} H${r} A${r} ${r} 0 0 1 0 ${base + r} Z`;
+  return `M${top} L${right} ${bottom - r} A${r} ${r} 0 0 1 ${right - r} ${bottom} H${left + r} A${r} ${r} 0 0 1 ${left} ${bottom - r} Z`;
 }
 
 const easeOutBack = (p) => {

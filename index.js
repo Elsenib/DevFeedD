@@ -44,7 +44,13 @@ app.use('/posts', postsRoutes);
 app.use('/profile', profileRoutes);
 app.use('/conversations', conversationsRoutes);
 app.use('/chat', chatRoutes);
-app.use('/support', supportRoutes);
+// Manual bank-transfer support/boosts are off until real in-app billing exists.
+// Old APKs still call these routes, so answer them without any account details.
+if (process.env.PAYMENTS_ENABLED === 'true') {
+  app.use('/support', supportRoutes);
+} else {
+  app.use('/support', (req, res) => res.status(410).json({ message: 'Ödənişlər hazırda deaktivdir.' }));
+}
 app.use('/users', usersRoutes);
 app.use('/notifications', notificationsRoutes);
 app.use('/reports', reportsRoutes);
