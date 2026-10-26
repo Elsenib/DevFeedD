@@ -12,4 +12,3 @@ server/.env
 .env.local
 .env.*.local
 *.log
-marketing/video/frames
