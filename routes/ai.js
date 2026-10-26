@@ -5,7 +5,7 @@ const { auth } = require('../middleware/auth');
 
 const router = express.Router();
 
-const MODEL = process.env.AI_MODEL || 'claude-opus-5-5';
+const MODEL = process.env.AI_MODEL || 'claude-haiku-5-5';
 const DAILY_LIMIT = Math.max(1, parseInt(process.env.AI_DAILY_LIMIT, 10) || 20);
 const MAX_TURNS = 20;
 const MAX_CHARS = 4000;
