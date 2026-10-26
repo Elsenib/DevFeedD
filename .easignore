@@ -12,3 +12,4 @@ server/.env
 .env.local
 .env.*.local
 *.log
+web58
