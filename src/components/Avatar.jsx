@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, View } from 'react-native';
+import { Text } from './Text';
 import { avatarTone } from '../utils/avatarTone';
 import { repairUploadUrl } from '../utils/media';
 

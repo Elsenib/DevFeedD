@@ -5,7 +5,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
-import { FONT_ASSETS, applyGlobalFont } from './src/theme/fonts';
+import { FONT_ASSETS } from './src/theme/fonts';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import { AuthContext } from './src/context/AuthContext';
@@ -79,8 +79,6 @@ function friendlyOAuthError(provider, value) {
   }
   return message || `${providerName} girişi tamamlanmadı.`;
 }
-
-applyGlobalFont();
 
 function ThemedStatusBar() {
   const { themeMode } = useContext(PreferencesContext);
@@ -235,7 +233,9 @@ export default function App() {
     <PreferencesProvider>
       <AppAlertProvider>
         <AuthContext.Provider value={authContext}>
-          <NavigationContainer>
+          {/* React Navigation 7 stopped navigate() from reaching screens inside a
+              nested navigator by default; the screens here still rely on it. */}
+          <NavigationContainer navigationInChildEnabled>
             <ThemedStatusBar />
             <Stack.Navigator screenOptions={{ headerShown: false }}>
               {!user ? (

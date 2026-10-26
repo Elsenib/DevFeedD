@@ -1,5 +1,6 @@
 import { useContext, useEffect, useMemo, useState } from 'react';
-import { Alert, Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Modal, Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Text } from '../components/Text';
 import { MaterialIcons } from '@expo/vector-icons';
 import { PreferencesContext } from './PreferencesContext';
 

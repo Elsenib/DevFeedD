@@ -29,6 +29,10 @@
   label { display: block; font-size: 12px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; margin: 14px 0 6px; }
   .field { width: 100%; height: 46px; padding: 0 14px; background: var(--bg); border: 1px solid var(--border); border-radius: 14px; color: var(--text); outline: none; }
   .field:focus { border-color: var(--primary); }
+  .pw { position: relative; }
+  .pw .field { padding-right: 48px; }
+  .eye { position: absolute; right: 4px; top: 4px; width: 38px; height: 38px; border: 0; border-radius: 10px; background: transparent; color: var(--muted); display: flex; align-items: center; justify-content: center; }
+  .eye:hover { color: var(--text); }
   .btn { height: 40px; padding: 0 16px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); font-weight: 700; }
   .btn:hover { border-color: #2E3446; }
   .btn:disabled { opacity: 0.5; cursor: default; }
@@ -115,7 +119,12 @@
     <label for="email">Email</label>
     <input class="field" id="email" type="email" autocomplete="username" required>
     <label for="password">Şifrə</label>
-    <input class="field" id="password" type="password" autocomplete="current-password" required>
+    <div class="pw">
+      <input class="field" id="password" type="password" autocomplete="current-password" required>
+      <button type="button" class="eye" id="eye" aria-label="Şifrəni göstər" title="Şifrəni göstər">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path id="eyeSlash" class="hidden" d="M4 4l16 16"/></svg>
+      </button>
+    </div>
     <button class="btn btn-primary btn-block" type="submit" id="loginBtn">Daxil ol</button>
     <div class="error" id="loginError"></div>
   </form>
@@ -238,6 +247,14 @@ $('loginForm').addEventListener('submit', async (event) => {
   }
 });
 $('logout').addEventListener('click', () => logout());
+$('eye').addEventListener('click', () => {
+  const show = $('password').type === 'password';
+  $('password').type = show ? 'text' : 'password';
+  $('eyeSlash').classList.toggle('hidden', !show);
+  const label = show ? 'Şifrəni gizlət' : 'Şifrəni göstər';
+  $('eye').setAttribute('aria-label', label);
+  $('eye').title = label;
+});
 
 // ---------- tabs
 const loaders = { overview: loadOverview, reports: loadReports, users: loadUsers, posts: loadPosts };

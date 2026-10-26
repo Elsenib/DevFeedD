@@ -1,8 +1,9 @@
 import { useContext, useState } from 'react';
-import { ActivityIndicator, Alert, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, TouchableOpacity, View } from 'react-native';
+import { Text, TextInput } from '../components/Text';
 import { AuthContext } from '../context/AuthContext';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { AuthBackdrop, BrandMark, authStyles as styles } from '../components/AuthChrome';
+import { AuthBackdrop, BrandMark, authStyles as styles, PasswordInput } from '../components/AuthChrome';
 
 export default function RegisterScreen({ navigation }) {
   const { signUp, verifyEmailRegistration, socialSignIn } = useContext(AuthContext);
@@ -125,12 +126,11 @@ export default function RegisterScreen({ navigation }) {
               autoCapitalize="none"
               style={styles.input}
             />
-            <TextInput
+            <PasswordInput
               value={password}
               onChangeText={setPassword}
               placeholder="Şifrə"
               placeholderTextColor="#7C859A"
-              secureTextEntry
               style={styles.input}
             />
             <TouchableOpacity style={styles.button} onPress={handleRegister} disabled={loading}>

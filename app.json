@@ -22,16 +22,7 @@
       "**/*"
     ],
     "plugins": [
-      [
-        "expo-build-properties",
-        {
-          "android": {
-            "compileSdkVersion": 34,
-            "targetSdkVersion": 35,
-            "buildToolsVersion": "34.0.0"
-          }
-        }
-      ]
+      "expo-video"
     ],
     "android": {
       "package": "com.elsenib.devfeed",

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
-import { ResizeMode, Video } from 'expo-av';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '../components/Text';
+import { useEvent } from 'expo';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { MaterialIcons } from '@expo/vector-icons';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -16,8 +18,13 @@ function formatClock(ms) {
 
 export default function VideoPlayerScreen({ route, navigation }) {
   const { uri, authorName, authorAvatar, caption } = route.params || {};
-  const videoRef = useRef(null);
-  const [status, setStatus] = useState({ isLoaded: false });
+  const player = useVideoPlayer(uri, (instance) => {
+    instance.loop = true;
+    instance.timeUpdateEventInterval = 0.25;
+    instance.play();
+  });
+  const { status } = useEvent(player, 'statusChange', { status: player.status });
+  const { currentTime } = useEvent(player, 'timeUpdate', { currentTime: 0 });
   const [playing, setPlaying] = useState(true);
   const [muted, setMuted] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
@@ -25,8 +32,10 @@ export default function VideoPlayerScreen({ route, navigation }) {
   const [scrubMs, setScrubMs] = useState(null);
   const hideTimer = useRef(null);
 
-  const duration = status.isLoaded ? status.durationMillis || 0 : 0;
-  const position = scrubMs ?? (status.isLoaded ? status.positionMillis || 0 : 0);
+  // expo-video reports seconds; the controls below work in milliseconds.
+  const loaded = status === 'readyToPlay' || player.duration > 0;
+  const duration = loaded ? Math.round(player.duration * 1000) : 0;
+  const position = scrubMs ?? Math.round((currentTime || 0) * 1000);
   const progress = duration ? Math.min(1, position / duration) : 0;
 
   const scheduleHide = useCallback(() => {
@@ -44,27 +53,26 @@ export default function VideoPlayerScreen({ route, navigation }) {
     if (playing) scheduleHide();
   };
 
-  const togglePlay = async () => {
+  useEffect(() => {
+    player.muted = muted;
+  }, [player, muted]);
+
+  const togglePlay = () => {
     const next = !playing;
     setPlaying(next);
     setControlsVisible(true);
-    if (next) scheduleHide();
-    else clearTimeout(hideTimer.current);
-    try {
-      if (next) await videoRef.current?.playAsync();
-      else await videoRef.current?.pauseAsync();
-    } catch (error) {
-      // The native view may still be attaching; shouldPlay keeps state in sync.
+    if (next) {
+      player.play();
+      scheduleHide();
+    } else {
+      player.pause();
+      clearTimeout(hideTimer.current);
     }
   };
 
-  const seekTo = async (ms) => {
-    const target = Math.max(0, Math.min(duration || 0, ms));
-    try {
-      await videoRef.current?.setPositionAsync(target);
-    } catch (error) {
-      // Seeking before the video loads is a no-op.
-    }
+  const seekTo = (ms) => {
+    if (!duration) return;
+    player.currentTime = Math.max(0, Math.min(duration, ms)) / 1000;
   };
 
   const seekBy = (delta) => {
@@ -77,20 +85,12 @@ export default function VideoPlayerScreen({ route, navigation }) {
   return (
     <View style={styles.container}>
       <Pressable style={StyleSheet.absoluteFill} onPress={controlsVisible ? togglePlay : showControls} accessibilityLabel={playing ? 'Dayandır' : 'Oynat'}>
-        <Video
-          ref={videoRef}
-          source={{ uri }}
-          style={StyleSheet.absoluteFill}
-          videoStyle={styles.videoFill}
-          resizeMode={ResizeMode.COVER}
-          shouldPlay={playing}
-          isMuted={muted}
-          isLooping
-          onPlaybackStatusUpdate={setStatus}
-        />
+        <View style={StyleSheet.absoluteFill} pointerEvents="none">
+          <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} />
+        </View>
       </Pressable>
 
-      {!status.isLoaded && (
+      {!loaded && (
         <View style={styles.loader} pointerEvents="none">
           <ActivityIndicator size="large" color="#FF7A2F" />
         </View>
@@ -150,8 +150,8 @@ export default function VideoPlayerScreen({ route, navigation }) {
             onMoveShouldSetResponder={() => true}
             onResponderGrant={(event) => { showControls(); setScrubMs(msFromTouch(event.nativeEvent.locationX)); }}
             onResponderMove={(event) => setScrubMs(msFromTouch(event.nativeEvent.locationX))}
-            onResponderRelease={async () => {
-              if (scrubMs !== null) await seekTo(scrubMs);
+            onResponderRelease={() => {
+              if (scrubMs !== null) seekTo(scrubMs);
               setScrubMs(null);
             }}
             accessibilityRole="adjustable"
@@ -184,10 +184,6 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  videoFill: {
-    width: '100%',
-    height: '100%',
   },
   overlay: {
     flex: 1,

@@ -12,15 +12,15 @@ import {
   RefreshControl,
   ScrollView,
   StyleSheet,
-  Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Text, TextInput } from '../components/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { ResizeMode, Video } from 'expo-av';
+import { useEvent } from 'expo';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import * as WebBrowser from 'expo-web-browser';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useIsFocused, useNavigation } from '@react-navigation/native';
@@ -183,11 +183,26 @@ function FeedVideo({ uri, post, active }) {
   const navigation = useNavigation();
   const isFocused = useIsFocused();
   const [muted, setMuted] = useState(true);
-  const [status, setStatus] = useState({ isLoaded: false });
   const shouldPlay = !!active && isFocused;
-  const duration = status.isLoaded ? status.durationMillis || 0 : 0;
-  const position = status.isLoaded ? status.positionMillis || 0 : 0;
+  const player = useVideoPlayer(uri, (instance) => {
+    instance.loop = true;
+    instance.muted = true;
+    instance.timeUpdateEventInterval = 0.25;
+  });
+  const { currentTime } = useEvent(player, 'timeUpdate', { currentTime: 0 });
+  useEvent(player, 'statusChange', { status: player.status });
+  const duration = player.duration > 0 ? Math.round(player.duration * 1000) : 0;
+  const position = Math.round((currentTime || 0) * 1000);
   const progress = duration ? Math.min(1, position / duration) : 0;
+
+  useEffect(() => {
+    player.muted = muted;
+  }, [player, muted]);
+
+  useEffect(() => {
+    if (shouldPlay) player.play();
+    else player.pause();
+  }, [player, shouldPlay]);
 
   return (
     <Pressable
@@ -198,17 +213,9 @@ function FeedVideo({ uri, post, active }) {
       }}
       accessibilityLabel="Videonu tam ekranda aç"
     >
-      <Video
-        source={{ uri }}
-        style={StyleSheet.absoluteFill}
-        videoStyle={styles.videoFill}
-        resizeMode={ResizeMode.COVER}
-        shouldPlay={shouldPlay}
-        isMuted={muted}
-        isLooping
-        progressUpdateIntervalMillis={250}
-        onPlaybackStatusUpdate={setStatus}
-      />
+      <View style={StyleSheet.absoluteFill} pointerEvents="none">
+        <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} />
+      </View>
       {!!duration && (
         <View style={styles.videoTimePill} pointerEvents="none">
           <MaterialIcons name={shouldPlay ? 'play-arrow' : 'pause'} size={13} color="#ffffff" />
@@ -573,7 +580,7 @@ function ComposeModal({ visible, onClose, onSubmit, submitting }) {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.All,
+      mediaTypes: ['images', 'videos'],
       allowsEditing: false,
       quality: 0.82,
       videoMaxDuration: 90,
@@ -1951,10 +1958,6 @@ const styles = StyleSheet.create({
     height: 3,
     borderRadius: 2,
     marginTop: 8,
-  },
-  videoFill: {
-    width: '100%',
-    height: '100%',
   },
   feedVideo: {
     width: '100%',

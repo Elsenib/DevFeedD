@@ -1,4 +1,7 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { Text, TextInput } from './Text';
+import { MaterialIcons } from '@expo/vector-icons';
 import Svg, { Circle, Defs, Ellipse, RadialGradient, Rect, Stop } from 'react-native-svg';
 
 // Ember glow + small black-hole mark shared by the login and register screens.
@@ -42,7 +45,46 @@ export function BrandMark() {
   );
 }
 
+// Password field with an eye button that shows or hides what was typed.
+// Outer margins stay on the wrapper so the button centres on the field itself.
+export function PasswordInput({ style, ...props }) {
+  const [visible, setVisible] = useState(false);
+  const { margin, marginTop, marginBottom, ...inputStyle } = StyleSheet.flatten(style) || {};
+  return (
+    <View style={{ margin, marginTop, marginBottom, justifyContent: 'center' }}>
+      <TextInput
+        {...props}
+        secureTextEntry={!visible}
+        autoCapitalize="none"
+        autoCorrect={false}
+        style={[inputStyle, authStyles.passwordInput]}
+      />
+      <Pressable
+        onPress={() => setVisible((value) => !value)}
+        hitSlop={8}
+        style={authStyles.eyeButton}
+        accessibilityRole="button"
+        accessibilityLabel={visible ? 'Şifrəni gizlət' : 'Şifrəni göstər'}
+      >
+        <MaterialIcons name={visible ? 'visibility-off' : 'visibility'} size={21} color="#8790A6" />
+      </Pressable>
+    </View>
+  );
+}
+
 export const authStyles = StyleSheet.create({
+  passwordInput: {
+    paddingRight: 52,
+  },
+  eyeButton: {
+    position: 'absolute',
+    right: 4,
+    top: 0,
+    bottom: 0,
+    width: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   brandRow: {
     flexDirection: 'row',
     alignItems: 'center',
