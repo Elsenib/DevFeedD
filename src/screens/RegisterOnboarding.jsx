@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { AuthContext } from '../context/AuthContext';
 
 const ROLES = [
@@ -41,13 +42,14 @@ const TECH_STACKS = {
   default: ['Git', 'Figma', 'Jira', 'Slack', 'Notion'],
 };
 
-const LANGUAGES = ['Azerbaycanca', 'English', 'Turkce', 'Rusca'];
+const LANGUAGES = ['Azərbaycanca', 'English', 'Türkcə', 'Rusca'];
+const MAX_SUB_ROLES = 3;
 
 export default function RegisterOnboardingScreen() {
   const { completeOnboarding, signOut, user } = useContext(AuthContext);
   const [step, setStep] = useState(0);
   const [selectedRole, setSelectedRole] = useState(null);
-  const [selectedSubRole, setSelectedSubRole] = useState(null);
+  const [selectedSubRoles, setSelectedSubRoles] = useState([]);
   const [selectedSkills, setSelectedSkills] = useState([]);
   const [selectedLanguages, setSelectedLanguages] = useState([]);
   const [profileData, setProfileData] = useState({
@@ -69,8 +71,8 @@ export default function RegisterOnboardingScreen() {
       Alert.alert('Xəta', 'Rolu seçin');
       return;
     }
-    if (step === 1 && subRoles.length > 0 && !selectedSubRole) {
-      Alert.alert('Xəta', 'Alt rolu seçin');
+    if (step === 1 && subRoles.length > 0 && selectedSubRoles.length === 0) {
+      Alert.alert('Xəta', 'Ən azı bir sahə seçin');
       return;
     }
     if (step === 2 && selectedSkills.length === 0) {
@@ -90,7 +92,7 @@ export default function RegisterOnboardingScreen() {
     try {
       await completeOnboarding({
         role: selectedRole,
-        subRole: selectedSubRole,
+        subRole: selectedSubRoles.join(' · ') || null,
         skills: selectedSkills,
         languages: selectedLanguages,
         name: profileData.name.trim(),
@@ -117,7 +119,7 @@ export default function RegisterOnboardingScreen() {
               style={[styles.card, active && styles.cardActive]}
               onPress={() => {
                 setSelectedRole(role.id);
-                setSelectedSubRole(null);
+                setSelectedSubRoles([]);
               }}
             >
               <Text style={styles.cardTitle}>{role.label}</Text>
@@ -132,17 +134,26 @@ export default function RegisterOnboardingScreen() {
   const renderSubRoleStep = () => (
     <>
       <Text style={styles.title}>Daha dəqiq seç</Text>
-      <Text style={styles.subtitle}>Sahəni seç, sonra texnologiyalara keçək.</Text>
+      <Text style={styles.subtitle}>Bir neçəsini seçə bilərsən (ən çox {MAX_SUB_ROLES}).</Text>
       <View style={styles.list}>
         {subRoles.map((subRole) => {
-          const active = selectedSubRole === subRole;
+          const active = selectedSubRoles.includes(subRole);
+          const limitReached = !active && selectedSubRoles.length >= MAX_SUB_ROLES;
           return (
             <TouchableOpacity
               key={subRole}
-              style={[styles.rowCard, active && styles.cardActive]}
-              onPress={() => setSelectedSubRole(subRole)}
+              style={[styles.rowCard, active && styles.cardActive, limitReached && styles.rowDisabled]}
+              onPress={() => {
+                if (limitReached) return;
+                toggleValue(subRole, setSelectedSubRoles);
+              }}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: active, disabled: limitReached }}
             >
-              <Text style={styles.cardTitle}>{subRole}</Text>
+              <View style={styles.rowInner}>
+                <Text style={styles.cardTitle}>{subRole}</Text>
+                <MaterialIcons name={active ? 'check-circle' : 'radio-button-unchecked'} size={22} color={active ? '#FF7A2F' : '#4B5268'} />
+              </View>
             </TouchableOpacity>
           );
         })}
@@ -423,5 +434,13 @@ const styles = StyleSheet.create({
   primaryButtonText: {
     color: '#ffffff',
     fontWeight: '800',
+  },
+  rowInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  rowDisabled: {
+    opacity: 0.45,
   },
 });
