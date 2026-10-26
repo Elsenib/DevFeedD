@@ -40,6 +40,8 @@ const POST_TYPES = [
   { id: 'JOB', label: 'İş', icon: 'work-outline', color: '#F5B83D' },
 ];
 
+const PAGE_SIZE = 20;
+
 const FEED_TABS = [
   { id: 'all', label: 'Sizin üçün' },
   { id: 'MEDIA', label: 'Videolar' },
@@ -914,10 +916,15 @@ export default function FeedScreen({ navigation, route }) {
     setActiveVideoId(video ? video.item.id : null);
   }).current;
 
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+
   const loadPosts = useCallback(async () => {
     try {
-      const data = await api.fetchPosts();
-      setPosts(Array.isArray(data) ? data : []);
+      const data = await api.fetchPosts({ limit: PAGE_SIZE, offset: 0 });
+      const rows = Array.isArray(data) ? data : [];
+      setPosts(rows);
+      setHasMore(rows.length === PAGE_SIZE);
     } catch (error) {
       Alert.alert('Feed yüklənmədi', error.response?.data?.message || error.message);
     } finally {
@@ -925,6 +932,26 @@ export default function FeedScreen({ navigation, route }) {
       setRefreshing(false);
     }
   }, []);
+
+  // Next page when the list nears its end; ids already shown are skipped so
+  // posts created meanwhile (which shift offsets) don't appear twice.
+  const loadMore = async () => {
+    if (loadingMore || !hasMore || loading) return;
+    setLoadingMore(true);
+    try {
+      const data = await api.fetchPosts({ limit: PAGE_SIZE, offset: posts.length });
+      const rows = Array.isArray(data) ? data : [];
+      setPosts((prev) => {
+        const seen = new Set(prev.map((post) => String(post.id)));
+        return [...prev, ...rows.filter((post) => !seen.has(String(post.id)))];
+      });
+      setHasMore(rows.length === PAGE_SIZE);
+    } catch (error) {
+      // Keep what is on screen; the next scroll retries.
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   useEffect(() => {
     loadPosts();
@@ -1170,6 +1197,9 @@ export default function FeedScreen({ navigation, route }) {
 
             </View>
           }
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.6}
+          ListFooterComponent={loadingMore ? <ActivityIndicator style={styles.loadMoreSpinner} color={colors.primary} /> : null}
           ListEmptyComponent={<Text style={[styles.emptyText, themed.emptyText]}>{feedTab === 'all' ? 'Hələ paylaşım yoxdur. İlk postu sən yaz.' : 'Bu bölmədə hələ paylaşım yoxdur.'}</Text>}
         />
       )}
@@ -2091,5 +2121,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: -10,
+  },
+  loadMoreSpinner: {
+    marginVertical: 18,
   },
 });

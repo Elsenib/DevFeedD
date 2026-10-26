@@ -7,6 +7,8 @@ const { auth, optionalAuth } = require('../middleware/auth');
 const { containsIllegalWords, checkBadWords } = require('../middleware/contentFilter');
 const { createNotification } = require('../services/notifications');
 const { notBlockedSql, isBlockedBetween } = require('../services/moderation');
+const { publicBaseUrl } = require('../services/publicUrl');
+const { resumeFileFromUrl, signResumeUrl } = require('../services/resumeLinks');
 
 const router = express.Router();
 const resumesDir = path.join(__dirname, '../uploads/resumes');
@@ -63,15 +65,7 @@ function getUploadedMediaType(file) {
 }
 
 function getPublicUploadUrl(req, folder, filename) {
-  // PUBLIC_BACKEND_URL may be set to a full callback URL; only its origin is a valid base.
-  const raw = (process.env.PUBLIC_BACKEND_URL || `${req.protocol}://${req.get('host')}`).trim();
-  let base;
-  try {
-    base = new URL(raw).origin;
-  } catch (error) {
-    base = raw.replace(/\/auth\/.*$/i, '').replace(/\/$/, '');
-  }
-  return `${base}/uploads/${folder}/${filename}`;
+  return `${publicBaseUrl(req)}/uploads/${folder}/${filename}`;
 }
 
 function isPrivateHost(hostname) {
@@ -177,7 +171,8 @@ async function notifyMentionedUsers({ text, actorId, actorName, entityType, enti
 // GET /posts?limit=20&offset=0
 router.get('/', optionalAuth, async (req, res) => {
   try {
-    const { limit = 20, offset = 0 } = req.query;
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20));
+    const offset = Math.max(0, parseInt(req.query.offset, 10) || 0);
     const viewerId = req.user?.id || 0;
     const result = await pool.query(
       `SELECT 
@@ -243,6 +238,14 @@ router.post('/applications/resume', auth, resumeUpload.single('resume'), async (
     if (!req.file) {
       return res.status(400).json({ message: 'CV PDF faylı lazımdır.' });
     }
+    const header = Buffer.alloc(5);
+    const fd = fs.openSync(req.file.path, 'r');
+    fs.readSync(fd, header, 0, 5, 0);
+    fs.closeSync(fd);
+    if (header.toString('latin1') !== '%PDF-') {
+      fs.unlinkSync(req.file.path);
+      return res.status(400).json({ message: 'Fayl PDF deyil. Zəhmət olmasa PDF formatında CV seçin.' });
+    }
     res.status(201).json({
       resumeUrl: getPublicUploadUrl(req, 'resumes', req.file.filename),
       resumeFileName: req.file.originalname || req.file.filename,
@@ -297,7 +300,7 @@ router.get('/applications/inbox', auth, async (req, res) => {
        LIMIT 100`,
       [req.user.id]
     );
-    res.json(result.rows);
+    res.json(result.rows.map((row) => ({ ...row, resume_url: signResumeUrl(req, row.resume_url) })));
   } catch (error) {
     console.error('GET /posts/applications/inbox error:', error);
     res.status(500).json({ message: 'Müraciətlər yüklənmədi.' });
@@ -661,6 +664,10 @@ router.post('/:id/apply', auth, async (req, res) => {
     if (await isBlockedBetween(userId, jobPost.user_id)) return res.status(403).json({ error: 'Bu elana müraciət etmək mümkün deyil.' });
     if (!String(applicant_phone || '').trim()) return res.status(400).json({ error: 'Əlaqə nömrəsi lazımdır.' });
     if (!String(resume_url || '').trim()) return res.status(400).json({ error: 'CV PDF faylı lazımdır.' });
+    const resumeFile = resumeFileFromUrl(resume_url);
+    if (!resumeFile || !fs.existsSync(path.join(resumesDir, resumeFile))) {
+      return res.status(400).json({ error: 'CV faylı tapılmadı. Zəhmət olmasa CV-ni yenidən yükləyin.' });
+    }
 
     if (
       containsIllegalWords(cover_letter) ||
@@ -709,7 +716,7 @@ router.post('/:id/apply', auth, async (req, res) => {
     const messageText = [
       `Mən "${jobTitle}" elanına müraciət etdim.`,
       `Telefon: ${applicant_phone}`,
-      `CV: ${resume_url}`,
+      'CV müraciətə əlavə olunub (Mesajlar → Müraciətlər).',
       cover_letter ? `Məktub: ${cover_letter}` : 'Məktub əlavə edilməyib.',
     ].join('\n');
 
@@ -753,7 +760,7 @@ router.get('/:id/applications', auth, async (req, res) => {
       [id]
     );
 
-    res.json(applicationsResult.rows);
+    res.json(applicationsResult.rows.map((row) => ({ ...row, resume_url: signResumeUrl(req, row.resume_url) })));
   } catch (error) {
     console.error('GET /posts/:id/applications real flow error:', error);
     res.status(500).json({ error: error.message });

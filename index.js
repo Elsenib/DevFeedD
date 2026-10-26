@@ -14,6 +14,7 @@ const usersRoutes = require('./routes/users');
 const notificationsRoutes = require('./routes/notifications');
 const reportsRoutes = require('./routes/reports');
 const legalRoutes = require('./routes/legal');
+const resumesRoutes = require('./routes/resumes');
 
 dotenv.config();
 
@@ -29,6 +30,8 @@ app.use(express.json());
 
 const uploadsDir = path.join(__dirname, 'uploads');
 fs.mkdirSync(uploadsDir, { recursive: true });
+// CVs hold phone numbers: never serve them statically, only via signed /resumes links.
+app.use('/uploads/resumes', (req, res) => res.status(404).json({ message: 'Not found' }));
 app.use('/uploads', express.static(uploadsDir));
 
 // Health check endpoint
@@ -45,6 +48,7 @@ app.use('/support', supportRoutes);
 app.use('/users', usersRoutes);
 app.use('/notifications', notificationsRoutes);
 app.use('/reports', reportsRoutes);
+app.use('/resumes', resumesRoutes);
 app.use('/', legalRoutes);
 
 // Error handling middleware

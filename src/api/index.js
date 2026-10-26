@@ -74,8 +74,8 @@ export async function uploadPostMedia({ uri, name = 'media', type = 'application
   return response.data;
 }
 
-export async function fetchPosts() {
-  const response = await api.get('/posts');
+export async function fetchPosts({ limit = 20, offset = 0 } = {}) {
+  const response = await api.get('/posts', { params: { limit, offset } });
   return response.data;
 }
 
