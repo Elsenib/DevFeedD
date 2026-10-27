@@ -1,5 +1,6 @@
 import { Alert } from 'react-native';
 import * as api from '../api';
+import { errorText } from './errors';
 
 const REPORT_REASONS = [
   { key: 'spam', label: 'Spam' },
@@ -10,7 +11,7 @@ const REPORT_REASONS = [
   { key: 'other', label: 'Digər' },
 ];
 
-const errorMessage = (error) => error.response?.data?.message || error.message;
+const errorMessage = (error) => errorText(error);
 
 export function reportContent({ targetType, targetId }) {
   Alert.alert('Şikayət səbəbi', 'Bu məzmunda nə problem var?', [
@@ -32,7 +33,7 @@ export function reportContent({ targetType, targetId }) {
 export function blockUser({ userId, userName, onBlocked }) {
   Alert.alert(
     'İstifadəçini blokla',
-    `${userName || 'Bu istifadəçi'} sizə yaza bilməyəcək, siz də onun postlarını, şərhlərini və mesajlarını görməyəcəksiniz. Parametrlərdən blokdan çıxara bilərsiniz.`,
+    `${userName || 'Bu istifadəçi'} sənə yaza bilməyəcək, sən də onun paylaşımlarını, şərhlərini və mesajlarını görməyəcəksən. Tənzimləmələrdən blokdan çıxara bilərsən.`,
     [
       { text: 'Ləğv et', style: 'cancel' },
       {

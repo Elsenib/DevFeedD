@@ -10,6 +10,7 @@ import { API_BASE_URL, LANGUAGE_PICKER_ENABLED } from '../constants/config';
 import * as api from '../api';
 import appConfig from '../../app.json';
 import { AuroraGlow, ScreenHeader } from '../components/ScreenChrome';
+import { errorText } from '../utils/errors';
 
 export default function SettingsScreen({ navigation }) {
   const { user, token, signOut, updateCurrentUser } = useContext(AuthContext);
@@ -37,7 +38,7 @@ export default function SettingsScreen({ navigation }) {
   // The token rides in the URL fragment, which browsers never send to the server.
   const openAdminPanel = () => {
     WebBrowser.openBrowserAsync(`${API_BASE_URL}/admin#token=${encodeURIComponent(token || '')}`).catch((error) => {
-      Alert.alert('Panel açılmadı', error.message);
+      Alert.alert('Panel açılmadı', 'Admin panelini açmaq mümkün olmadı.');
     });
   };
 
@@ -46,7 +47,7 @@ export default function SettingsScreen({ navigation }) {
       await api.unblockUser(blockedUser.id);
       setBlockedUsers((current) => current.filter((item) => item.id !== blockedUser.id));
     } catch (error) {
-      Alert.alert('Xəta', error.response?.data?.message || error.message);
+      Alert.alert('Xəta', errorText(error));
     }
   };
 
@@ -57,21 +58,21 @@ export default function SettingsScreen({ navigation }) {
       await signOut();
     } catch (error) {
       setDeleting(false);
-      Alert.alert('Hesab silinmədi', error.response?.data?.message || error.message);
+      Alert.alert('Hesab silinmədi', errorText(error));
     }
   };
 
   const handleDeleteAccount = () => {
     Alert.alert(
       'Hesabı sil',
-      'Profiliniz, postlarınız, şərhləriniz, mesajlarınız və müraciətləriniz birdəfəlik silinəcək. Bu əməliyyatı geri qaytarmaq olmaz.',
+      'Profilin, paylaşımların, şərhlərin, mesajların və müraciətlərin birdəfəlik silinəcək. Bunu geri qaytarmaq olmaz.',
       [
         { text: 'Ləğv et', style: 'cancel' },
         {
           text: 'Davam et',
           style: 'destructive',
           onPress: () => setTimeout(() => {
-            Alert.alert('Əminsiniz?', 'Hesabınız indi silinəcək.', [
+            Alert.alert('Əminsən?', 'Hesabın indi silinəcək.', [
               { text: 'Xeyr', style: 'cancel' },
               { text: 'Bəli, sil', style: 'destructive', onPress: deleteAccount },
             ]);
@@ -82,7 +83,7 @@ export default function SettingsScreen({ navigation }) {
   };
 
   const handleSignOut = () => {
-    Alert.alert('Çıxış', 'Hesabdan çıxmaq istəyirsiniz?', [
+    Alert.alert('Çıxış', 'Hesabdan çıxmaq istəyirsən?', [
       { text: 'Xeyr', style: 'cancel' },
       { text: 'Bəli', style: 'destructive', onPress: signOut },
     ]);
@@ -94,7 +95,7 @@ export default function SettingsScreen({ navigation }) {
       await updateCurrentUser({ activityVisible: nextValue });
     } catch (error) {
       setActivityVisible(!nextValue);
-      Alert.alert('Tənzimləmə xətası', error.response?.data?.message || error.message);
+      Alert.alert('Ayar yadda saxlanmadı', errorText(error));
     }
   };
 

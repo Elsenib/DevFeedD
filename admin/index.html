@@ -241,7 +241,7 @@ $('loginForm').addEventListener('submit', async (event) => {
     try { localStorage.setItem(TOKEN_KEY, token); } catch (e) {}
     await start();
   } catch (error) {
-    $('loginError').textContent = error.message === 'Invalid credentials.' ? 'Email və ya şifrə yanlışdır.' : error.message;
+    $('loginError').textContent = error.message;
   } finally {
     $('loginBtn').disabled = false;
   }

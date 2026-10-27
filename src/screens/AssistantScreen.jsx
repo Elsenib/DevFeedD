@@ -19,6 +19,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthContext } from '../context/AuthContext';
 import { PreferencesContext } from '../context/PreferencesContext';
 import * as api from '../api';
+import { errorText } from '../utils/errors';
 
 const AI_ICON = require('../../assets/ai-assistant.png');
 const MAX_SAVED = 40;
@@ -76,7 +77,7 @@ export default function AssistantScreen({ navigation }) {
       save([...history, { role: 'assistant', content: result.reply }]);
       if (typeof result.remaining === 'number') setRemaining(result.remaining);
     } catch (error) {
-      const message = error.response?.data?.message || 'AI cavab vermədi. İnterneti yoxla və yenidən yaz.';
+      const message = errorText(error, 'AI cavab vermədi. Yenidən yaz.');
       if (typeof error.response?.data?.remaining === 'number') setRemaining(error.response.data.remaining);
       save([...history, { role: 'assistant', content: message, failed: true }]);
     } finally {

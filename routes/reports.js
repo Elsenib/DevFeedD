@@ -42,7 +42,7 @@ router.post('/', auth, async (req, res) => {
       [req.user.id, targetType, targetId, reason, details || null]
     );
 
-    res.status(201).json({ message: 'Şikayətiniz qəbul edildi. Komandamız tezliklə baxacaq.', report: result.rows[0] });
+    res.status(201).json({ message: 'Şikayətin qəbul edildi. Komandamız tezliklə baxacaq.', report: result.rows[0] });
   } catch (error) {
     console.error('POST /reports error:', error);
     res.status(500).json({ message: 'Şikayət göndərilmədi.' });

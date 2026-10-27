@@ -32,6 +32,7 @@ import * as api from '../api';
 import { openModerationMenu } from '../utils/moderation';
 import { repairUploadUrl } from '../utils/media';
 import Avatar from '../components/Avatar';
+import { errorText } from '../utils/errors';
 
 const POST_TYPES = [
   { id: 'TEXT', label: 'Post', icon: 'notes', color: '#A9AFBF' },
@@ -110,7 +111,7 @@ async function openExternalUrl(url) {
     }
     await Linking.openURL(value);
   } catch (error) {
-    Alert.alert('Link xətası', error.message);
+    Alert.alert('Link açılmadı', 'Bu linki açmaq mümkün olmadı.');
   }
 }
 
@@ -693,7 +694,7 @@ function ComposeModal({ visible, onClose, onSubmit, submitting }) {
       });
       reset();
     } catch (error) {
-      Alert.alert('Paylaşım xətası', error.response?.data?.error || error.response?.data?.message || error.message);
+      Alert.alert('Paylaşım xətası', errorText(error));
     } finally {
       setUploadingMedia(false);
     }
@@ -945,7 +946,7 @@ export default function FeedScreen({ navigation, route }) {
       setPosts(rows);
       setHasMore(rows.length === PAGE_SIZE);
     } catch (error) {
-      Alert.alert('Feed yüklənmədi', error.response?.data?.message || error.message);
+      Alert.alert('Paylaşımlar yüklənmədi', errorText(error));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -1002,7 +1003,7 @@ export default function FeedScreen({ navigation, route }) {
       ]);
       setComposeOpen(false);
     } catch (error) {
-      Alert.alert('Paylaşım alınmadı', error.response?.data?.error || error.response?.data?.message || error.message);
+      Alert.alert('Paylaşım alınmadı', errorText(error));
     } finally {
       setPosting(false);
     }
@@ -1114,7 +1115,7 @@ export default function FeedScreen({ navigation, route }) {
       setSelectedJob(null);
       Alert.alert('Müraciət göndərildi', result.conversationId ? 'Elan sahibinin DM və müraciətlər bölməsinə düşdü.' : 'Müraciətin qeydə alındı.');
     } catch (error) {
-      Alert.alert('Müraciət xətası', error.response?.data?.error || error.response?.data?.message || error.message);
+      Alert.alert('Müraciət xətası', errorText(error));
     } finally {
       setApplyingJob(false);
     }

@@ -19,6 +19,7 @@ import { AuroraGlow, HeaderIconButton, ScreenHeader } from '../components/Screen
 import { avatarTone } from '../utils/avatarTone';
 import { timeAgo } from '../utils/time';
 import Avatar from '../components/Avatar';
+import { errorText } from '../utils/errors';
 
 function iconFor(type) {
   if (type === 'post_like') return { name: 'favorite', color: '#f85149' };
@@ -71,7 +72,7 @@ export default function NotificationsScreen({ navigation }) {
       setNotifications(nextNotifications);
       syncUnreadFromList(nextNotifications);
     } catch (error) {
-      Alert.alert('Bildiriş xətası', error.response?.data?.message || error.message);
+      Alert.alert('Bildiriş xətası', errorText(error));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -93,7 +94,7 @@ export default function NotificationsScreen({ navigation }) {
       setNotifications((prev) => prev.map((item) => ({ ...item, read_at: item.read_at || new Date().toISOString() })));
       markAllNotificationsReadLocal();
     } catch (error) {
-      Alert.alert('Bildiriş xətası', error.response?.data?.message || error.message);
+      Alert.alert('Bildiriş xətası', errorText(error));
     }
   };
 

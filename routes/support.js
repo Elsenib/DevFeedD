@@ -27,16 +27,16 @@ router.post('/payments', auth, async (req, res) => {
   const note = String(req.body.note || '').trim();
 
   if (!Number.isFinite(amount) || amount < 1) {
-    return res.status(400).json({ message: 'Minimum destek meblegi 1 AZN-dir.' });
+    return res.status(400).json({ message: 'Minimum dəstək məbləği 1 AZN-dir.' });
   }
   if (note && invalidText(note)) {
-    return res.status(400).json({ message: 'Destek qeydi qaydalara uygun deyil.' });
+    return res.status(400).json({ message: 'Dəstək qeydi qaydalara uyğun deyil.' });
   }
 
   try {
     const receiver = await db.query('SELECT id FROM users WHERE id = $1', [receiverId]);
     if (receiver.rows.length === 0) {
-      return res.status(404).json({ message: 'Destek alacaq profil tapilmadi.' });
+      return res.status(404).json({ message: 'Dəstək alacaq profil tapılmadı.' });
     }
 
     const reference = `DF-${Date.now()}-${req.user.id}`;
@@ -54,7 +54,7 @@ router.post('/payments', auth, async (req, res) => {
     });
   } catch (error) {
     console.error('POST /support/payments error:', error);
-    res.status(500).json({ message: 'Destek qeyde alina bilmedi.' });
+    res.status(500).json({ message: 'Dəstək qeydə alınmadı.' });
   }
 });
 

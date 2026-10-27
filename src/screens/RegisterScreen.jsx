@@ -4,6 +4,7 @@ import { Text, TextInput } from '../components/Text';
 import { AuthContext } from '../context/AuthContext';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AuthBackdrop, BrandMark, authStyles as styles, PasswordInput } from '../components/AuthChrome';
+import { errorText } from '../utils/errors';
 
 export default function RegisterScreen({ navigation }) {
   const { signUp, verifyEmailRegistration, socialSignIn } = useContext(AuthContext);
@@ -34,7 +35,7 @@ export default function RegisterScreen({ navigation }) {
         );
       }
     } catch (error) {
-      Alert.alert('Qeydiyyat xətası', error.response?.data?.message || error.message);
+      Alert.alert('Qeydiyyat xətası', errorText(error));
     } finally {
       setLoading(false);
     }
@@ -49,7 +50,7 @@ export default function RegisterScreen({ navigation }) {
     try {
       await verifyEmailRegistration({ email: pendingEmail, code: code.trim() });
     } catch (error) {
-      Alert.alert('Email təsdiqi alınmadı', error.response?.data?.message || error.message);
+      Alert.alert('Email təsdiqi alınmadı', errorText(error));
     } finally {
       setVerifying(false);
     }
@@ -60,7 +61,7 @@ export default function RegisterScreen({ navigation }) {
     try {
       await socialSignIn(provider);
     } catch (error) {
-      Alert.alert(`${provider} ilə davam et`, error.response?.data?.message || error.message);
+      Alert.alert(`${provider} ilə davam et`, errorText(error));
     } finally {
       setSocialLoading(null);
     }

@@ -7,6 +7,7 @@ import { PreferencesContext } from '../context/PreferencesContext';
 import { AuroraGlow, ScreenHeader } from '../components/ScreenChrome';
 import Avatar from '../components/Avatar';
 import * as api from '../api';
+import { errorText } from '../utils/errors';
 
 const TABS = [
   { id: 'followers', label: 'İzləyicilər' },
@@ -28,7 +29,7 @@ export default function FollowListScreen({ route, navigation }) {
       const rows = tab === 'followers' ? await api.fetchFollowers(userId) : await api.fetchFollowing(userId);
       setPeople(Array.isArray(rows) ? rows : []);
     } catch (error) {
-      Alert.alert('Siyahı yüklənmədi', error.response?.data?.message || error.message);
+      Alert.alert('Siyahı yüklənmədi', errorText(error));
     } finally {
       setLoading(false);
     }
@@ -51,7 +52,7 @@ export default function FollowListScreen({ route, navigation }) {
       else await api.unfollowUser(person.id);
     } catch (error) {
       setPeople((prev) => prev.map((item) => (item.id === person.id ? { ...item, following_by_me: !next } : item)));
-      Alert.alert('İzləmə xətası', error.response?.data?.message || error.message);
+      Alert.alert('İzləmə xətası', errorText(error));
     }
   };
 

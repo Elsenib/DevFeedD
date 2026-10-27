@@ -8,8 +8,8 @@ const { rateLimit } = require('../middleware/rateLimit');
 
 const router = express.Router();
 
-const loginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10, message: 'Çox sayda cəhd. 15 dəqiqə sonra yenidən yoxlayın.' });
-const registerLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 10, message: 'Çox sayda qeydiyyat cəhdi. Bir az sonra yenidən yoxlayın.' });
+const loginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10, message: 'Çox sayda cəhd. 15 dəqiqə sonra yenidən yoxla.' });
+const registerLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 10, message: 'Çox sayda qeydiyyat cəhdi. Bir az sonra yenidən yoxla.' });
 
 const DISPOSABLE_EMAIL_DOMAINS = new Set([
   'mailinator.com', '10minutemail.com', 'guerrillamail.com', 'trashmail.com', 'tempmail.com',
@@ -75,7 +75,7 @@ async function hasValidMailServer(email) {
 
 async function validateEmail(email) {
   if (!isValidEmailFormat(email)) {
-    return { valid: false, message: 'Düzgün email daxil edin.' };
+    return { valid: false, message: 'Düzgün email yaz.' };
   }
 
   if (isDisposableEmail(email)) {
@@ -84,7 +84,7 @@ async function validateEmail(email) {
 
   const hasServer = await hasValidMailServer(email);
   if (!hasServer) {
-    return { valid: false, message: 'Email domain mövcud deyil və ya düzgün deyil.' };
+    return { valid: false, message: 'Bu email ünvanının domeni mövcud deyil.' };
   }
 
   return { valid: true };
@@ -292,7 +292,7 @@ router.post('/register', registerLimiter, async (req, res) => {
   const trimmedName = String(name || '').trim();
 
   if (!trimmedName || !normalizedEmail || !password) {
-    return res.status(400).json({ message: 'Name, email and password are required.' });
+    return res.status(400).json({ message: 'Ad, email və şifrəni yaz.' });
   }
 
   try {
@@ -307,7 +307,7 @@ router.post('/register', registerLimiter, async (req, res) => {
 
     const existing = await db.query('SELECT id FROM users WHERE email = $1', [normalizedEmail]);
     if (existing.rows.length > 0) {
-      return res.status(400).json({ message: 'Email already registered.' });
+      return res.status(400).json({ message: 'Bu email artıq qeydiyyatdan keçib.' });
     }
 
     const hashed = await bcrypt.hash(password, 10);
@@ -356,7 +356,7 @@ router.post('/register', registerLimiter, async (req, res) => {
     res.json({ token, user });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: error.message || 'Registration failed' });
+    res.status(500).json({ message: 'Qeydiyyat alınmadı. Bir az sonra yenidən cəhd et.' });
   }
 });
 
@@ -409,7 +409,7 @@ router.post('/verify-email', loginLimiter, async (req, res) => {
     res.json({ token, user });
   } catch (error) {
     console.error('POST /auth/verify-email error:', error);
-    res.status(500).json({ message: error.message || 'Email təsdiqlənmədi.' });
+    res.status(500).json({ message: 'Email təsdiqlənmədi. Bir az sonra yenidən cəhd et.' });
   }
 });
 
@@ -417,7 +417,7 @@ router.post('/login', loginLimiter, async (req, res) => {
   const { email, password } = req.body;
   const normalizedEmail = normalizeEmail(email);
   if (!normalizedEmail || !password) {
-    return res.status(400).json({ message: 'Email and password are required.' });
+    return res.status(400).json({ message: 'Email və şifrəni yaz.' });
   }
 
   try {
@@ -427,15 +427,15 @@ router.post('/login', loginLimiter, async (req, res) => {
     );
     const user = result.rows[0];
     if (!user || !user.password_hash) {
-      return res.status(401).json({ message: 'Invalid credentials.' });
+      return res.status(401).json({ message: 'Email və ya şifrə yanlışdır.' });
     }
 
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) {
-      return res.status(401).json({ message: 'Invalid credentials.' });
+      return res.status(401).json({ message: 'Email və ya şifrə yanlışdır.' });
     }
     if (user.banned_at) {
-      return res.status(403).json({ message: 'Hesabınız qaydaları pozduğu üçün bloklanıb.', banned: true });
+      return res.status(403).json({ message: 'Hesabın qaydaları pozduğu üçün bloklanıb.', banned: true });
     }
 
     const token = makeToken(user);
@@ -444,7 +444,7 @@ router.post('/login', loginLimiter, async (req, res) => {
     res.json({ token, user });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Login failed' });
+    res.status(500).json({ message: 'Daxil olmaq alınmadı. Bir az sonra yenidən cəhd et.' });
   }
 });
 
@@ -453,10 +453,10 @@ router.get('/oauth/start/:provider', async (req, res) => {
   const appRedirectUri = String(req.query.redirectUri || '').trim();
 
   if (!config) {
-    return res.status(400).json({ message: 'Provider dəstəklənmir.' });
+    return res.status(400).json({ message: 'Bu giriş üsulu dəstəklənmir.' });
   }
   if (!config.clientId || !config.clientSecret) {
-    return res.status(500).json({ message: `${config.provider} OAuth üçün client id/secret Railway Variables-da yoxdur.` });
+    return res.status(500).json({ message: `${config.provider} ilə giriş hazırda işləmir.` });
   }
   if (!appRedirectUri) {
     return res.status(400).json({ message: 'redirectUri lazımdır.' });
@@ -551,7 +551,7 @@ router.get('/oauth/callback/:provider', async (req, res) => {
   } catch (error) {
     console.error('GET /auth/oauth/callback/:provider error:', error);
     await db.query('DELETE FROM oauth_states WHERE state = $1', [state]).catch(() => {});
-    return redirectError(error.message || 'OAuth tamamlanmadı.');
+    return redirectError('Giriş tamamlanmadı. Yenidən cəhd et.');
   }
 });
 
@@ -585,7 +585,7 @@ router.post('/oauth-callback', async (req, res) => {
   console.log('[oauth-callback] Received:', { provider, codeLen: code?.length, redirectUri });
 
   if (!code || !provider) {
-    return res.status(400).json({ message: 'code and provider required' });
+    return res.status(400).json({ message: 'Giriş məlumatları natamamdır.' });
   }
 
   try {
@@ -613,7 +613,7 @@ router.post('/oauth-callback', async (req, res) => {
 
       if (!tokenResp.ok) {
         console.error('[oauth-callback] Google token error:', tokenText);
-        return res.status(400).json({ message: 'Failed to exchange code for token', error: tokenText });
+        return res.status(400).json({ message: 'Giriş tamamlanmadı. Yenidən cəhd et.', error: tokenText });
       }
 
       const tokenData = JSON.parse(tokenText);
@@ -627,7 +627,7 @@ router.post('/oauth-callback', async (req, res) => {
 
       if (!profileResp.ok) {
         console.error('[oauth-callback] Google profile fetch failed:', profileResp.status);
-        return res.status(400).json({ message: 'Failed to fetch Google profile' });
+        return res.status(400).json({ message: 'Google hesabının məlumatları alınmadı.' });
       }
 
       profile = await profileResp.json();
@@ -649,12 +649,12 @@ router.post('/oauth-callback', async (req, res) => {
       return res.json(result);
 
     } else {
-      return res.status(400).json({ message: 'Unsupported provider: ' + provider });
+      return res.status(400).json({ message: 'Bu giriş üsulu dəstəklənmir: ' + provider });
     }
 
   } catch (error) {
     console.error('[oauth-callback] Error:', error);
-    res.status(500).json({ message: 'OAuth callback failed', error: error.message });
+    res.status(500).json({ message: 'Giriş tamamlanmadı. Yenidən cəhd et.' });
   }
 });
 

@@ -39,7 +39,7 @@ router.get('/', auth, async (req, res) => {
     res.json(conversations);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Could not load conversations' });
+    res.status(500).json({ message: 'Söhbətlər yüklənmədi.' });
   }
 });
 
@@ -60,7 +60,7 @@ router.get('/:id', auth, async (req, res) => {
 
     const conversation = result.rows[0];
     if (!conversation) {
-      return res.status(404).json({ message: 'Conversation not found' });
+      return res.status(404).json({ message: 'Söhbət tapılmadı.' });
     }
 
     const otherUser = conversation.user_a_id === req.user.id
@@ -94,7 +94,7 @@ router.get('/:id', auth, async (req, res) => {
     });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Could not load conversation' });
+    res.status(500).json({ message: 'Söhbət yüklənmədi.' });
   }
 });
 
@@ -102,27 +102,27 @@ router.post('/', auth, async (req, res) => {
   const { email, userId } = req.body;
 
   if (!email && !userId) {
-    return res.status(400).json({ message: 'Email or userId is required' });
+    return res.status(400).json({ message: 'Söhbət üçün istifadəçi seç.' });
   }
 
   let otherUser;
   try {
     if (userId) {
       if (parseInt(userId, 10) === req.user.id) {
-        return res.status(400).json({ message: 'Cannot create conversation with yourself' });
+        return res.status(400).json({ message: 'Özünlə söhbət başlatmaq olmaz.' });
       }
       const userResult = await db.query('SELECT id, name, email FROM users WHERE id = $1', [userId]);
       otherUser = userResult.rows[0];
     } else {
       if (email === req.user.email) {
-        return res.status(400).json({ message: 'Cannot create conversation with yourself' });
+        return res.status(400).json({ message: 'Özünlə söhbət başlatmaq olmaz.' });
       }
       const userResult = await db.query('SELECT id, name, email FROM users WHERE email = $1', [email]);
       otherUser = userResult.rows[0];
     }
 
     if (!otherUser) {
-      return res.status(404).json({ message: 'User not found' });
+      return res.status(404).json({ message: 'İstifadəçi tapılmadı.' });
     }
     if (await isBlockedBetween(req.user.id, otherUser.id)) {
       return res.status(403).json({ message: 'Bu istifadəçi ilə yazışmaq mümkün deyil.' });
@@ -148,7 +148,7 @@ router.post('/', auth, async (req, res) => {
     res.status(201).json({ id: newConversation.rows[0].id, title: otherUser.name });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Could not create conversation' });
+    res.status(500).json({ message: 'Söhbət başlamadı.' });
   }
 });
 
@@ -157,7 +157,7 @@ router.post('/:id/messages', auth, async (req, res) => {
   const { text } = req.body;
 
   if (!text || !text.trim()) {
-    return res.status(400).json({ message: 'Message text is required' });
+    return res.status(400).json({ message: 'Mesaj boşdur.' });
   }
   if (containsIllegalWords(text)) {
     return res.status(400).json({ message: 'Mesajda qadağan olunmuş məzmun var.' });
@@ -172,7 +172,7 @@ router.post('/:id/messages', auth, async (req, res) => {
     );
 
     if (conversationResult.rows.length === 0) {
-      return res.status(404).json({ message: 'Conversation not found' });
+      return res.status(404).json({ message: 'Söhbət tapılmadı.' });
     }
     const { user_a_id: userAId, user_b_id: userBId } = conversationResult.rows[0];
     if (await isBlockedBetween(userAId, userBId)) {
@@ -211,7 +211,7 @@ router.post('/:id/messages', auth, async (req, res) => {
     });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Could not send message' });
+    res.status(500).json({ message: 'Mesaj göndərilmədi.' });
   }
 });
 

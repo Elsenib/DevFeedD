@@ -33,7 +33,7 @@ app.use(express.json());
 const uploadsDir = path.join(__dirname, 'uploads');
 fs.mkdirSync(uploadsDir, { recursive: true });
 // CVs hold phone numbers: never serve them statically, only via signed /resumes links.
-app.use('/uploads/resumes', (req, res) => res.status(404).json({ message: 'Not found' }));
+app.use('/uploads/resumes', (req, res) => res.status(404).json({ message: 'Tapılmadı.' }));
 app.use('/uploads', express.static(uploadsDir));
 
 // Health check endpoint
@@ -64,7 +64,9 @@ app.use('/', legalRoutes);
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error('Error:', err.message, err.stack);
-  res.status(err.status || 500).json({ error: err.message || 'Internal Server Error' });
+  // Never send internal error text (SQL, stack details) to the app.
+  const status = err.status || err.statusCode || 500;
+  res.status(status).json({ message: status < 500 ? 'Sorğu düzgün deyil.' : 'Serverdə xəta baş verdi. Bir az sonra yenidən cəhd et.' });
 });
 
 const PORT = parseInt(process.env.PORT, 10) || 4000;

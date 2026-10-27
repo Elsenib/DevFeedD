@@ -18,6 +18,7 @@ import * as api from '../api';
 import { AuroraGlow, ScreenHeader } from '../components/ScreenChrome';
 import { avatarTone } from '../utils/avatarTone';
 import Avatar from '../components/Avatar';
+import { errorText } from '../utils/errors';
 
 function parseMetadata(metadata) {
   if (!metadata) return {};
@@ -83,7 +84,7 @@ export default function ExploreScreen({ navigation }) {
       setUsers(Array.isArray(userResults) ? userResults : []);
       setPosts(Array.isArray(postResults) ? postResults : []);
     } catch (error) {
-      Alert.alert('Kəşf xətası', error.response?.data?.message || error.message);
+      Alert.alert('Axtarış alınmadı', errorText(error));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -126,7 +127,7 @@ export default function ExploreScreen({ navigation }) {
         )
       );
     } catch (error) {
-      Alert.alert('İzləmə xətası', error.response?.data?.message || error.message);
+      Alert.alert('İzləmə xətası', errorText(error));
       loadResults();
     }
   };

@@ -22,6 +22,7 @@ import usePolling from '../hooks/usePolling';
 import { avatarTone } from '../utils/avatarTone';
 import { openModerationMenu } from '../utils/moderation';
 import Avatar from '../components/Avatar';
+import { errorText } from '../utils/errors';
 
 function formatTime(value) {
   if (!value) return '';
@@ -72,7 +73,7 @@ export default function ChatScreen({ route, navigation }) {
       setConversation(data);
       setMessages(Array.isArray(data.messages) ? data.messages : []);
     } catch (error) {
-      if (!silent) Alert.alert('Söhbət xətası', error.response?.data?.message || error.message);
+      if (!silent) Alert.alert('Söhbət xətası', errorText(error));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -105,7 +106,7 @@ export default function ChatScreen({ route, navigation }) {
       setMessages((prev) => [...prev, sent]);
       setText('');
     } catch (error) {
-      Alert.alert('Mesaj xətası', error.response?.data?.message || error.message);
+      Alert.alert('Mesaj xətası', errorText(error));
     } finally {
       setSending(false);
     }

@@ -22,6 +22,7 @@ import { AuroraGlow, HeaderIconButton } from '../components/ScreenChrome';
 import Avatar from '../components/Avatar';
 import { openModerationMenu } from '../utils/moderation';
 import { PostCard, normalizePost } from './FeedScreen';
+import { errorText } from '../utils/errors';
 
 function splitList(value) {
   if (Array.isArray(value)) return value.filter(Boolean);
@@ -80,7 +81,7 @@ function EditProfileModal({ visible, profile, colors, saving, onClose, onSave, o
             <Text style={styles.fieldLabel}>AD</Text>
             <TextInput value={name} onChangeText={setName} placeholder="Ad Soyad" placeholderTextColor={colors.muted} style={styles.input} />
             <Text style={styles.fieldLabel}>BIO</Text>
-            <TextInput value={bio} onChangeText={setBio} placeholder="Qisa bio" placeholderTextColor={colors.muted} style={[styles.input, styles.textarea]} multiline />
+            <TextInput value={bio} onChangeText={setBio} placeholder="Qısa bio" placeholderTextColor={colors.muted} style={[styles.input, styles.textarea]} multiline />
             <Text style={styles.fieldLabel}>ROL</Text>
             <TextInput value={role} onChangeText={setRole} placeholder="Developer, Designer..." placeholderTextColor={colors.muted} style={styles.input} />
             <Text style={styles.fieldLabel}>ALT ROL</Text>
@@ -242,7 +243,7 @@ export default function ProfileScreen({ route, navigation }) {
       setActivityHidden(!Array.isArray(postsData) && !!postsData.hidden);
       setSupportConfig(configData);
     } catch (error) {
-      Alert.alert('Profil xətası', error.response?.data?.message || error.message);
+      Alert.alert('Profil xətası', errorText(error));
     } finally {
       setLoading(false);
     }
@@ -270,7 +271,7 @@ export default function ProfileScreen({ route, navigation }) {
       setEditOpen(false);
       Alert.alert('Profil yeniləndi', 'Məlumatlar yadda saxlanıldı.');
     } catch (error) {
-      Alert.alert('Profil xətası', error.response?.data?.message || error.message);
+      Alert.alert('Profil xətası', errorText(error));
     } finally {
       setSaving(false);
     }
@@ -304,7 +305,7 @@ export default function ProfileScreen({ route, navigation }) {
       await updateCurrentUser({ avatar_url: uploaded.avatar_url }).catch(() => null);
       Alert.alert('Şəkil yeniləndi', 'Profil şəklin uğurla yükləndi.');
     } catch (error) {
-      Alert.alert('Avatar xətası', error.response?.data?.message || error.message);
+      Alert.alert('Profil şəkli yüklənmədi', errorText(error));
     } finally {
       setUploadingAvatar(false);
     }
@@ -324,7 +325,7 @@ export default function ProfileScreen({ route, navigation }) {
         `Referans: ${result.payment.reference}\nHesab: ${result.accountNumber}`
       );
     } catch (error) {
-      Alert.alert('Dəstək xətası', error.response?.data?.message || error.message);
+      Alert.alert('Dəstək xətası', errorText(error));
     } finally {
       setSupportSubmitting(false);
     }
@@ -348,7 +349,7 @@ export default function ProfileScreen({ route, navigation }) {
         following_count: result.following_count ?? prev?.following_count,
       }));
     } catch (error) {
-      Alert.alert('İzləmə xətası', error.response?.data?.message || error.message);
+      Alert.alert('İzləmə xətası', errorText(error));
       loadProfile();
     }
   };
@@ -406,7 +407,7 @@ export default function ProfileScreen({ route, navigation }) {
         title: conversation.title || profile.name,
       });
     } catch (error) {
-      Alert.alert('Mesaj xətası', error.response?.data?.message || error.message);
+      Alert.alert('Mesaj xətası', errorText(error));
     }
   };
 
@@ -583,12 +584,14 @@ function createStyles(colors) {
       flexDirection: 'row',
       alignItems: 'center',
       flexShrink: 1,
+      gap: 2,
+      marginRight: 12,
+      paddingVertical: 6,
     },
     topHandle: {
-      fontSize: 14,
-      fontWeight: '700',
-      flex: 1,
-      marginRight: 12,
+      fontSize: 15,
+      fontWeight: '800',
+      flexShrink: 1,
     },
     hero: {
       flexDirection: 'row',

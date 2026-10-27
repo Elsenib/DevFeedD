@@ -22,7 +22,7 @@ function forgetBan(userId) {
 const auth = async (req, res, next) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ message: 'Unauthorized' });
+    return res.status(401).json({ message: 'Davam etmək üçün daxil ol.' });
   }
 
   const token = authHeader.split(' ')[1];
@@ -30,11 +30,11 @@ const auth = async (req, res, next) => {
   try {
     payload = jwt.verify(token, process.env.JWT_SECRET);
   } catch (error) {
-    return res.status(401).json({ message: 'Invalid token' });
+    return res.status(401).json({ message: 'Sessiyanın vaxtı bitib. Yenidən daxil ol.' });
   }
   try {
     if (await isBanned(payload.id)) {
-      return res.status(403).json({ message: 'Hesabınız qaydaları pozduğu üçün bloklanıb.', banned: true });
+      return res.status(403).json({ message: 'Hesabın qaydaları pozduğu üçün bloklanıb.', banned: true });
     }
   } catch (error) {
     console.error('auth ban check error:', error);

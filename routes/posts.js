@@ -193,7 +193,7 @@ router.get('/', optionalAuth, async (req, res) => {
     res.json(result.rows);
   } catch (error) {
     console.error('GET /posts error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: 'Paylaşımlar yüklənmədi. Bir az sonra yenidən cəhd et.' });
   }
 });
 
@@ -244,7 +244,7 @@ router.post('/applications/resume', auth, resumeUpload.single('resume'), async (
     fs.closeSync(fd);
     if (header.toString('latin1') !== '%PDF-') {
       fs.unlinkSync(req.file.path);
-      return res.status(400).json({ message: 'Fayl PDF deyil. Zəhmət olmasa PDF formatında CV seçin.' });
+      return res.status(400).json({ message: 'Fayl PDF deyil. CV-ni PDF formatında seç.' });
     }
     res.status(201).json({
       resumeUrl: getPublicUploadUrl(req, 'resumes', req.file.filename),
@@ -256,7 +256,7 @@ router.post('/applications/resume', auth, resumeUpload.single('resume'), async (
       try { fs.unlinkSync(req.file.path); } catch (unlinkError) {}
     }
     console.error('POST /posts/applications/resume error:', error);
-    res.status(500).json({ message: error.message || 'CV yüklənmədi.' });
+    res.status(500).json({ message: 'CV yüklənmədi. Bir az sonra yenidən cəhd et.' });
   }
 });
 
@@ -279,7 +279,7 @@ router.post('/media', auth, mediaUpload.single('media'), async (req, res) => {
       try { fs.unlinkSync(req.file.path); } catch (unlinkError) {}
     }
     console.error('POST /posts/media error:', error);
-    res.status(500).json({ message: error.message || 'Media yüklənmədi.' });
+    res.status(500).json({ message: 'Media yüklənmədi. Bir az sonra yenidən cəhd et.' });
   }
 });
 
@@ -327,14 +327,14 @@ router.get('/:id', optionalAuth, async (req, res) => {
       [viewerId, id]
     );
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Post not found' });
+      return res.status(404).json({ error: 'Paylaşım tapılmadı.' });
     }
     // Increment views
     await pool.query('UPDATE posts SET views = views + 1 WHERE id = $1', [id]);
     res.json(result.rows[0]);
   } catch (error) {
     console.error('GET /posts/:id error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: 'Paylaşım yüklənmədi. Bir az sonra yenidən cəhd et.' });
   }
 });
 
@@ -345,17 +345,17 @@ router.post('/', auth, async (req, res) => {
     const user_id = req.user.id;
 
     if (!body) {
-      return res.status(400).json({ error: 'body is required' });
+      return res.status(400).json({ error: 'Mətn boşdur.' });
     }
     
     if (title && (containsIllegalWords(title) || checkBadWords(title))) {
-      return res.status(400).json({ error: 'Post başlığı kurallara uygun değil' });
+      return res.status(400).json({ error: 'Paylaşımın başlığı qaydalara uyğun deyil.' });
     }
     if (caption && (containsIllegalWords(caption) || checkBadWords(caption))) {
-      return res.status(400).json({ error: 'Post içeriği kurallara uygun değil' });
+      return res.status(400).json({ error: 'Paylaşımın məzmunu qaydalara uyğun deyil.' });
     }
     if (containsIllegalWords(body) || checkBadWords(body)) {
-      return res.status(400).json({ error: 'Post metni kurallara uygun değil' });
+      return res.status(400).json({ error: 'Paylaşımın mətni qaydalara uyğun deyil.' });
     }
     const linkValidation = validatePostLinks(metadata);
     if (!linkValidation.valid) {
@@ -371,7 +371,7 @@ router.post('/', auth, async (req, res) => {
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error('POST /posts error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: 'Paylaşım alınmadı. Bir az sonra yenidən cəhd et.' });
   }
 });
 
@@ -385,13 +385,13 @@ router.put('/:id', auth, async (req, res) => {
     // Check ownership
     const ownership = await pool.query('SELECT user_id FROM posts WHERE id = $1', [id]);
     if (ownership.rows.length === 0) {
-      return res.status(404).json({ error: 'Post not found' });
+      return res.status(404).json({ error: 'Paylaşım tapılmadı.' });
     }
     if (ownership.rows[0].user_id !== user_id) {
-      return res.status(403).json({ error: 'Not authorized' });
+      return res.status(403).json({ error: 'Bunu etməyə icazən yoxdur.' });
     }
     if (containsIllegalWords(title) || containsIllegalWords(caption) || containsIllegalWords(body)) {
-      return res.status(400).json({ error: 'İçerik kurallara uyğun deyil.' });
+      return res.status(400).json({ error: 'Məzmun qaydalara uyğun deyil.' });
     }
     const linkValidation = validatePostLinks(metadata);
     if (!linkValidation.valid) {
@@ -407,7 +407,7 @@ router.put('/:id', auth, async (req, res) => {
     res.json(result.rows[0]);
   } catch (error) {
     console.error('PUT /posts/:id error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: 'Paylaşım yenilənmədi. Bir az sonra yenidən cəhd et.' });
   }
 });
 
@@ -420,17 +420,17 @@ router.delete('/:id', auth, async (req, res) => {
     // Check ownership
     const ownership = await pool.query('SELECT user_id FROM posts WHERE id = $1', [id]);
     if (ownership.rows.length === 0) {
-      return res.status(404).json({ error: 'Post not found' });
+      return res.status(404).json({ error: 'Paylaşım tapılmadı.' });
     }
     if (ownership.rows[0].user_id !== user_id) {
-      return res.status(403).json({ error: 'Not authorized' });
+      return res.status(403).json({ error: 'Bunu etməyə icazən yoxdur.' });
     }
 
     await pool.query('DELETE FROM posts WHERE id = $1', [id]);
-    res.json({ message: 'Post deleted' });
+    res.json({ message: 'Paylaşım silindi.' });
   } catch (error) {
     console.error('DELETE /posts/:id error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: 'Paylaşım silinmədi. Bir az sonra yenidən cəhd et.' });
   }
 });
 
@@ -442,7 +442,7 @@ router.post('/:id/like', auth, async (req, res) => {
 
     const postResult = await pool.query('SELECT user_id FROM posts WHERE id = $1', [id]);
     if (postResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Post tapılmadı.' });
+      return res.status(404).json({ error: 'Paylaşım tapılmadı.' });
     }
 
     const insert = await pool.query(
@@ -467,7 +467,7 @@ router.post('/:id/like', auth, async (req, res) => {
     res.json({ message: 'Bəyənildi', liked: true, like_count: count.rows[0].count });
   } catch (error) {
     console.error('POST /posts/:id/like error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: 'Bəyənmək alınmadı. Bir az sonra yenidən cəhd et.' });
   }
 });
 
@@ -482,7 +482,7 @@ router.delete('/:id/like', auth, async (req, res) => {
     res.json({ message: 'Bəyənmə silindi', liked: false, like_count: count.rows[0].count });
   } catch (error) {
     console.error('DELETE /posts/:id/like error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: 'Bəyənməni geri götürmək alınmadı. Bir az sonra yenidən cəhd et.' });
   }
 });
 
@@ -494,7 +494,7 @@ router.post('/:id/bookmark', auth, async (req, res) => {
 
     const postResult = await pool.query('SELECT user_id FROM posts WHERE id = $1', [id]);
     if (postResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Post tapılmadı.' });
+      return res.status(404).json({ error: 'Paylaşım tapılmadı.' });
     }
 
     const insert = await pool.query(
@@ -519,7 +519,7 @@ router.post('/:id/bookmark', auth, async (req, res) => {
     res.json({ message: 'Yadda saxlandı', bookmarked: true, bookmark_count: count.rows[0].count });
   } catch (error) {
     console.error('POST /posts/:id/bookmark error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: 'Yadda saxlamaq alınmadı. Bir az sonra yenidən cəhd et.' });
   }
 });
 
@@ -534,7 +534,7 @@ router.delete('/:id/bookmark', auth, async (req, res) => {
     res.json({ message: 'Yadda saxlamadan çıxarıldı', bookmarked: false, bookmark_count: count.rows[0].count });
   } catch (error) {
     console.error('DELETE /posts/:id/bookmark error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: 'Yadda saxlanandan çıxarmaq alınmadı. Bir az sonra yenidən cəhd et.' });
   }
 });
 
@@ -554,7 +554,7 @@ router.post('/:id/comments', auth, async (req, res) => {
     let replyToUserId = reply_to_user_id || replyToUserIdBody || null;
 
     if (!text) {
-      return res.status(400).json({ error: 'text is required' });
+      return res.status(400).json({ error: 'Mətn boşdur.' });
     }
     if (containsIllegalWords(text) || checkBadWords(text)) {
       return res.status(400).json({ error: 'Şərh qaydalara uyğun deyil.' });
@@ -562,7 +562,7 @@ router.post('/:id/comments', auth, async (req, res) => {
 
     const postResult = await pool.query('SELECT user_id FROM posts WHERE id = $1', [id]);
     if (postResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Post tapılmadı.' });
+      return res.status(404).json({ error: 'Paylaşım tapılmadı.' });
     }
 
     if (parentCommentId) {
@@ -616,7 +616,7 @@ router.post('/:id/comments', auth, async (req, res) => {
     res.status(201).json(comment);
   } catch (error) {
     console.error('POST /posts/:id/comments error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: 'Şərh göndərilmədi. Bir az sonra yenidən cəhd et.' });
   }
 });
 
@@ -640,7 +640,7 @@ router.get('/:id/comments', optionalAuth, async (req, res) => {
     res.json(result.rows);
   } catch (error) {
     console.error('GET /posts/:id/comments error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: 'Şərhlər yüklənmədi. Bir az sonra yenidən cəhd et.' });
   }
 });
 
@@ -658,15 +658,15 @@ router.post('/:id/apply', auth, async (req, res) => {
 
     const postResult = await pool.query('SELECT id, user_id, title, caption, post_type FROM posts WHERE id = $1', [id]);
     const jobPost = postResult.rows[0];
-    if (!jobPost) return res.status(404).json({ error: 'Post not found' });
-    if (jobPost.post_type !== 'JOB') return res.status(400).json({ error: 'Only JOB posts can be applied to' });
+    if (!jobPost) return res.status(404).json({ error: 'Paylaşım tapılmadı.' });
+    if (jobPost.post_type !== 'JOB') return res.status(400).json({ error: 'Yalnız iş elanlarına müraciət etmək olar.' });
     if (String(jobPost.user_id) === String(userId)) return res.status(400).json({ error: 'Öz iş elanına müraciət etmək olmaz.' });
     if (await isBlockedBetween(userId, jobPost.user_id)) return res.status(403).json({ error: 'Bu elana müraciət etmək mümkün deyil.' });
     if (!String(applicant_phone || '').trim()) return res.status(400).json({ error: 'Əlaqə nömrəsi lazımdır.' });
     if (!String(resume_url || '').trim()) return res.status(400).json({ error: 'CV PDF faylı lazımdır.' });
     const resumeFile = resumeFileFromUrl(resume_url);
     if (!resumeFile || !fs.existsSync(path.join(resumesDir, resumeFile))) {
-      return res.status(400).json({ error: 'CV faylı tapılmadı. Zəhmət olmasa CV-ni yenidən yükləyin.' });
+      return res.status(400).json({ error: 'CV faylı tapılmadı. CV-ni yenidən yüklə.' });
     }
 
     if (
@@ -735,10 +735,10 @@ router.post('/:id/apply', auth, async (req, res) => {
       text: `${req.user.name || 'Bir istifadəçi'} iş elanına müraciət etdi.`,
     });
 
-    res.json({ message: 'Application submitted', conversationId, application: applicationResult.rows[0] });
+    res.json({ message: 'Müraciət göndərildi.', conversationId, application: applicationResult.rows[0] });
   } catch (error) {
     console.error('POST /posts/:id/apply real flow error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: 'Müraciət göndərilmədi. Bir az sonra yenidən cəhd et.' });
   }
 });
 
@@ -746,8 +746,8 @@ router.get('/:id/applications', auth, async (req, res) => {
   try {
     const { id } = req.params;
     const postResult = await pool.query('SELECT user_id FROM posts WHERE id = $1', [id]);
-    if (postResult.rows.length === 0) return res.status(404).json({ error: 'Post not found' });
-    if (postResult.rows[0].user_id !== req.user.id) return res.status(403).json({ error: 'Not authorized to view applications' });
+    if (postResult.rows.length === 0) return res.status(404).json({ error: 'Paylaşım tapılmadı.' });
+    if (postResult.rows[0].user_id !== req.user.id) return res.status(403).json({ error: 'Bu müraciətləri görməyə icazən yoxdur.' });
 
     const applicationsResult = await pool.query(
       `SELECT ja.id, ja.user_id, ja.status, ja.cover_letter, ja.resume_url, ja.resume_file_name,
@@ -763,7 +763,7 @@ router.get('/:id/applications', auth, async (req, res) => {
     res.json(applicationsResult.rows.map((row) => ({ ...row, resume_url: signResumeUrl(req, row.resume_url) })));
   } catch (error) {
     console.error('GET /posts/:id/applications real flow error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: 'Müraciətlər yüklənmədi. Bir az sonra yenidən cəhd et.' });
   }
 });
 
@@ -779,7 +779,7 @@ router.get('/:id/application-status', auth, async (req, res) => {
     res.json({ applied: result.rows.length > 0, status: result.rows[0]?.status || null });
   } catch (error) {
     console.error('GET /posts/:id/application-status error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: 'Müraciət statusu yüklənmədi. Bir az sonra yenidən cəhd et.' });
   }
 });
 

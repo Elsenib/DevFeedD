@@ -89,7 +89,7 @@ router.get('/rooms', auth, async (req, res) => {
     res.json(result.rows);
   } catch (error) {
     console.error('GET /chat/rooms error:', error);
-    res.status(500).json({ message: 'Could not load chat rooms' });
+    res.status(500).json({ message: 'Otaqlar yüklənmədi.' });
   }
 });
 
@@ -99,10 +99,10 @@ router.post('/rooms', auth, async (req, res) => {
   const cleanDescription = String(description || '').trim();
 
   if (!cleanName) {
-    return res.status(400).json({ message: 'Room name is required' });
+    return res.status(400).json({ message: 'Otağın adını yaz.' });
   }
   if (invalidText(cleanName) || invalidText(cleanDescription)) {
-    return res.status(400).json({ message: 'Otaq melumati qaydalara uygun deyil.' });
+    return res.status(400).json({ message: 'Otaq məlumatı qaydalara uyğun deyil.' });
   }
 
   try {
@@ -123,10 +123,10 @@ router.post('/rooms', auth, async (req, res) => {
     res.status(201).json({ ...result.rows[0], member_count: 1, joined: true, last_message: null });
   } catch (error) {
     if (error.code === '23505') {
-      return res.status(409).json({ message: 'Bu adda chat otaqi var.' });
+      return res.status(409).json({ message: 'Bu adda otaq artıq var.' });
     }
     console.error('POST /chat/rooms error:', error);
-    res.status(500).json({ message: 'Could not create chat room' });
+    res.status(500).json({ message: 'Otaq yaradılmadı.' });
   }
 });
 
@@ -135,7 +135,7 @@ router.post('/rooms/:id/join', auth, async (req, res) => {
     const { id } = req.params;
     const room = await db.query('SELECT id FROM chat_rooms WHERE id = $1 AND is_public = true', [id]);
     if (room.rows.length === 0) {
-      return res.status(404).json({ message: 'Room not found' });
+      return res.status(404).json({ message: 'Otaq tapılmadı.' });
     }
 
     await db.query(
@@ -144,10 +144,10 @@ router.post('/rooms/:id/join', auth, async (req, res) => {
        ON CONFLICT (room_id, user_id) DO NOTHING`,
       [id, req.user.id]
     );
-    res.json({ message: 'Joined' });
+    res.json({ message: 'Otağa qoşuldun.' });
   } catch (error) {
     console.error('POST /chat/rooms/:id/join error:', error);
-    res.status(500).json({ message: 'Could not join room' });
+    res.status(500).json({ message: 'Otağa qoşulmaq alınmadı.' });
   }
 });
 
@@ -156,7 +156,7 @@ router.get('/rooms/:id/members', auth, async (req, res) => {
     const { id } = req.params;
     const room = await requireRoomAccess(id, req.user.id);
     if (!room) {
-      return res.status(404).json({ message: 'Room not found' });
+      return res.status(404).json({ message: 'Otaq tapılmadı.' });
     }
 
     const result = await db.query(
@@ -171,7 +171,7 @@ router.get('/rooms/:id/members', auth, async (req, res) => {
     res.json(result.rows);
   } catch (error) {
     console.error('GET /chat/rooms/:id/members error:', error);
-    res.status(500).json({ message: 'Could not load room members' });
+    res.status(500).json({ message: 'Üzvlər yüklənmədi.' });
   }
 });
 
@@ -180,13 +180,13 @@ router.post('/rooms/:id/invite', auth, async (req, res) => {
     const { id } = req.params;
     const room = await requireRoomAccess(id, req.user.id);
     if (!room) {
-      return res.status(404).json({ message: 'Room not found' });
+      return res.status(404).json({ message: 'Otaq tapılmadı.' });
     }
 
     const email = String(req.body.email || '').trim().toLowerCase();
     const userId = req.body.userId ? parseInt(req.body.userId, 10) : null;
     if (!email && !userId) {
-      return res.status(400).json({ message: 'Email və ya userId lazımdır.' });
+      return res.status(400).json({ message: 'Söhbət üçün istifadəçi seç.' });
     }
 
     const userResult = userId
@@ -224,10 +224,10 @@ router.post('/rooms/:id/leave', auth, async (req, res) => {
   try {
     const { id } = req.params;
     await db.query('DELETE FROM room_members WHERE room_id = $1 AND user_id = $2', [id, req.user.id]);
-    res.json({ message: 'Left' });
+    res.json({ message: 'Otaqdan çıxdın.' });
   } catch (error) {
     console.error('POST /chat/rooms/:id/leave error:', error);
-    res.status(500).json({ message: 'Could not leave room' });
+    res.status(500).json({ message: 'Otaqdan çıxmaq alınmadı.' });
   }
 });
 
@@ -237,7 +237,7 @@ router.get('/rooms/:id/messages', auth, async (req, res) => {
     const { limit = 80 } = req.query;
     const room = await db.query('SELECT id, name FROM chat_rooms WHERE id = $1 AND is_public = true', [id]);
     if (room.rows.length === 0) {
-      return res.status(404).json({ message: 'Room not found' });
+      return res.status(404).json({ message: 'Otaq tapılmadı.' });
     }
 
     const result = await db.query(
@@ -255,7 +255,7 @@ router.get('/rooms/:id/messages', auth, async (req, res) => {
     res.json(result.rows.reverse());
   } catch (error) {
     console.error('GET /chat/rooms/:id/messages error:', error);
-    res.status(500).json({ message: 'Could not load room messages' });
+    res.status(500).json({ message: 'Mesajlar yüklənmədi.' });
   }
 });
 
@@ -264,16 +264,16 @@ router.post('/rooms/:id/messages', auth, async (req, res) => {
   const text = String(req.body.text || '').trim();
 
   if (!text) {
-    return res.status(400).json({ message: 'Message text is required' });
+    return res.status(400).json({ message: 'Mesaj boşdur.' });
   }
   if (invalidText(text)) {
-    return res.status(400).json({ message: 'Mesaj qaydalara uygun deyil.' });
+    return res.status(400).json({ message: 'Mesaj qaydalara uyğun deyil.' });
   }
 
   try {
     const room = await db.query('SELECT id FROM chat_rooms WHERE id = $1 AND is_public = true', [id]);
     if (room.rows.length === 0) {
-      return res.status(404).json({ message: 'Room not found' });
+      return res.status(404).json({ message: 'Otaq tapılmadı.' });
     }
 
     await db.query(
@@ -306,7 +306,7 @@ router.post('/rooms/:id/messages', auth, async (req, res) => {
     });
   } catch (error) {
     console.error('POST /chat/rooms/:id/messages error:', error);
-    res.status(500).json({ message: 'Could not send room message' });
+    res.status(500).json({ message: 'Mesaj göndərilmədi.' });
   }
 });
 

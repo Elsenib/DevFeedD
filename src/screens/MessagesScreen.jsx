@@ -22,6 +22,7 @@ import { AuroraGlow, HeaderIconButton, ScreenHeader } from '../components/Screen
 import { avatarTone } from '../utils/avatarTone';
 import { timeAgo } from '../utils/time';
 import Avatar from '../components/Avatar';
+import { errorText } from '../utils/errors';
 
 
 function ConversationAvatar({ title, avatarUrl }) {
@@ -166,7 +167,7 @@ export default function MessagesScreen({ navigation }) {
       setApplications(Array.isArray(applicationData) ? applicationData : []);
       setRooms(Array.isArray(roomData) ? roomData : []);
     } catch (error) {
-      if (!silent) Alert.alert('Mesaj xətası', error.response?.data?.message || error.message);
+      if (!silent) Alert.alert('Mesaj xətası', errorText(error));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -195,7 +196,7 @@ export default function MessagesScreen({ navigation }) {
         title: conversation.title,
       });
     } catch (error) {
-      Alert.alert('Söhbət xətası', error.response?.data?.message || error.message);
+      Alert.alert('Söhbət xətası', errorText(error));
     } finally {
       setCreating(false);
     }
@@ -209,7 +210,7 @@ export default function MessagesScreen({ navigation }) {
         title: conversation.title || application.applicant_name || application.name,
       });
     } catch (error) {
-      Alert.alert('Geri dönüş xətası', error.response?.data?.message || error.message);
+      Alert.alert('Geri dönüş xətası', errorText(error));
     }
   };
 
@@ -218,7 +219,7 @@ export default function MessagesScreen({ navigation }) {
     try {
       await Linking.openURL(resumeUrl);
     } catch (error) {
-      Alert.alert('CV açılmadı', error.message);
+      Alert.alert('CV açılmadı', 'CV faylını açmaq mümkün olmadı. Bir az sonra yenidən cəhd et.');
     }
   };
 

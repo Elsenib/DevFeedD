@@ -4,6 +4,7 @@ import { Text, TextInput } from '../components/Text';
 import { AuthContext } from '../context/AuthContext';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AuthBackdrop, BrandMark, authStyles as styles, PasswordInput } from '../components/AuthChrome';
+import { errorText } from '../utils/errors';
 
 export default function LoginScreen({ navigation }) {
   const { signIn, socialSignIn, addingAccount, cancelAddAccount } = useContext(AuthContext);
@@ -14,14 +15,14 @@ export default function LoginScreen({ navigation }) {
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert('Xəta', 'E-poçt və şifrəni daxil edin');
+      Alert.alert('Xəta', 'E-poçt və şifrəni yaz');
       return;
     }
     setLoading(true);
     try {
       await signIn({ email, password });
     } catch (error) {
-      Alert.alert('Daxil olmaq alınmadı', error.response?.data?.message || error.message);
+      Alert.alert('Daxil olmaq alınmadı', errorText(error));
     } finally {
       setLoading(false);
     }
@@ -32,7 +33,7 @@ export default function LoginScreen({ navigation }) {
     try {
       await socialSignIn(provider);
     } catch (error) {
-      Alert.alert(`${provider} ilə davam et`, error.response?.data?.message || error.message);
+      Alert.alert(`${provider} ilə davam et`, errorText(error));
     } finally {
       setSocialLoading(null);
     }

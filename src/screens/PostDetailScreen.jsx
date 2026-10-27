@@ -24,6 +24,7 @@ import { openModerationMenu } from '../utils/moderation';
 import { DeployPayload, MediaPayload } from './FeedScreen';
 import { AuroraGlow } from '../components/ScreenChrome';
 import Avatar from '../components/Avatar';
+import { errorText } from '../utils/errors';
 
 const POST_TYPES = {
   TEXT: { label: 'POST', color: '#8790A6', icon: 'notes' },
@@ -49,7 +50,7 @@ function normalizePost(row) {
     ...(row || {}),
     type,
     metadata: parseMetadata(row?.metadata),
-    title: row?.title || row?.caption || 'Paylasim',
+    title: row?.title || row?.caption || 'Paylaşım',
     caption: row?.caption || row?.title || row?.body || '',
     body: row?.body || row?.caption || row?.title || '',
     authorName: row?.name || row?.user?.name || 'İstifadəçi',
@@ -86,7 +87,7 @@ async function openExternalUrl(url) {
     }
     await Linking.openURL(value);
   } catch (error) {
-    Alert.alert('Link xətası', error.message);
+    Alert.alert('Link açılmadı', 'Bu linki açmaq mümkün olmadı.');
   }
 }
 
@@ -229,7 +230,7 @@ function EditPostModal({ visible, post, saving, onClose, onSave }) {
           <TextInput
             value={caption}
             onChangeText={setCaption}
-            placeholder="Paylasim basligi"
+            placeholder="Paylaşım başlığı"
             placeholderTextColor="#4b5563"
             style={styles.modalInput}
           />
@@ -351,7 +352,7 @@ export default function PostDetailScreen({ route, navigation }) {
       setPost(normalizePost(freshPost));
       setComments(Array.isArray(freshComments) ? freshComments : []);
     } catch (error) {
-      Alert.alert('Post yüklənmədi', error.response?.data?.message || error.response?.data?.error || error.message);
+      Alert.alert('Post yüklənmədi', errorText(error));
     } finally {
       setLoading(false);
     }
@@ -389,7 +390,7 @@ export default function PostDetailScreen({ route, navigation }) {
       setReplyTarget(null);
       return true;
     } catch (error) {
-      Alert.alert('Şərh alınmadı', error.response?.data?.message || error.response?.data?.error || error.message);
+      Alert.alert('Şərh alınmadı', errorText(error));
       return false;
     } finally {
       setSavingComment(false);
@@ -465,7 +466,7 @@ export default function PostDetailScreen({ route, navigation }) {
       setApplyOpen(false);
       Alert.alert('Müraciət göndərildi', result.conversationId ? 'Elan sahibinin DM və müraciətlər bölməsinə düşdü.' : 'Müraciətin qeydə alındı.');
     } catch (error) {
-      Alert.alert('Müraciət xətası', error.response?.data?.error || error.response?.data?.message || error.message);
+      Alert.alert('Müraciət xətası', errorText(error));
     } finally {
       setApplyingJob(false);
     }
@@ -480,7 +481,7 @@ export default function PostDetailScreen({ route, navigation }) {
         `5 AZN köçürməni bu hesaba et:\n${result.accountNumber}\nReferans: ${result.boost.reference}`
       );
     } catch (error) {
-      Alert.alert('Boost xətası', error.response?.data?.message || error.message);
+      Alert.alert('Boost xətası', errorText(error));
     } finally {
       setBoostingJob(false);
     }
@@ -532,7 +533,7 @@ export default function PostDetailScreen({ route, navigation }) {
         title: conversation.title || application.name || application.applicant_name,
       });
     } catch (error) {
-      Alert.alert('Mesaj xətası', error.response?.data?.message || error.message);
+      Alert.alert('Mesaj xətası', errorText(error));
     }
   };
 
@@ -548,7 +549,7 @@ export default function PostDetailScreen({ route, navigation }) {
       }));
       setEditOpen(false);
     } catch (error) {
-      Alert.alert('Redaktə alınmadı', error.response?.data?.message || error.response?.data?.error || error.message);
+      Alert.alert('Redaktə alınmadı', errorText(error));
     } finally {
       setSavingEdit(false);
     }
@@ -565,7 +566,7 @@ export default function PostDetailScreen({ route, navigation }) {
             await api.deletePost(post.id);
             navigation.goBack();
           } catch (error) {
-            Alert.alert('Silmək alınmadı', error.response?.data?.message || error.response?.data?.error || error.message);
+            Alert.alert('Silmək alınmadı', errorText(error));
           }
         },
       },

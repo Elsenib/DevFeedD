@@ -25,6 +25,7 @@ import { avatarTone } from '../utils/avatarTone';
 import { AuroraGlow, HeaderIconButton, ScreenHeader } from '../components/ScreenChrome';
 import { openModerationMenu } from '../utils/moderation';
 import Avatar from '../components/Avatar';
+import { errorText } from '../utils/errors';
 
 function formatTime(value) {
   if (!value) return '';
@@ -224,7 +225,7 @@ export default function PublicChatScreen({ route, navigation }) {
       setRooms(nextRooms);
       setSelectedRoom((current) => current || nextRooms[0] || null);
     } catch (error) {
-      Alert.alert('Chat yüklənmədi', error.response?.data?.message || error.message);
+      Alert.alert('Otaqlar yüklənmədi', errorText(error));
     } finally {
       setLoadingRooms(false);
       setRefreshing(false);
@@ -242,7 +243,7 @@ export default function PublicChatScreen({ route, navigation }) {
       const data = await api.fetchChatMessages(selectedRoomId);
       setMessages(Array.isArray(data) ? data : []);
     } catch (error) {
-      if (!silent) Alert.alert('Mesaj alınmadı', error.response?.data?.message || error.message);
+      if (!silent) Alert.alert('Mesaj alınmadı', errorText(error));
     } finally {
       if (!silent) setLoadingMessages(false);
     }
@@ -295,7 +296,7 @@ export default function PublicChatScreen({ route, navigation }) {
         await api.joinChatRoom(room.id);
         setRooms((prev) => prev.map((item) => (item.id === room.id ? { ...item, joined: true } : item)));
       } catch (error) {
-        Alert.alert('Otaq xətası', error.response?.data?.message || error.message);
+        Alert.alert('Otaq xətası', errorText(error));
       }
     }
   };
@@ -314,7 +315,7 @@ export default function PublicChatScreen({ route, navigation }) {
       setSelectedRoom(room);
       setRoomModalOpen(false);
     } catch (error) {
-      Alert.alert('Otaq xətası', error.response?.data?.message || error.message);
+      Alert.alert('Otaq xətası', errorText(error));
     } finally {
       setCreatingRoom(false);
     }
@@ -331,7 +332,7 @@ export default function PublicChatScreen({ route, navigation }) {
       loadMembers();
       loadRooms();
     } catch (error) {
-      Alert.alert('Dəvət xətası', error.response?.data?.message || error.message);
+      Alert.alert('Dəvət xətası', errorText(error));
     } finally {
       setInviting(false);
     }
@@ -353,7 +354,7 @@ export default function PublicChatScreen({ route, navigation }) {
       );
       setText('');
     } catch (error) {
-      Alert.alert('Mesaj alınmadı', error.response?.data?.message || error.message);
+      Alert.alert('Mesaj alınmadı', errorText(error));
     } finally {
       setSending(false);
     }

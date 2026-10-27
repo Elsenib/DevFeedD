@@ -54,7 +54,7 @@ router.get('/', auth, async (req, res) => {
       [req.user.id]
     );
     const user = result.rows[0];
-    if (!user) return res.status(404).json({ message: 'User not found' });
+    if (!user) return res.status(404).json({ message: 'İstifadəçi tapılmadı.' });
 
     const counts = await getProfileCounts(req.user.id, req.user.id);
     const stack = (user.skills && user.skills.length) ? user.skills : (user.languages && user.languages.length ? user.languages : []);
@@ -68,7 +68,7 @@ router.get('/', auth, async (req, res) => {
     });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Could not load profile' });
+    res.status(500).json({ message: 'Profil yüklənmədi.' });
   }
 });
 
@@ -113,7 +113,7 @@ router.get('/posts', auth, async (req, res) => {
     res.json(result.rows);
   } catch (error) {
     console.error('GET /profile/posts error:', error);
-    res.status(500).json({ message: 'Profil paylaşımları yüklənmədi' });
+    res.status(500).json({ message: 'Profil paylaşımları yüklənmədi.' });
   }
 });
 
@@ -159,7 +159,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
   try {
     const userId = parseInt(req.params.id, 10);
     if (Number.isNaN(userId)) {
-      return res.status(400).json({ message: 'Invalid user id' });
+      return res.status(400).json({ message: 'İstifadəçi düzgün deyil.' });
     }
 
     const viewerId = req.user?.id || 0;
@@ -168,7 +168,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
       [userId]
     );
     const user = result.rows[0];
-    if (!user) return res.status(404).json({ message: 'User not found' });
+    if (!user) return res.status(404).json({ message: 'İstifadəçi tapılmadı.' });
 
     const counts = await getProfileCounts(userId, viewerId);
     const stack = (user.skills && user.skills.length) ? user.skills : (user.languages && user.languages.length ? user.languages : []);
@@ -183,7 +183,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
     });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Could not load profile' });
+    res.status(500).json({ message: 'Profil yüklənmədi.' });
   }
 });
 
@@ -196,16 +196,16 @@ router.patch('/', auth, async (req, res) => {
     : (typeof activity_visible === 'boolean' ? activity_visible : null);
   try {
     if (name && containsIllegalWords(name)) {
-      return res.status(400).json({ message: 'Ad qadağan edilmiş sözlər ehtiva edir' });
+      return res.status(400).json({ message: 'Adda qadağan olunmuş sözlər var.' });
     }
     if (name && checkBadWords(name)) {
-      return res.status(400).json({ message: 'Ad uyğunsuz sözlər ehtiva edir' });
+      return res.status(400).json({ message: 'Adda uyğunsuz sözlər var.' });
     }
     if (bio && containsIllegalWords(bio)) {
-      return res.status(400).json({ message: 'Bio qadağan edilmiş sözlər ehtiva edir' });
+      return res.status(400).json({ message: 'Bio-da qadağan olunmuş sözlər var.' });
     }
     if (bio && checkBadWords(bio)) {
-      return res.status(400).json({ message: 'Bio uyğunsuz sözlər ehtiva edir' });
+      return res.status(400).json({ message: 'Bio-da uyğunsuz sözlər var.' });
     }
 
     const skillsJson = Array.isArray(skills) ? skills : (skills ? [skills] : []);
@@ -239,11 +239,11 @@ router.patch('/', auth, async (req, res) => {
     );
 
     const user = result.rows[0];
-    if (!user) return res.status(404).json({ message: 'User not found' });
+    if (!user) return res.status(404).json({ message: 'İstifadəçi tapılmadı.' });
     res.json({ user });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Could not update profile' });
+    res.status(500).json({ message: 'Profil yenilənmədi.' });
   }
 });
 
@@ -256,7 +256,7 @@ router.delete('/', auth, async (req, res) => {
     const deleted = result.rows[0];
     if (!deleted) {
       await client.query('ROLLBACK');
-      return res.status(404).json({ message: 'User not found' });
+      return res.status(404).json({ message: 'İstifadəçi tapılmadı.' });
     }
     await client.query('DELETE FROM email_verification_codes WHERE email = $1', [deleted.email]);
     await client.query("DELETE FROM oauth_login_sessions WHERE user_payload->>'id' = $1", [String(req.user.id)]);
@@ -271,7 +271,7 @@ router.delete('/', auth, async (req, res) => {
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
     console.error('DELETE /profile error:', error);
-    res.status(500).json({ message: 'Hesab silinmədi. Yenidən cəhd edin.' });
+    res.status(500).json({ message: 'Hesab silinmədi. Yenidən cəhd et.' });
   } finally {
     client.release();
   }

@@ -11,6 +11,7 @@ import {
 import { Text, TextInput } from '../components/Text';
 import { MaterialIcons } from '@expo/vector-icons';
 import { AuthContext } from '../context/AuthContext';
+import { errorText } from '../utils/errors';
 
 const ROLES = [
   { id: 'developer', label: 'Developer', desc: 'Kod yazır, layihə qurur' },
@@ -68,15 +69,15 @@ export default function RegisterOnboardingScreen() {
 
   const handleContinue = () => {
     if (step === 0 && !selectedRole) {
-      Alert.alert('Xəta', 'Rolu seçin');
+      Alert.alert('Xəta', 'Rolunu seç');
       return;
     }
     if (step === 1 && subRoles.length > 0 && selectedSubRoles.length === 0) {
-      Alert.alert('Xəta', 'Ən azı bir sahə seçin');
+      Alert.alert('Xəta', 'Ən azı bir sahə seç');
       return;
     }
     if (step === 2 && selectedSkills.length === 0) {
-      Alert.alert('Xəta', 'Ən azı bir texnologiya seçin');
+      Alert.alert('Xəta', 'Ən azı bir texnologiya seç');
       return;
     }
     setStep((current) => Math.min(current + 1, 3));
@@ -100,7 +101,7 @@ export default function RegisterOnboardingScreen() {
         website: profileData.website.trim(),
       });
     } catch (error) {
-      Alert.alert('Xəta', error.response?.data?.message || error.message || 'Profil tamamlanmadı');
+      Alert.alert('Profil tamamlanmadı', errorText(error));
     } finally {
       setLoading(false);
     }
