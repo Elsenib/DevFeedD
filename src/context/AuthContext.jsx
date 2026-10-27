@@ -10,4 +10,11 @@ export const AuthContext = createContext({
   socialSignIn: async () => {},
   completeOnboarding: async () => {},
   updateCurrentUser: async () => {},
+  accounts: [],
+  addingAccount: false,
+  switchAccount: async () => {},
+  removeAccount: async () => {},
+  startAddAccount: () => {},
+  cancelAddAccount: () => {},
+  openAccountSwitcher: () => {},
 });

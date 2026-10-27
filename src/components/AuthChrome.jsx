@@ -73,6 +73,26 @@ export function PasswordInput({ style, ...props }) {
 }
 
 export const authStyles = StyleSheet.create({
+  cancelAdd: {
+    position: 'absolute',
+    top: 54,
+    left: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 18,
+    backgroundColor: 'rgba(16,19,29,0.9)',
+    borderWidth: 1,
+    borderColor: '#1F2433',
+    zIndex: 2,
+  },
+  cancelAddText: {
+    color: '#F1F4FA',
+    fontWeight: '700',
+    fontSize: 13,
+  },
   passwordInput: {
     paddingRight: 52,
   },

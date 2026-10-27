@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Animated, Easing, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { Text } from './Text';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AuthContext } from '../context/AuthContext';
 import Svg, { Circle, ClipPath, Defs, Ellipse, G, LinearGradient, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
 
 const BAR_TOP = 26;
@@ -191,6 +192,7 @@ function BlackHoleButton({ active, onPress, reduceMotion }) {
 export default function BlackHoleTabBar({ state, navigation, unreadCount = 0 }) {
   const { width: screenWidth } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  const { openAccountSwitcher } = useContext(AuthContext);
   const reduceMotion = useReduceMotion();
   const width = screenWidth - SIDE_GAP * 2;
   const centers = SLOT_FRACTIONS.map((f) => f * width);
@@ -267,6 +269,7 @@ export default function BlackHoleTabBar({ state, navigation, unreadCount = 0 }) 
               setCreateActive(false);
               if (currentRoute !== tab.route) navigation.navigate(tab.route);
             }}
+            onLongPress={tab.route === 'Profile' ? openAccountSwitcher : undefined}
             accessibilityRole="tab"
             accessibilityState={{ selected: focused }}
             accessibilityLabel={tab.route === 'Notifications' && unreadCount ? `${tab.label}, ${unreadCount} yeni` : tab.label}

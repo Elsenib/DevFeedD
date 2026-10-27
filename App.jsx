@@ -1,5 +1,5 @@
-import { useContext, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, SafeAreaView, StyleSheet } from 'react-native';
+import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Alert, SafeAreaView, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -12,6 +12,8 @@ import { AuthContext } from './src/context/AuthContext';
 import { AppAlertProvider } from './src/context/AppAlertContext';
 import { PreferencesContext, PreferencesProvider } from './src/context/PreferencesContext';
 import * as api from './src/api';
+import { MAX_ACCOUNTS, forgetAccount, loadAccounts, rememberAccount, tokenFor } from './src/utils/accounts';
+import AccountSwitcher from './src/components/AccountSwitcher';
 import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
 import RegisterOnboardingScreen from './src/screens/RegisterOnboarding';
@@ -53,13 +55,8 @@ function idFromToken(token) {
   }
 }
 
-async function persistAuth(nextToken, nextUser) {
-  if (!nextToken || !nextUser) {
-    await AsyncStorage.removeItem(AUTH_STORAGE_KEY);
-    return;
-  }
-
-  await AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ token: nextToken, user: nextUser }));
+function withId(user, token) {
+  return user && user.id == null && token ? { ...user, id: idFromToken(token) } : user;
 }
 
 function getOAuthParam(url, key) {
@@ -90,25 +87,91 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [accounts, setAccounts] = useState([]);
+  const [addingAccount, setAddingAccount] = useState(false);
+  const [switcherOpen, setSwitcherOpen] = useState(false);
 
+  // AUTH_STORAGE_KEY names the active account; tokens are in the device keystore.
+  // Builds before 1.0.7 kept the token here, so move it on first launch.
   useEffect(() => {
     const restore = async () => {
       try {
-        const saved = await AsyncStorage.getItem(AUTH_STORAGE_KEY);
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (parsed?.token && parsed?.user) {
-            setToken(parsed.token);
-            setUser(normalizeUser(parsed.user));
+        const saved = JSON.parse(await AsyncStorage.getItem(AUTH_STORAGE_KEY));
+        if (saved?.user) {
+          const savedUser = withId(normalizeUser(saved.user), saved.token);
+          if (saved.token) {
+            await rememberAccount(savedUser, saved.token);
+            await AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ user: savedUser }));
+          }
+          const savedToken = await tokenFor(savedUser.id);
+          if (savedToken) {
+            setToken(savedToken);
+            setUser(savedUser);
           }
         }
       } catch (error) {
         await AsyncStorage.removeItem(AUTH_STORAGE_KEY).catch(() => {});
       }
+      setAccounts(await loadAccounts());
       setLoading(false);
     };
     restore();
   }, []);
+
+  // Makes an account the active one and keeps it in the device's account list.
+  const activate = useCallback(async (nextToken, nextUser) => {
+    const active = withId(nextUser, nextToken);
+    setToken(nextToken);
+    setUser(active);
+    setAddingAccount(false);
+    await AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ user: active }));
+    setAccounts(await rememberAccount(active, nextToken));
+  }, []);
+
+  const switchAccount = useCallback(async (accountId) => {
+    setSwitcherOpen(false);
+    const entry = accounts.find((item) => String(item.id) === String(accountId));
+    const savedToken = entry && (await tokenFor(entry.id));
+    if (!savedToken) {
+      setAccounts(await forgetAccount(accountId));
+      Alert.alert('Yenidən daxil ol', 'Bu hesabın sessiyası bitib. Hesabı yenidən əlavə et.');
+      return;
+    }
+    await activate(savedToken, entry.user);
+  }, [accounts, activate]);
+
+  // Signing out removes the active account from this device and falls back to
+  // another saved account, if there is one.
+  const signOutActive = useCallback(async () => {
+    const remaining = user?.id != null ? await forgetAccount(user.id) : await loadAccounts();
+    setAccounts(remaining);
+    const next = remaining[0];
+    const nextToken = next && (await tokenFor(next.id));
+    if (nextToken) {
+      await activate(nextToken, next.user);
+      return;
+    }
+    setToken(null);
+    setUser(null);
+    await AsyncStorage.removeItem(AUTH_STORAGE_KEY);
+  }, [activate, user?.id]);
+
+  const removeAccount = useCallback(async (accountId) => {
+    if (String(accountId) === String(user?.id)) {
+      await signOutActive();
+      return;
+    }
+    setAccounts(await forgetAccount(accountId));
+  }, [signOutActive, user?.id]);
+
+  const startAddAccount = useCallback(() => {
+    setSwitcherOpen(false);
+    if (accounts.length >= MAX_ACCOUNTS) {
+      Alert.alert('Limit', `Bu cihazda ən çox ${MAX_ACCOUNTS} hesab saxlamaq olar. Əvvəlcə birini sil.`);
+      return;
+    }
+    setAddingAccount(true);
+  }, [accounts.length]);
 
   useEffect(() => {
     api.setToken(token);
@@ -126,33 +189,30 @@ export default function App() {
       signIn: async ({ email, password }) => {
         const data = await api.login(email, password);
         const nextUser = normalizeUser(data.user || { email });
-        setToken(data.token);
-        setUser(nextUser);
-        await persistAuth(data.token, nextUser);
+        await activate(data.token, nextUser);
         return data;
       },
-      signOut: async () => {
-        setToken(null);
-        setUser(null);
-        await persistAuth(null, null);
-      },
+      signOut: signOutActive,
+      accounts,
+      addingAccount,
+      switchAccount,
+      removeAccount,
+      startAddAccount,
+      cancelAddAccount: () => setAddingAccount(false),
+      openAccountSwitcher: () => setSwitcherOpen(true),
       signUp: async ({ name, email, password }) => {
         const data = await api.register(name, email, password);
         if (data.verificationRequired || !data.token) {
           return data;
         }
         const nextUser = normalizeUser(data.user || { name, email });
-        setToken(data.token);
-        setUser(nextUser);
-        await persistAuth(data.token, nextUser);
+        await activate(data.token, nextUser);
         return data;
       },
       verifyEmailRegistration: async ({ email, code }) => {
         const data = await api.verifyEmailRegistration(email, code);
         const nextUser = normalizeUser(data.user || { email });
-        setToken(data.token);
-        setUser(nextUser);
-        await persistAuth(data.token, nextUser);
+        await activate(data.token, nextUser);
         return data;
       },
       socialSignIn: async (provider) => {
@@ -177,9 +237,7 @@ export default function App() {
         const data = await api.completeOAuth(sessionId);
 
         const nextUser = normalizeUser(data.user);
-        setToken(data.token);
-        setUser(nextUser);
-        await persistAuth(data.token, nextUser);
+        await activate(data.token, nextUser);
         return data;
       },
       completeOnboarding: async (profile) => {
@@ -200,8 +258,7 @@ export default function App() {
           role_sub: data.user?.role_sub || profile.subRole,
           onboardingPending: false,
         });
-        setUser(nextUser);
-        await persistAuth(token, nextUser);
+        await activate(token, nextUser);
         return data;
       },
       updateCurrentUser: async (profile) => {
@@ -211,12 +268,11 @@ export default function App() {
           ...(data.user || {}),
           onboardingPending: false,
         });
-        setUser(nextUser);
-        await persistAuth(token, nextUser);
+        await activate(token, nextUser);
         return data;
       },
     }),
-    [token, user, currentUser]
+    [token, user, currentUser, accounts, addingAccount, activate, signOutActive, switchAccount, removeAccount, startAddAccount]
   );
 
   if (loading || (!fontsLoaded && !fontError)) {
@@ -235,10 +291,10 @@ export default function App() {
         <AuthContext.Provider value={authContext}>
           {/* React Navigation 7 stopped navigate() from reaching screens inside a
               nested navigator by default; the screens here still rely on it. */}
-          <NavigationContainer navigationInChildEnabled>
+          <NavigationContainer navigationInChildEnabled key={addingAccount ? 'adding' : String(currentUser?.id ?? 'guest')}>
             <ThemedStatusBar />
             <Stack.Navigator screenOptions={{ headerShown: false }}>
-              {!user ? (
+              {!user || addingAccount ? (
                 <>
                   <Stack.Screen name="Login" component={LoginScreen} />
                   <Stack.Screen name="Register" component={RegisterScreen} />
@@ -259,6 +315,7 @@ export default function App() {
               )}
             </Stack.Navigator>
           </NavigationContainer>
+          <AccountSwitcher visible={switcherOpen} onClose={() => setSwitcherOpen(false)} />
         </AuthContext.Provider>
       </AppAlertProvider>
     </PreferencesProvider>

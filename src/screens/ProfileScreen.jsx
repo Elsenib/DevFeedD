@@ -204,7 +204,7 @@ function ManualSupportModal({ visible, profile, colors, config, submitting, onCl
 }
 
 export default function ProfileScreen({ route, navigation }) {
-  const { user, updateCurrentUser } = useContext(AuthContext);
+  const { user, updateCurrentUser, openAccountSwitcher } = useContext(AuthContext);
   const { theme } = useContext(PreferencesContext);
   const colors = theme.colors;
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -421,9 +421,12 @@ export default function ProfileScreen({ route, navigation }) {
           {!isOwnProfile && navigation.canGoBack() ? (
             <HeaderIconButton icon="arrow-back" onPress={() => navigation.goBack()} label="Geri" />
           ) : (
-            <Text style={[styles.topHandle, { color: colors.muted }]} numberOfLines={1}>
-              @{String(profile?.email || user?.email || displayName).split('@')[0]}
-            </Text>
+            <TouchableOpacity style={styles.handleButton} onPress={openAccountSwitcher} accessibilityLabel="Hesablar arasında keç">
+              <Text style={[styles.topHandle, { color: colors.text }]} numberOfLines={1}>
+                @{String(profile?.email || user?.email || displayName).split('@')[0]}
+              </Text>
+              <MaterialIcons name="keyboard-arrow-down" size={20} color={colors.text} />
+            </TouchableOpacity>
           )}
           {isOwnProfile ? (
             <HeaderIconButton icon="settings" onPress={() => navigation.navigate('Settings')} label="Tənzimləmələr" />
@@ -570,6 +573,11 @@ function createStyles(colors) {
       alignItems: 'center',
       justifyContent: 'space-between',
       marginBottom: 12,
+    },
+    handleButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flexShrink: 1,
     },
     topHandle: {
       fontSize: 14,

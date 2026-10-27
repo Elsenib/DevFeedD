@@ -6,7 +6,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AuthBackdrop, BrandMark, authStyles as styles, PasswordInput } from '../components/AuthChrome';
 
 export default function LoginScreen({ navigation }) {
-  const { signIn, socialSignIn } = useContext(AuthContext);
+  const { signIn, socialSignIn, addingAccount, cancelAddAccount } = useContext(AuthContext);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -58,6 +58,12 @@ export default function LoginScreen({ navigation }) {
   return (
     <View style={styles.container}>
       <AuthBackdrop />
+      {addingAccount && (
+        <TouchableOpacity style={styles.cancelAdd} onPress={cancelAddAccount} accessibilityLabel="Hesab əlavə etməni ləğv et">
+          <MaterialCommunityIcons name="arrow-left" size={20} color="#F1F4FA" />
+          <Text style={styles.cancelAddText}>Hesabıma qayıt</Text>
+        </TouchableOpacity>
+      )}
       <BrandMark />
       <Text style={styles.title}>Xoş gəldin</Text>
       <Text style={styles.subtitle}>Developerlər üçün sosial platforma.</Text>
