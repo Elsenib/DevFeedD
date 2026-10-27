@@ -461,6 +461,7 @@ export function PostCard({ post, onPress, onAuthorPress, onLike, onBookmark, onA
         {onMore && (
           <TouchableOpacity
             style={styles.moreButton}
+            accessibilityLabel="Seçimlər"
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             onPress={(event) => {
               event?.stopPropagation?.();

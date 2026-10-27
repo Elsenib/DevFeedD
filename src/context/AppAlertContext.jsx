@@ -12,6 +12,7 @@ function normalizeButtons(buttons) {
     text: button?.text || 'Oldu',
     style: button?.style || 'default',
     onPress: button?.onPress,
+    icon: button?.icon,
   }));
 }
 
@@ -43,6 +44,8 @@ export function AppAlertProvider({ children }) {
         message: typeof message === 'string' ? message : '',
         buttons: normalizeButtons(buttons),
         cancelable: options?.cancelable !== false,
+        // { sheet: true } shows the buttons as an action sheet (icon + label rows).
+        sheet: !!options?.sheet,
       });
     };
 
@@ -52,6 +55,49 @@ export function AppAlertProvider({ children }) {
   }, []);
 
   const close = () => setAlertState(null);
+  const choose = (button) => {
+    close();
+    button.onPress?.();
+  };
+
+  if (alertState?.sheet) {
+    const actions = alertState.buttons.filter((button) => button.style !== 'cancel');
+    const cancel = alertState.buttons.find((button) => button.style === 'cancel');
+    return (
+      <>
+        {children}
+        <Modal visible transparent animationType="slide" onRequestClose={close}>
+          <View style={styles.sheetOverlay}>
+            <Pressable style={styles.backdrop} onPress={close} />
+            <View style={styles.sheet}>
+              <View style={styles.sheetHandle} />
+              {!!alertState.title && <Text style={styles.sheetTitle}>{alertState.title}</Text>}
+              {!!alertState.message && <Text style={styles.sheetMessage}>{alertState.message}</Text>}
+              {actions.map((button, index) => {
+                const destructive = button.style === 'destructive';
+                const tint = destructive ? colors.danger : colors.text;
+                return (
+                  <TouchableOpacity key={`${button.text}-${index}`} style={styles.sheetRow} onPress={() => choose(button)}>
+                    {!!button.icon && (
+                      <View style={[styles.sheetIcon, { backgroundColor: destructive ? `${colors.danger}1F` : colors.surfaceStrong }]}>
+                        <MaterialIcons name={button.icon} size={20} color={tint} />
+                      </View>
+                    )}
+                    <Text style={[styles.sheetRowText, { color: tint }]}>{button.text}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+              {!!cancel && (
+                <TouchableOpacity style={styles.sheetCancel} onPress={() => choose(cancel)}>
+                  <Text style={styles.sheetCancelText}>{cancel.text}</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        </Modal>
+      </>
+    );
+  }
   const icon = alertState ? iconFor(alertState.title, alertState.buttons) : null;
   const stacked = (alertState?.buttons.length || 0) > 2;
 
@@ -62,12 +108,12 @@ export function AppAlertProvider({ children }) {
         <View style={styles.overlay}>
           <Pressable style={styles.backdrop} onPress={alertState?.cancelable ? close : undefined} />
           <View style={styles.card}>
-            <View style={styles.headerRow}>
+            <View style={[styles.headerRow, !alertState?.message && styles.headerRowCentered]}>
               <View style={[styles.iconWrap, { backgroundColor: `${icon?.color || colors.primary}22` }]}>
                 <MaterialIcons name={icon?.name || 'info-outline'} size={26} color={icon?.color || colors.primary} />
               </View>
               <View style={styles.titleBlock}>
-                <Text style={styles.title}>{alertState?.title || 'DevFeed'}</Text>
+                <Text style={[styles.title, !alertState?.message && styles.titleOnly]}>{alertState?.title || 'DevFeed'}</Text>
                 {!!alertState?.message && <Text style={styles.message}>{alertState.message}</Text>}
               </View>
             </View>
@@ -132,6 +178,82 @@ function createStyles(colors) {
     headerRow: {
       flexDirection: 'row',
       alignItems: 'flex-start',
+    },
+    headerRowCentered: {
+      alignItems: 'center',
+    },
+    titleOnly: {
+      marginBottom: 0,
+    },
+    sheetOverlay: {
+      flex: 1,
+      justifyContent: 'flex-end',
+    },
+    sheet: {
+      backgroundColor: colors.surface,
+      borderColor: colors.border,
+      borderWidth: 1,
+      borderBottomWidth: 0,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      paddingHorizontal: 16,
+      paddingTop: 10,
+      paddingBottom: 30,
+    },
+    sheetHandle: {
+      alignSelf: 'center',
+      width: 40,
+      height: 5,
+      borderRadius: 3,
+      backgroundColor: colors.border,
+      marginBottom: 12,
+    },
+    sheetTitle: {
+      color: colors.text,
+      fontSize: 16,
+      fontWeight: '900',
+      marginBottom: 4,
+      paddingHorizontal: 4,
+    },
+    sheetMessage: {
+      color: colors.muted,
+      fontSize: 13,
+      lineHeight: 19,
+      marginBottom: 6,
+      paddingHorizontal: 4,
+    },
+    sheetRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      minHeight: 52,
+      paddingHorizontal: 4,
+    },
+    sheetIcon: {
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 14,
+    },
+    sheetRowText: {
+      fontSize: 16,
+      fontWeight: '700',
+    },
+    sheetCancel: {
+      marginTop: 10,
+      height: 48,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surfaceStrong,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    sheetCancelText: {
+      color: colors.text,
+      fontSize: 15,
+      fontWeight: '800',
     },
     iconWrap: {
       width: 44,
