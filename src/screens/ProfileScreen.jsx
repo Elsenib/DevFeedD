@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  KeyboardAvoidingView,
   Modal,
   ScrollView,
   StyleSheet,
@@ -53,48 +54,52 @@ function EditProfileModal({ visible, profile, colors, saving, onClose, onSave, o
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={styles.modalOverlay}>
+      {/* Android draws edge-to-edge, so the window no longer shrinks for the
+          keyboard; padding lifts the sheet and the scroll view reaches every field. */}
+      <KeyboardAvoidingView style={styles.modalOverlay} behavior="padding">
         <View style={styles.sheet}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Profili düzəlt</Text>
-            <TouchableOpacity onPress={onClose}>
-              <MaterialIcons name="close" size={24} color={colors.muted} />
+          <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Profili düzəlt</Text>
+              <TouchableOpacity onPress={onClose}>
+                <MaterialIcons name="close" size={24} color={colors.muted} />
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity style={styles.avatarPicker} onPress={onPickAvatar}>
+              {profile?.avatar_url ? (
+                <Image source={{ uri: profile.avatar_url }} style={styles.avatarImageLarge} />
+              ) : (
+                <View style={styles.avatarLarge}>
+                  <MaterialIcons name="add-a-photo" size={28} color="#ffffff" />
+                </View>
+              )}
+              <Text style={styles.avatarPickerText}>Profil şəkli seç</Text>
             </TouchableOpacity>
-          </View>
 
-          <TouchableOpacity style={styles.avatarPicker} onPress={onPickAvatar}>
-            {profile?.avatar_url ? (
-              <Image source={{ uri: profile.avatar_url }} style={styles.avatarImageLarge} />
-            ) : (
-              <View style={styles.avatarLarge}>
-                <MaterialIcons name="add-a-photo" size={28} color="#ffffff" />
-              </View>
-            )}
-            <Text style={styles.avatarPickerText}>Profil şəkli seç</Text>
-          </TouchableOpacity>
+            <Text style={styles.fieldLabel}>AD</Text>
+            <TextInput value={name} onChangeText={setName} placeholder="Ad Soyad" placeholderTextColor={colors.muted} style={styles.input} />
+            <Text style={styles.fieldLabel}>BIO</Text>
+            <TextInput value={bio} onChangeText={setBio} placeholder="Qisa bio" placeholderTextColor={colors.muted} style={[styles.input, styles.textarea]} multiline />
+            <Text style={styles.fieldLabel}>ROL</Text>
+            <TextInput value={role} onChangeText={setRole} placeholder="Developer, Designer..." placeholderTextColor={colors.muted} style={styles.input} />
+            <Text style={styles.fieldLabel}>ALT ROL</Text>
+            <TextInput value={roleSub} onChangeText={setRoleSub} placeholder="Frontend, Backend..." placeholderTextColor={colors.muted} style={styles.input} />
+            <Text style={styles.fieldLabel}>STACK</Text>
+            <TextInput value={skills} onChangeText={setSkills} placeholder="React Native, Node.js" placeholderTextColor={colors.muted} style={styles.input} />
+            <Text style={styles.fieldLabel}>WEBSITE</Text>
+            <TextInput value={website} onChangeText={setWebsite} placeholder="https://..." placeholderTextColor={colors.muted} style={styles.input} autoCapitalize="none" />
 
-          <Text style={styles.fieldLabel}>AD</Text>
-          <TextInput value={name} onChangeText={setName} placeholder="Ad Soyad" placeholderTextColor={colors.muted} style={styles.input} />
-          <Text style={styles.fieldLabel}>BIO</Text>
-          <TextInput value={bio} onChangeText={setBio} placeholder="Qisa bio" placeholderTextColor={colors.muted} style={[styles.input, styles.textarea]} multiline />
-          <Text style={styles.fieldLabel}>ROL</Text>
-          <TextInput value={role} onChangeText={setRole} placeholder="Developer, Designer..." placeholderTextColor={colors.muted} style={styles.input} />
-          <Text style={styles.fieldLabel}>ALT ROL</Text>
-          <TextInput value={roleSub} onChangeText={setRoleSub} placeholder="Frontend, Backend..." placeholderTextColor={colors.muted} style={styles.input} />
-          <Text style={styles.fieldLabel}>STACK</Text>
-          <TextInput value={skills} onChangeText={setSkills} placeholder="React Native, Node.js" placeholderTextColor={colors.muted} style={styles.input} />
-          <Text style={styles.fieldLabel}>WEBSITE</Text>
-          <TextInput value={website} onChangeText={setWebsite} placeholder="https://..." placeholderTextColor={colors.muted} style={styles.input} autoCapitalize="none" />
-
-          <TouchableOpacity
-            style={[styles.primaryButton, saving && styles.disabledButton]}
-            onPress={() => onSave({ name, bio, website, role, roleSub, skills: splitList(skills) })}
-            disabled={saving}
-          >
-            {saving ? <ActivityIndicator color="#ffffff" /> : <Text style={styles.primaryButtonText}>Yadda saxla</Text>}
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.primaryButton, saving && styles.disabledButton]}
+              onPress={() => onSave({ name, bio, website, role, roleSub, skills: splitList(skills) })}
+              disabled={saving}
+            >
+              {saving ? <ActivityIndicator color="#ffffff" /> : <Text style={styles.primaryButtonText}>Yadda saxla</Text>}
+            </TouchableOpacity>
+          </ScrollView>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

@@ -1,5 +1,5 @@
 import { useContext, useState } from 'react';
-import { ActivityIndicator, Alert, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, TouchableOpacity, View, KeyboardAvoidingView, ScrollView } from 'react-native';
 import { Text, TextInput } from '../components/Text';
 import { AuthContext } from '../context/AuthContext';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -56,51 +56,53 @@ export default function LoginScreen({ navigation }) {
   );
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView style={styles.screen} behavior="padding">
       <AuthBackdrop />
-      {addingAccount && (
-        <TouchableOpacity style={styles.cancelAdd} onPress={cancelAddAccount} accessibilityLabel="Hesab əlavə etməni ləğv et">
-          <MaterialCommunityIcons name="arrow-left" size={20} color="#F1F4FA" />
-          <Text style={styles.cancelAddText}>Hesabıma qayıt</Text>
-        </TouchableOpacity>
-      )}
-      <BrandMark />
-      <Text style={styles.title}>Xoş gəldin</Text>
-      <Text style={styles.subtitle}>Developerlər üçün sosial platforma.</Text>
-      <View style={styles.formCard}>
-        <TextInput
-          value={email}
-          onChangeText={setEmail}
-          placeholder="E-poçt"
-          placeholderTextColor="#7C859A"
-          keyboardType="email-address"
-          autoCapitalize="none"
-          style={styles.input}
-        />
-        <PasswordInput
-          value={password}
-          onChangeText={setPassword}
-          placeholder="Şifrə"
-          placeholderTextColor="#7C859A"
-          style={styles.input}
-        />
-        <TouchableOpacity style={styles.button} onPress={handleLogin} disabled={loading}>
-          {loading ? <ActivityIndicator color="#1A0A02" /> : <Text style={styles.buttonText}>Daxil ol</Text>}
-        </TouchableOpacity>
+      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        {addingAccount && (
+          <TouchableOpacity style={styles.cancelAdd} onPress={cancelAddAccount} accessibilityLabel="Hesab əlavə etməni ləğv et">
+            <MaterialCommunityIcons name="arrow-left" size={20} color="#F1F4FA" />
+            <Text style={styles.cancelAddText}>Hesabıma qayıt</Text>
+          </TouchableOpacity>
+        )}
+        <BrandMark />
+        <Text style={styles.title}>Xoş gəldin</Text>
+        <Text style={styles.subtitle}>Developerlər üçün sosial platforma.</Text>
+        <View style={styles.formCard}>
+          <TextInput
+            value={email}
+            onChangeText={setEmail}
+            placeholder="E-poçt"
+            placeholderTextColor="#7C859A"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            style={styles.input}
+          />
+          <PasswordInput
+            value={password}
+            onChangeText={setPassword}
+            placeholder="Şifrə"
+            placeholderTextColor="#7C859A"
+            style={styles.input}
+          />
+          <TouchableOpacity style={styles.button} onPress={handleLogin} disabled={loading}>
+            {loading ? <ActivityIndicator color="#1A0A02" /> : <Text style={styles.buttonText}>Daxil ol</Text>}
+          </TouchableOpacity>
 
-        <View style={styles.dividerContainer}>
-          <View style={styles.divider} />
-          <Text style={styles.dividerText}>və ya</Text>
-          <View style={styles.divider} />
+          <View style={styles.dividerContainer}>
+            <View style={styles.divider} />
+            <Text style={styles.dividerText}>və ya</Text>
+            <View style={styles.divider} />
+          </View>
+
+          {renderSocialButton('github', 'GitHub ilə davam et', 'github')}
+          {renderSocialButton('google', 'Google ilə davam et', 'google')}
+
+          <TouchableOpacity onPress={() => navigation.navigate('Register')}>
+            <Text style={styles.switchText}>Hesabın yoxdur? <Text style={styles.switchAccent}>Qeydiyyatdan keç</Text></Text>
+          </TouchableOpacity>
         </View>
-
-        {renderSocialButton('github', 'GitHub ilə davam et', 'github')}
-        {renderSocialButton('google', 'Google ilə davam et', 'google')}
-
-        <TouchableOpacity onPress={() => navigation.navigate('Register')}>
-          <Text style={styles.switchText}>Hesabın yoxdur? <Text style={styles.switchAccent}>Qeydiyyatdan keç</Text></Text>
-        </TouchableOpacity>
-      </View>
-    </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }

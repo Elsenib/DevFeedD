@@ -4,6 +4,7 @@ import {
   Alert,
   FlatList,
   Image,
+  KeyboardAvoidingView,
   Linking,
   Modal,
   RefreshControl,
@@ -70,7 +71,7 @@ function NewConversationModal({ visible, creating, onClose, onCreate }) {
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={styles.modalOverlay}>
+      <KeyboardAvoidingView style={styles.modalOverlay} behavior="padding">
         <View style={styles.newChatSheet}>
           <View style={styles.sheetHandle} />
           <View style={styles.modalHeader}>
@@ -123,7 +124,7 @@ function NewConversationModal({ visible, creating, onClose, onCreate }) {
             </TouchableOpacity>
           )}
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

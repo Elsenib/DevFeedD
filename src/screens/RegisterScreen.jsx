@@ -1,5 +1,5 @@
 import { useContext, useState } from 'react';
-import { ActivityIndicator, Alert, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, TouchableOpacity, View, KeyboardAvoidingView, ScrollView } from 'react-native';
 import { Text, TextInput } from '../components/Text';
 import { AuthContext } from '../context/AuthContext';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -84,78 +84,80 @@ export default function RegisterScreen({ navigation }) {
   );
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView style={styles.screen} behavior="padding">
       <AuthBackdrop />
-      <BrandMark />
-      <Text style={styles.title}>Yeni hesab aç</Text>
-      <Text style={styles.subtitle}>Bir neçə saniyədə qeydiyyatdan keç və feed-ə başla.</Text>
-      <View style={styles.formCard}>
-        {pendingEmail ? (
-          <>
-            <Text style={styles.pendingText}>{pendingEmail} ünvanına gələn təsdiq kodunu daxil et.</Text>
-            <TextInput
-              value={code}
-              onChangeText={setCode}
-              placeholder="6 rəqəmli kod"
-              placeholderTextColor="#7C859A"
-              keyboardType="number-pad"
-              style={styles.input}
-            />
-            <TouchableOpacity style={styles.button} onPress={handleVerify} disabled={verifying}>
-              {verifying ? <ActivityIndicator color="#ffffff" /> : <Text style={styles.buttonText}>Emaili təsdiqlə</Text>}
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setPendingEmail('')}>
-              <Text style={styles.switchText}>Məlumatları dəyiş</Text>
-            </TouchableOpacity>
-          </>
-        ) : (
-          <>
-            <TextInput
-              value={name}
-              onChangeText={setName}
-              placeholder="Ad Soyad"
-              placeholderTextColor="#7C859A"
-              style={styles.input}
-            />
-            <TextInput
-              value={email}
-              onChangeText={setEmail}
-              placeholder="E-poçt"
-              placeholderTextColor="#7C859A"
-              keyboardType="email-address"
-              autoCapitalize="none"
-              style={styles.input}
-            />
-            <PasswordInput
-              value={password}
-              onChangeText={setPassword}
-              placeholder="Şifrə"
-              placeholderTextColor="#7C859A"
-              style={styles.input}
-            />
-            <TouchableOpacity style={styles.button} onPress={handleRegister} disabled={loading}>
-              {loading ? <ActivityIndicator color="#1A0A02" /> : <Text style={styles.buttonText}>Qeydiyyat</Text>}
-            </TouchableOpacity>
-          </>
-        )}
+      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <BrandMark />
+        <Text style={styles.title}>Yeni hesab aç</Text>
+        <Text style={styles.subtitle}>Bir neçə saniyədə qeydiyyatdan keç və feed-ə başla.</Text>
+        <View style={styles.formCard}>
+          {pendingEmail ? (
+            <>
+              <Text style={styles.pendingText}>{pendingEmail} ünvanına gələn təsdiq kodunu daxil et.</Text>
+              <TextInput
+                value={code}
+                onChangeText={setCode}
+                placeholder="6 rəqəmli kod"
+                placeholderTextColor="#7C859A"
+                keyboardType="number-pad"
+                style={styles.input}
+              />
+              <TouchableOpacity style={styles.button} onPress={handleVerify} disabled={verifying}>
+                {verifying ? <ActivityIndicator color="#ffffff" /> : <Text style={styles.buttonText}>Emaili təsdiqlə</Text>}
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setPendingEmail('')}>
+                <Text style={styles.switchText}>Məlumatları dəyiş</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <TextInput
+                value={name}
+                onChangeText={setName}
+                placeholder="Ad Soyad"
+                placeholderTextColor="#7C859A"
+                style={styles.input}
+              />
+              <TextInput
+                value={email}
+                onChangeText={setEmail}
+                placeholder="E-poçt"
+                placeholderTextColor="#7C859A"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                style={styles.input}
+              />
+              <PasswordInput
+                value={password}
+                onChangeText={setPassword}
+                placeholder="Şifrə"
+                placeholderTextColor="#7C859A"
+                style={styles.input}
+              />
+              <TouchableOpacity style={styles.button} onPress={handleRegister} disabled={loading}>
+                {loading ? <ActivityIndicator color="#1A0A02" /> : <Text style={styles.buttonText}>Qeydiyyat</Text>}
+              </TouchableOpacity>
+            </>
+          )}
 
-        {!pendingEmail && (
-          <>
-            <View style={styles.dividerContainer}>
-              <View style={styles.divider} />
-              <Text style={styles.dividerText}>və ya</Text>
-              <View style={styles.divider} />
-            </View>
+          {!pendingEmail && (
+            <>
+              <View style={styles.dividerContainer}>
+                <View style={styles.divider} />
+                <Text style={styles.dividerText}>və ya</Text>
+                <View style={styles.divider} />
+              </View>
 
-            {renderSocialButton('github', 'GitHub ilə davam et', 'github')}
-            {renderSocialButton('google', 'Google ilə davam et', 'google')}
+              {renderSocialButton('github', 'GitHub ilə davam et', 'github')}
+              {renderSocialButton('google', 'Google ilə davam et', 'google')}
 
-            <TouchableOpacity onPress={() => navigation.goBack()}>
-              <Text style={styles.switchText}>Artıq hesabın var? <Text style={styles.switchAccent}>Daxil ol</Text></Text>
-            </TouchableOpacity>
-          </>
-        )}
-      </View>
-    </View>
+              <TouchableOpacity onPress={() => navigation.goBack()}>
+                <Text style={styles.switchText}>Artıq hesabın var? <Text style={styles.switchAccent}>Daxil ol</Text></Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }

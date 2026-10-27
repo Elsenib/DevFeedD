@@ -76,107 +76,44 @@ function checkBadWords(text) {
   return filter.isProfane(text);
 }
 
-async function validateImageMetadata(buffer) {
-  try {
-    const metadata = await sharp(buffer).metadata();
-    
-    if (!['jpeg', 'png', 'webp'].includes(metadata.format)) {
-      return { valid: false, reason: 'İcazə verilən şəkil formatı: JPG, PNG, WebP' };
-    }
-    
-    const maxDimension = 2048;
-    if (metadata.width > maxDimension || metadata.height > maxDimension) {
-      return { valid: false, reason: `Şəkil ölçüsü çox böyükdür (maksimum: ${maxDimension}x${maxDimension}px). Lütfən daha kiçik şəkil seçin.` };
-    }
-    
-    const minDimension = 32;
-    if (metadata.width < minDimension || metadata.height < minDimension) {
-      return { valid: false, reason: `Şəkil ölçüsü çox kiçikdir (minimum: ${minDimension}x${minDimension}px)` };
-    }
-    
-    return { valid: true, metadata };
-  } catch (error) {
-    return { valid: false, reason: 'Şəkil oxunmadı: ' + error.message };
-  }
-}
+const AVATAR_SIZE = 512;
+const AVATAR_MIN_SIDE = 64;
 
-async function detectNSFWSkinTone(buffer) {
+// Checks an uploaded avatar and turns it into a 512x512 JPEG: square-cropped
+// around the most interesting region, rotated by its EXIF orientation, and
+// with all metadata (GPS position, camera details) dropped.
+async function processAvatar(buffer) {
+  let metadata;
   try {
-    const image = sharp(buffer);
-    const metadata = await image.metadata();
-    
-    // Resize for faster processing if image is too large
-    const resized = image.resize(400, 400, { fit: 'inside', withoutEnlargement: true });
-    
-    // Get raw RGB pixel data
-    const { data, info } = await resized.raw().toBuffer({ resolveWithObject: true });
-    
-    let skinTonePixels = 0;
-    let totalPixels = 0;
-    
-    // Process pixels (RGB format, 3 bytes per pixel)
-    for (let i = 0; i < data.length; i += 3) {
-      const r = data[i];
-      const g = data[i + 1];
-      const b = data[i + 2];
-      
-      // Skin tone detection: 
-      // - Red dominant (R > G and R > B)
-      // - High saturation (R-B > 20)
-      // - Within skin tone range
-      if (r > 80 && g > 40 && b > 20 && (r - g) > 5 && (r - b) > 15) {
-        skinTonePixels++;
-      }
-      totalPixels++;
-    }
-    
-    const skinTonePercentage = (skinTonePixels / totalPixels) * 100;
-    
-    // If more than 25% skin tone pixels, likely inappropriate
-    if (skinTonePercentage > 18) {
-      return { valid: false, reason: 'Şəkil uyğunsuz dərəcədə cəldi göstərir. Lütfən başqa şəkil seçin.' };
-    }
-    
-    return { valid: true };
+    metadata = await sharp(buffer).metadata();
   } catch (error) {
-    console.warn('NSFW detection error (non-blocking):', error.message);
-    return { valid: true }; // Don't block if detection fails
+    return { valid: false, reason: 'Şəkil oxunmadı. Başqa şəkil seç.' };
   }
-}
-
-async function validateAvatar(buffer) {
-  const validation = await validateImageMetadata(buffer);
-  if (!validation.valid) return validation;
-  
-  const { metadata } = validation;
-  const aspectRatio = metadata.width / metadata.height;
-  
-  if (aspectRatio < 0.75 || aspectRatio > 1.33) {
-    return { valid: false, reason: 'Profil şəkli kvadrata yaxın ölçüdə olmalıdır (portrət formatı qəbul olunur)' };
+  if (!['jpeg', 'png', 'webp', 'heif'].includes(metadata.format)) {
+    return { valid: false, reason: 'Yalnız JPG, PNG, WebP və HEIC şəkillər qəbul olunur.' };
   }
-  
-  // Check for excessive skin tones (NSFW detection)
-  const nsfwCheck = await detectNSFWSkinTone(buffer);
-  if (!nsfwCheck.valid) {
-    return nsfwCheck;
+  if (Math.min(metadata.width || 0, metadata.height || 0) < AVATAR_MIN_SIDE) {
+    return { valid: false, reason: 'Şəkil çox kiçikdir. Ən azı 64×64 piksel olmalıdır.' };
   }
-  
-  return { valid: true, metadata };
+  try {
+    const output = await sharp(buffer)
+      .rotate()
+      .resize(AVATAR_SIZE, AVATAR_SIZE, { fit: 'cover', position: sharp.strategy.attention })
+      .flatten({ background: '#10131D' })
+      .jpeg({ quality: 85, mozjpeg: true })
+      .toBuffer();
+    return { valid: true, buffer: output };
+  } catch (error) {
+    return { valid: false, reason: 'Şəkil emal olunmadı. Başqa şəkil seç.' };
+  }
 }
 
 function validateFileUpload(file) {
-  if (!file) return { valid: false, reason: 'Fayl seçilmədi' };
-  
-  const maxSize = 5 * 1024 * 1024;
-  if (file.size > maxSize) {
-    return { valid: false, reason: `Fayl çox böyükdür. Maksimum: 5MB, Yüklənmiş: ${(file.size / 1024 / 1024).toFixed(2)}MB` };
-  }
-  
-  const allowedMimes = ['image/jpeg', 'image/png', 'image/webp'];
+  if (!file) return { valid: false, reason: 'Şəkil seçilmədi.' };
+  const allowedMimes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
   if (!allowedMimes.includes(file.mimetype)) {
-    return { valid: false, reason: `İcazə verilən formatlar: JPG, PNG, WebP. Yüklənmiş: ${file.mimetype}` };
+    return { valid: false, reason: 'Yalnız JPG, PNG, WebP və HEIC şəkillər qəbul olunur.' };
   }
-  
   return { valid: true };
 }
 
@@ -184,10 +121,8 @@ module.exports = {
   containsIllegalWords,
   containsNSFWKeywords,
   checkBadWords,
-  validateImageMetadata,
-  validateAvatar,
+  processAvatar,
   validateFileUpload,
-  detectNSFWSkinTone,
   ILLEGAL_TERMS,
   NSFW_KEYWORDS,
   filter,

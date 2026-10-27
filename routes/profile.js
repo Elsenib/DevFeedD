@@ -4,33 +4,36 @@ const path = require('path');
 const multer = require('multer');
 const db = require('../db');
 const { auth, optionalAuth } = require('../middleware/auth');
-const { validateFileUpload, validateAvatar, containsIllegalWords, checkBadWords } = require('../middleware/contentFilter');
+const { validateFileUpload, processAvatar, containsIllegalWords, checkBadWords } = require('../middleware/contentFilter');
+const { publicBaseUrl } = require('../services/publicUrl');
 
 const router = express.Router();
 
 const avatarUploadDir = path.join(__dirname, '../uploads/avatars');
 fs.mkdirSync(avatarUploadDir, { recursive: true });
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, avatarUploadDir),
-  filename: (req, file, cb) => {
-    const extension = path.extname(file.originalname) || '.jpg';
-    const filename = `${Date.now()}-${Math.round(Math.random() * 1e9)}${extension}`;
-    cb(null, filename);
-  },
-});
+const AVATAR_MAX_BYTES = 10 * 1024 * 1024;
 
+// Kept in memory: the original is re-encoded by processAvatar and only the
+// cleaned-up JPEG is written to disk.
 const upload = multer({
-  storage,
-  limits: { fileSize: 5 * 1024 * 1024 },
+  storage: multer.memoryStorage(),
+  limits: { fileSize: AVATAR_MAX_BYTES },
   fileFilter: (req, file, cb) => {
     const validation = validateFileUpload(file);
-    if (!validation.valid) {
-      return cb(new Error(validation.reason));
-    }
+    if (!validation.valid) return cb(Object.assign(new Error(validation.reason), { status: 400 }));
     cb(null, true);
   },
 });
+
+// Multer reports problems through next(err); answer them as JSON the app can show.
+function receiveAvatar(req, res, next) {
+  upload.single('avatar')(req, res, (error) => {
+    if (!error) return next();
+    const message = error.code === 'LIMIT_FILE_SIZE' ? 'Şəkil çox böyükdür. Maksimum 10 MB ola bilər.' : error.message;
+    res.status(400).json({ message });
+  });
+}
 
 async function getProfileCounts(userId, viewerId = 0) {
   const result = await db.query(
@@ -69,29 +72,24 @@ router.get('/', auth, async (req, res) => {
   }
 });
 
-router.post('/avatar', auth, upload.single('avatar'), async (req, res) => {
+router.post('/avatar', auth, receiveAvatar, async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ message: 'Şəkil seçilmədi.' });
+  }
   try {
-    if (!req.file) {
-      return res.status(400).json({ message: 'Şəkil yüklənmədi' });
+    const avatar = await processAvatar(req.file.buffer);
+    if (!avatar.valid) {
+      return res.status(400).json({ message: avatar.reason });
     }
+    const filename = `${Date.now()}-${Math.round(Math.random() * 1e9)}.jpg`;
+    await fs.promises.writeFile(path.join(avatarUploadDir, filename), avatar.buffer);
 
-    // Read file buffer from disk for validation
-    const fileBuffer = fs.readFileSync(req.file.path);
-    const avatarValidation = await validateAvatar(fileBuffer);
-    if (!avatarValidation.valid) {
-      fs.unlinkSync(req.file.path);
-      return res.status(400).json({ message: avatarValidation.reason });
-    }
-
-    const avatarUrl = `${req.protocol}://${req.get('host')}/uploads/avatars/${req.file.filename}`;
+    const avatarUrl = `${publicBaseUrl(req)}/uploads/avatars/${filename}`;
     const result = await db.query('UPDATE users SET avatar_url = $1 WHERE id = $2 RETURNING avatar_url', [avatarUrl, req.user.id]);
     res.json({ avatar_url: result.rows[0].avatar_url });
   } catch (error) {
-    if (req.file && req.file.path) {
-      try { fs.unlinkSync(req.file.path); } catch (e) {}
-    }
-    console.error(error);
-    res.status(500).json({ message: error.message || 'Could not upload avatar' });
+    console.error('POST /profile/avatar error:', error);
+    res.status(500).json({ message: 'Profil şəkli yüklənmədi. Bir az sonra yenidən cəhd et.' });
   }
 });
 

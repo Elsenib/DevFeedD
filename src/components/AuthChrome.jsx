@@ -124,6 +124,16 @@ export const authStyles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 22,
   },
+  screen: {
+    flex: 1,
+    backgroundColor: '#06080F',
+  },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 22,
+    paddingVertical: 48,
+  },
   title: {
     color: '#F1F4FA',
     fontSize: 30,

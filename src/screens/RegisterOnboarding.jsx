@@ -2,6 +2,7 @@ import { useContext, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
@@ -229,7 +230,7 @@ export default function RegisterOnboardingScreen() {
   );
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView style={styles.container} behavior="padding">
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.progressRow}>
           {[0, 1, 2, 3].map((item) => (
@@ -268,7 +269,7 @@ export default function RegisterOnboardingScreen() {
           </TouchableOpacity>
         )}
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
