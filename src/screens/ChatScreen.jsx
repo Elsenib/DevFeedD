@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -18,6 +18,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { AuthContext } from '../context/AuthContext';
 import { PreferencesContext } from '../context/PreferencesContext';
 import * as api from '../api';
+import usePolling from '../hooks/usePolling';
 import { avatarTone } from '../utils/avatarTone';
 import { openModerationMenu } from '../utils/moderation';
 import Avatar from '../components/Avatar';
@@ -60,14 +61,18 @@ export default function ChatScreen({ route, navigation }) {
 
   const screenTitle = useMemo(() => conversation?.title || title || 'Söhbət', [conversation?.title, title]);
 
-  const loadConversation = useCallback(async () => {
+  const listRef = useRef(null);
+  const shownCount = useRef(0);
+
+  // `silent` loads come from polling: no alert if a request fails in between.
+  const loadConversation = useCallback(async ({ silent = false } = {}) => {
     if (!conversationId) return;
     try {
       const data = await api.fetchConversation(conversationId);
       setConversation(data);
       setMessages(Array.isArray(data.messages) ? data.messages : []);
     } catch (error) {
-      Alert.alert('Söhbət xətası', error.response?.data?.message || error.message);
+      if (!silent) Alert.alert('Söhbət xətası', error.response?.data?.message || error.message);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -77,6 +82,14 @@ export default function ChatScreen({ route, navigation }) {
   useEffect(() => {
     loadConversation();
   }, [loadConversation]);
+
+  usePolling(() => loadConversation({ silent: true }), 3000, !!conversationId);
+
+  // Follow the conversation down whenever a message arrives or is sent.
+  const scrollOnNewMessage = () => {
+    if (messages.length > shownCount.current) listRef.current?.scrollToEnd({ animated: shownCount.current > 0 });
+    shownCount.current = messages.length;
+  };
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -179,9 +192,11 @@ export default function ChatScreen({ route, navigation }) {
       </View>
 
       <FlatList
+        ref={listRef}
         data={messages}
         keyExtractor={(item) => item.id?.toString() ?? Math.random().toString()}
         renderItem={renderMessage}
+        onContentSizeChange={scrollOnNewMessage}
         contentContainerStyle={styles.messagesContent}
         keyboardShouldPersistTaps="handled"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />}

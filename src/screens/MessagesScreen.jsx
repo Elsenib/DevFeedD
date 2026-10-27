@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { PreferencesContext } from '../context/PreferencesContext';
 import * as api from '../api';
+import usePolling from '../hooks/usePolling';
 import { AuroraGlow, HeaderIconButton, ScreenHeader } from '../components/ScreenChrome';
 import { avatarTone } from '../utils/avatarTone';
 import { timeAgo } from '../utils/time';
@@ -153,7 +154,7 @@ export default function MessagesScreen({ navigation }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [creating, setCreating] = useState(false);
 
-  const loadConversations = useCallback(async () => {
+  const loadConversations = useCallback(async ({ silent = false } = {}) => {
     try {
       const [conversationData, applicationData, roomData] = await Promise.all([
         api.fetchConversations(),
@@ -164,7 +165,7 @@ export default function MessagesScreen({ navigation }) {
       setApplications(Array.isArray(applicationData) ? applicationData : []);
       setRooms(Array.isArray(roomData) ? roomData : []);
     } catch (error) {
-      Alert.alert('Mesaj xətası', error.response?.data?.message || error.message);
+      if (!silent) Alert.alert('Mesaj xətası', error.response?.data?.message || error.message);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -174,6 +175,8 @@ export default function MessagesScreen({ navigation }) {
   useEffect(() => {
     loadConversations();
   }, [loadConversations]);
+
+  usePolling(() => loadConversations({ silent: true }), 8000);
 
   const handleRefresh = () => {
     setRefreshing(true);

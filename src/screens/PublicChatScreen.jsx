@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -20,6 +20,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { AuthContext } from '../context/AuthContext';
 import { PreferencesContext } from '../context/PreferencesContext';
 import * as api from '../api';
+import usePolling from '../hooks/usePolling';
 import { avatarTone } from '../utils/avatarTone';
 import { AuroraGlow, HeaderIconButton, ScreenHeader } from '../components/ScreenChrome';
 import { openModerationMenu } from '../utils/moderation';
@@ -230,18 +231,33 @@ export default function PublicChatScreen({ route, navigation }) {
     }
   }, []);
 
-  const loadMessages = useCallback(async () => {
+  const listRef = useRef(null);
+  const shownCount = useRef(0);
+
+  // `silent` loads come from polling: no spinner and no alert on a failed poll.
+  const loadMessages = useCallback(async ({ silent = false } = {}) => {
     if (!selectedRoomId) return;
-    setLoadingMessages(true);
+    if (!silent) setLoadingMessages(true);
     try {
       const data = await api.fetchChatMessages(selectedRoomId);
       setMessages(Array.isArray(data) ? data : []);
     } catch (error) {
-      Alert.alert('Mesaj alınmadı', error.response?.data?.message || error.message);
+      if (!silent) Alert.alert('Mesaj alınmadı', error.response?.data?.message || error.message);
     } finally {
-      setLoadingMessages(false);
+      if (!silent) setLoadingMessages(false);
     }
   }, [selectedRoomId]);
+
+  usePolling(() => loadMessages({ silent: true }), 3000, !!selectedRoomId);
+
+  useEffect(() => {
+    shownCount.current = 0;
+  }, [selectedRoomId]);
+
+  const scrollOnNewMessage = () => {
+    if (messages.length > shownCount.current) listRef.current?.scrollToEnd({ animated: shownCount.current > 0 });
+    shownCount.current = messages.length;
+  };
 
   useEffect(() => {
     loadRooms();
@@ -429,9 +445,11 @@ export default function PublicChatScreen({ route, navigation }) {
         </View>
       ) : (
         <FlatList
+          ref={listRef}
           data={messages}
           keyExtractor={(item) => item.id?.toString() ?? Math.random().toString()}
           renderItem={renderMessage}
+          onContentSizeChange={scrollOnNewMessage}
           contentContainerStyle={styles.messagesContent}
           keyboardShouldPersistTaps="handled"
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />}
