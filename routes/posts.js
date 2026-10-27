@@ -327,7 +327,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
       [viewerId, id]
     );
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Paylaşım tapılmadı.' });
+      return res.status(404).json({ message: 'Paylaşım tapılmadı.' });
     }
     // Increment views
     await pool.query('UPDATE posts SET views = views + 1 WHERE id = $1', [id]);
@@ -345,21 +345,21 @@ router.post('/', auth, async (req, res) => {
     const user_id = req.user.id;
 
     if (!body) {
-      return res.status(400).json({ error: 'Mətn boşdur.' });
+      return res.status(400).json({ message: 'Mətn boşdur.' });
     }
     
     if (title && (containsIllegalWords(title) || checkBadWords(title))) {
-      return res.status(400).json({ error: 'Paylaşımın başlığı qaydalara uyğun deyil.' });
+      return res.status(400).json({ message: 'Paylaşımın başlığı qaydalara uyğun deyil.' });
     }
     if (caption && (containsIllegalWords(caption) || checkBadWords(caption))) {
-      return res.status(400).json({ error: 'Paylaşımın məzmunu qaydalara uyğun deyil.' });
+      return res.status(400).json({ message: 'Paylaşımın məzmunu qaydalara uyğun deyil.' });
     }
     if (containsIllegalWords(body) || checkBadWords(body)) {
-      return res.status(400).json({ error: 'Paylaşımın mətni qaydalara uyğun deyil.' });
+      return res.status(400).json({ message: 'Paylaşımın mətni qaydalara uyğun deyil.' });
     }
     const linkValidation = validatePostLinks(metadata);
     if (!linkValidation.valid) {
-      return res.status(400).json({ error: linkValidation.message });
+      return res.status(400).json({ message: linkValidation.message });
     }
 
     const result = await pool.query(
@@ -385,17 +385,17 @@ router.put('/:id', auth, async (req, res) => {
     // Check ownership
     const ownership = await pool.query('SELECT user_id FROM posts WHERE id = $1', [id]);
     if (ownership.rows.length === 0) {
-      return res.status(404).json({ error: 'Paylaşım tapılmadı.' });
+      return res.status(404).json({ message: 'Paylaşım tapılmadı.' });
     }
     if (ownership.rows[0].user_id !== user_id) {
-      return res.status(403).json({ error: 'Bunu etməyə icazən yoxdur.' });
+      return res.status(403).json({ message: 'Bunu etməyə icazən yoxdur.' });
     }
     if (containsIllegalWords(title) || containsIllegalWords(caption) || containsIllegalWords(body)) {
-      return res.status(400).json({ error: 'Məzmun qaydalara uyğun deyil.' });
+      return res.status(400).json({ message: 'Məzmun qaydalara uyğun deyil.' });
     }
     const linkValidation = validatePostLinks(metadata);
     if (!linkValidation.valid) {
-      return res.status(400).json({ error: linkValidation.message });
+      return res.status(400).json({ message: linkValidation.message });
     }
 
     const result = await pool.query(
@@ -420,10 +420,10 @@ router.delete('/:id', auth, async (req, res) => {
     // Check ownership
     const ownership = await pool.query('SELECT user_id FROM posts WHERE id = $1', [id]);
     if (ownership.rows.length === 0) {
-      return res.status(404).json({ error: 'Paylaşım tapılmadı.' });
+      return res.status(404).json({ message: 'Paylaşım tapılmadı.' });
     }
     if (ownership.rows[0].user_id !== user_id) {
-      return res.status(403).json({ error: 'Bunu etməyə icazən yoxdur.' });
+      return res.status(403).json({ message: 'Bunu etməyə icazən yoxdur.' });
     }
 
     await pool.query('DELETE FROM posts WHERE id = $1', [id]);
@@ -442,7 +442,7 @@ router.post('/:id/like', auth, async (req, res) => {
 
     const postResult = await pool.query('SELECT user_id FROM posts WHERE id = $1', [id]);
     if (postResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Paylaşım tapılmadı.' });
+      return res.status(404).json({ message: 'Paylaşım tapılmadı.' });
     }
 
     const insert = await pool.query(
@@ -494,7 +494,7 @@ router.post('/:id/bookmark', auth, async (req, res) => {
 
     const postResult = await pool.query('SELECT user_id FROM posts WHERE id = $1', [id]);
     if (postResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Paylaşım tapılmadı.' });
+      return res.status(404).json({ message: 'Paylaşım tapılmadı.' });
     }
 
     const insert = await pool.query(
@@ -554,15 +554,15 @@ router.post('/:id/comments', auth, async (req, res) => {
     let replyToUserId = reply_to_user_id || replyToUserIdBody || null;
 
     if (!text) {
-      return res.status(400).json({ error: 'Mətn boşdur.' });
+      return res.status(400).json({ message: 'Mətn boşdur.' });
     }
     if (containsIllegalWords(text) || checkBadWords(text)) {
-      return res.status(400).json({ error: 'Şərh qaydalara uyğun deyil.' });
+      return res.status(400).json({ message: 'Şərh qaydalara uyğun deyil.' });
     }
 
     const postResult = await pool.query('SELECT user_id FROM posts WHERE id = $1', [id]);
     if (postResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Paylaşım tapılmadı.' });
+      return res.status(404).json({ message: 'Paylaşım tapılmadı.' });
     }
 
     if (parentCommentId) {
@@ -572,7 +572,7 @@ router.post('/:id/comments', auth, async (req, res) => {
       );
       const parentComment = parentResult.rows[0];
       if (!parentComment) {
-        return res.status(404).json({ error: 'Cavab verilən şərh tapılmadı.' });
+        return res.status(404).json({ message: 'Cavab verilən şərh tapılmadı.' });
       }
       replyToUserId = replyToUserId || parentComment.user_id;
     }
@@ -658,15 +658,15 @@ router.post('/:id/apply', auth, async (req, res) => {
 
     const postResult = await pool.query('SELECT id, user_id, title, caption, post_type FROM posts WHERE id = $1', [id]);
     const jobPost = postResult.rows[0];
-    if (!jobPost) return res.status(404).json({ error: 'Paylaşım tapılmadı.' });
-    if (jobPost.post_type !== 'JOB') return res.status(400).json({ error: 'Yalnız iş elanlarına müraciət etmək olar.' });
-    if (String(jobPost.user_id) === String(userId)) return res.status(400).json({ error: 'Öz iş elanına müraciət etmək olmaz.' });
-    if (await isBlockedBetween(userId, jobPost.user_id)) return res.status(403).json({ error: 'Bu elana müraciət etmək mümkün deyil.' });
-    if (!String(applicant_phone || '').trim()) return res.status(400).json({ error: 'Əlaqə nömrəsi lazımdır.' });
-    if (!String(resume_url || '').trim()) return res.status(400).json({ error: 'CV PDF faylı lazımdır.' });
+    if (!jobPost) return res.status(404).json({ message: 'Paylaşım tapılmadı.' });
+    if (jobPost.post_type !== 'JOB') return res.status(400).json({ message: 'Yalnız iş elanlarına müraciət etmək olar.' });
+    if (String(jobPost.user_id) === String(userId)) return res.status(400).json({ message: 'Öz iş elanına müraciət etmək olmaz.' });
+    if (await isBlockedBetween(userId, jobPost.user_id)) return res.status(403).json({ message: 'Bu elana müraciət etmək mümkün deyil.' });
+    if (!String(applicant_phone || '').trim()) return res.status(400).json({ message: 'Əlaqə nömrəsi lazımdır.' });
+    if (!String(resume_url || '').trim()) return res.status(400).json({ message: 'CV PDF faylı lazımdır.' });
     const resumeFile = resumeFileFromUrl(resume_url);
     if (!resumeFile || !fs.existsSync(path.join(resumesDir, resumeFile))) {
-      return res.status(400).json({ error: 'CV faylı tapılmadı. CV-ni yenidən yüklə.' });
+      return res.status(400).json({ message: 'CV faylı tapılmadı. CV-ni yenidən yüklə.' });
     }
 
     if (
@@ -675,7 +675,7 @@ router.post('/:id/apply', auth, async (req, res) => {
       containsIllegalWords(resume_file_name) ||
       containsIllegalWords(applicant_phone)
     ) {
-      return res.status(400).json({ error: 'Müraciət məzmunu uyğun deyil.' });
+      return res.status(400).json({ message: 'Müraciət məzmunu uyğun deyil.' });
     }
 
     const applicationResult = await pool.query(
@@ -746,8 +746,8 @@ router.get('/:id/applications', auth, async (req, res) => {
   try {
     const { id } = req.params;
     const postResult = await pool.query('SELECT user_id FROM posts WHERE id = $1', [id]);
-    if (postResult.rows.length === 0) return res.status(404).json({ error: 'Paylaşım tapılmadı.' });
-    if (postResult.rows[0].user_id !== req.user.id) return res.status(403).json({ error: 'Bu müraciətləri görməyə icazən yoxdur.' });
+    if (postResult.rows.length === 0) return res.status(404).json({ message: 'Paylaşım tapılmadı.' });
+    if (postResult.rows[0].user_id !== req.user.id) return res.status(403).json({ message: 'Bu müraciətləri görməyə icazən yoxdur.' });
 
     const applicationsResult = await pool.query(
       `SELECT ja.id, ja.user_id, ja.status, ja.cover_letter, ja.resume_url, ja.resume_file_name,
